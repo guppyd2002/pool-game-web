@@ -198,9 +198,10 @@ describe('CmVector', () => {
       fc.assert(fc.property(vectorArb, vectorArb, (a, b) => {
         const cab = CmVector.cross(a, b);
         const cba = CmVector.cross(b, a);
-        expect(cab.x).toBe(-cba.x);
-        expect(cab.y).toBe(-cba.y);
-        expect(cab.z).toBe(-cba.z);
+        // Use + 0 to normalize -0 to 0 for Object.is comparison
+        expect(cab.x + cba.x).toBe(0);
+        expect(cab.y + cba.y).toBe(0);
+        expect(cab.z + cba.z).toBe(0);
       }), { numRuns: 1000 });
     });
 
