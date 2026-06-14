@@ -4,9 +4,10 @@
  * All divisions use Math.trunc() to match C# long integer semantics.
  */
 
-import { Fixed, MULTIPLIER, fixAbs, fixClampMin } from './fixed-math';
+import type { Fixed } from './fixed-math';
+import { MULTIPLIER, fixAbs, fixClampMin } from './fixed-math';
 import { CmVector } from './cm-vector';
-import { ICmCollider } from './colliders';
+import type { ICmCollider } from './colliders';
 
 /** Space cube for broad-phase culling */
 export interface CmSpaceCube {

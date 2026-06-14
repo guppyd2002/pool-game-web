@@ -3,7 +3,7 @@
  * Format: fields separated by ":", states separated by "|".
  */
 
-import { Fixed } from './fixed-math';
+import type { Fixed } from './fixed-math';
 import { CmVector } from './cm-vector';
 import { CmSimpleVector } from './cm-vector';
 

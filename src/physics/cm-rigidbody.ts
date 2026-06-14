@@ -5,10 +5,13 @@
  * All divisions use Math.trunc() to match C# long integer semantics.
  */
 
-import { Fixed, MULTIPLIER, fixMul, fixSqrtSave, fixPowSave, fixAbs } from './fixed-math';
+import type { Fixed } from './fixed-math';
+import { MULTIPLIER, fixMul, fixSqrtSave, fixPowSave, fixAbs } from './fixed-math';
 import { CmVector } from './cm-vector';
-import { ICmCollider, CmHitInfo, CmSphereCollider, CmPlaneCollider, CmLineCollider, CollisionResult } from './colliders';
-import { CmCollisionManager, CmSpaceCube } from './cm-collision';
+import type { ICmCollider, CmHitInfo, CollisionResult } from './colliders';
+import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from './colliders';
+import { CmCollisionManager } from './cm-collision';
+import type { CmSpaceCube } from './cm-collision';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +50,7 @@ export class CmKinematicTrigger {
 
 // ─── Re-export CmSpaceCube ───────────────────────────────────────────────────
 
-export { CmSpaceCube } from './cm-collision';
+export type { CmSpaceCube } from './cm-collision';
 
 // ─── State types ─────────────────────────────────────────────────────────────
 

@@ -4,7 +4,8 @@
  * All divisions use Math.trunc() to match C# long integer semantics.
  */
 
-import { Fixed, MULTIPLIER, fixAbs, fixPowSave } from './fixed-math';
+import type { Fixed } from "./fixed-math";
+import { MULTIPLIER, fixAbs, fixPowSave } from './fixed-math';
 import { CmVector } from './cm-vector';
 
 // ─── Data Structures ─────────────────────────────────────────────────────────

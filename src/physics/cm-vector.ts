@@ -5,7 +5,8 @@
  * CRITICAL: All divisions use Math.trunc() to match C# long division.
  */
 
-import { Fixed, MULTIPLIER, fixSqrtSave, fixAbs } from './fixed-math';
+import type { Fixed } from './fixed-math';
+import { MULTIPLIER, fixSqrtSave, fixAbs } from './fixed-math';
 
 // ─── CmSimpleVector ──────────────────────────────────────────────────────────
 

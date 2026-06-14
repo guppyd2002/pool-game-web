@@ -5,11 +5,13 @@
  * All divisions use Math.trunc() to match C# long integer semantics.
  */
 
-import { Fixed, MULTIPLIER, fixDiv, fixClamp, fixPowSave, fixAbs } from './fixed-math';
+import type { Fixed } from './fixed-math';
+import { MULTIPLIER, fixDiv, fixClamp, fixPowSave, fixAbs } from './fixed-math';
 import { CmVector } from './cm-vector';
-import { ICmCollider } from './colliders';
+import type { ICmCollider } from './colliders';
 import { CmRigidbody, CmKinematicTrigger } from './cm-rigidbody';
-import { CmCollisionManager, CmSpaceCube } from './cm-collision';
+import { CmCollisionManager } from './cm-collision';
+import type { CmSpaceCube } from './cm-collision';
 import { CmRigidbodyState, CmSpaceState, CmKinematicState } from './cm-state';
 import { CmSimpleVector } from './cm-vector';
 
