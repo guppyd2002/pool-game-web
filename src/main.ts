@@ -1,3 +1,11 @@
-// Pool Game Web - Phase 0
-// Entry point will be set up in T8 (Three.js scene)
-console.log('Pool Game Web - Phase 0');
+import { createScene } from './renderer/scene';
+
+// Create the 3D scene
+const sceneAPI = createScene(document.getElementById('app')!);
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  sceneAPI.render();
+}
+animate();
