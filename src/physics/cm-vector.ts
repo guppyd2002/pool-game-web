@@ -261,4 +261,44 @@ export class CmVector {
   equals(other: CmVector): boolean {
     return this.x === other.x && this.y === other.y && this.z === other.z;
   }
+
+  // ─── Additional static methods (used by colliders) ──────────────────
+
+  /** Absolute value per component */
+  static abs(v: CmVector): CmVector {
+    return new CmVector(fixAbs(v.x), fixAbs(v.y), fixAbs(v.z));
+  }
+
+  /** Normalize a vector (returns unit vector scaled to MULTIPLIER) */
+  static normalize(val: CmVector): CmVector {
+    const mgn = val.magnitude;
+    if (mgn === 0) return CmVector.zero;
+    return new CmVector(
+      Math.trunc((val.x * MULTIPLIER) / mgn),
+      Math.trunc((val.y * MULTIPLIER) / mgn),
+      Math.trunc((val.z * MULTIPLIER) / mgn),
+    );
+  }
+
+  /** Distance between two vectors */
+  static distance(v1: CmVector, v2: CmVector): Fixed {
+    if (v1.x === v2.x && v1.y === v2.y && v1.z === v2.z) return 0;
+    return CmVector.sub(v1, v2).magnitude;
+  }
+
+  /** Squared distance between two vectors */
+  static sqrDistance(v1: CmVector, v2: CmVector): Fixed {
+    if (v1.x === v2.x && v1.y === v2.y && v1.z === v2.z) return 0;
+    return CmVector.sub(v1, v2).sqrMagnitude;
+  }
+
+  /** Project point onto axis line (pointOnAxis + project(point - pointOnAxis, axis)) */
+  static projectPointOnAxis(point: CmVector, pointOnAxis: CmVector, axis: CmVector): CmVector {
+    return CmVector.add(pointOnAxis, CmVector.project(CmVector.sub(point, pointOnAxis), axis));
+  }
+
+  /** Project point onto plane defined by pointOnPlane and planeNormal */
+  static projectPointOnPlane(point: CmVector, pointOnPlane: CmVector, planeNormal: CmVector): CmVector {
+    return CmVector.sub(point, CmVector.project(CmVector.sub(point, pointOnPlane), planeNormal));
+  }
 }
