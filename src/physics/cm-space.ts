@@ -59,14 +59,20 @@ export class CmSpace {
     this.rigidbodies = [];
     this.colliders = [];
     this.triggers = triggers;
+    for (let i = 0; i < triggers.length; i++) {
+      triggers[i].id = i;
+    }
     this.subspacesScale = 0;
 
     let instanceId = 0;
 
     // Process bodies — determine subspaceScale from largest radius
-    for (const body of bodies) {
+    for (let i = 0; i < bodies.length; i++) {
+      const body = bodies[i];
       const sSize = 8 * body.collider.radius;
       if (this.subspacesScale < sSize) this.subspacesScale = sSize;
+      body.id = i; // C# uses list index as Id
+      body.collider.id = i;
       body.collider.instanceId = instanceId;
       body.collider.enabled = true;
       body.init();
@@ -78,7 +84,9 @@ export class CmSpace {
     this.subspacesScalePow = fixPowSave(this.subspacesScale);
 
     // Process static colliders
-    for (const collider of colliders) {
+    for (let i = 0; i < colliders.length; i++) {
+      const collider = colliders[i];
+      collider.id = i; // C# uses list index as Id
       collider.instanceId = instanceId;
       collider.enabled = true;
       this.colliders.push(collider);
