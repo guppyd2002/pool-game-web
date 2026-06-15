@@ -70,12 +70,17 @@ export function createScene(container: HTMLElement): SceneAPI {
   camera.position.set(0, 2.5, 1.8);
   camera.lookAt(0, 0, 0);
 
-  // OrbitControls
+  // OrbitControls — right-click rotate, middle-click pan (left-click reserved for shooting)
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.mouseButtons = {
+    LEFT: null as unknown as THREE.MOUSE,       // disabled — used by input-handler
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.ROTATE,
+  };
 
   // ─── Lighting ────────────────────────────────────────────────────────
   const ambient = new THREE.AmbientLight(0xffffff, 0.3);

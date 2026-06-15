@@ -42,8 +42,9 @@ wsClient.connect().then(() => {
 
 // ─── Apply shot (shared logic) ───────────────────────────────────────────────
 
-function applyShot(directionX: number, directionZ: number, force: number) {
-  if (sim.isSimulating) return;
+function applyShot(directionX: number, directionZ: number, force: number, isRemote = false) {
+  // Only block local shots during simulation; remote shots always apply (with state reset)
+  if (!isRemote && sim.isSimulating) return;
 
   const impulse = new CmVector(
     Math.trunc((directionX * force) / MULTIPLIER),
@@ -86,6 +87,9 @@ const input = createInputHandler(
 // ─── Receive remote shot ─────────────────────────────────────────────────────
 
 wsClient.onShotReceived((data: ShotPayload) => {
+  // Stop current simulation
+  sim.stop();
+
   // Restore state snapshot (ensures deterministic replay)
   space.setStateFromString(data.ballsState, null);
 
@@ -99,8 +103,9 @@ wsClient.onShotReceived((data: ShotPayload) => {
     );
   }
 
-  // Apply the shot
-  applyShot(data.directionX, data.directionZ, data.force);
+  // Restart sim loop and apply the remote shot
+  sim.start();
+  applyShot(data.directionX, data.directionZ, data.force, true);
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
