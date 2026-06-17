@@ -1,0 +1,474 @@
+[
+  {
+    "id": "GV-01",
+    "description": "Single ball straight roll x-axis, medium impulse (30000), stops via friction",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -5000,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 30000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -5000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": -6979,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 627
+  },
+  {
+    "id": "GV-02",
+    "description": "Single ball into right rail (x=\u002B12699), bounces and stops",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": 9000,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 60000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": 9000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 3999,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 725
+  },
+  {
+    "id": "GV-03",
+    "description": "Head-on collision: cue stops, object ball continues forward",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -4000,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 1,
+          "x": 0,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 30000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -4000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": -10164,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 1,
+        "px": 15825,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 208
+  },
+  {
+    "id": "GV-04",
+    "description": "Half-ball cut: cue at z=0 shoots object ball offset by one radius (z=570)",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -4000,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 1,
+          "x": 0,
+          "y": 9440,
+          "z": 570
+        }
+      ],
+      "impulse": {
+        "x": 30000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -4000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": -15762,
+        "py": 9439,
+        "pz": -1609,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 1,
+        "px": -651,
+        "py": 9439,
+        "pz": 6750,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 4
+      }
+    ],
+    "simSteps": 247
+  },
+  {
+    "id": "GV-05",
+    "description": "High-speed shot (impulse 62000) \u2014 tests sub-step collision prevention",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -6000,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 62000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -6000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 15840,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 13
+  },
+  {
+    "id": "GV-06",
+    "description": "Low-speed shot (8000): slide\u2192roll\u2192stop three-phase friction",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -1000,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 8000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -1000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 592,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 445
+  },
+  {
+    "id": "GV-07",
+    "description": "Top-spin follow: forward impulse 20000 \u002B top-spin torque 20000 in \u002Bz axis",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -5000,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 20000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 20000
+      },
+      "hitPoint": {
+        "x": -5000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": -12158,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 38058
+  },
+  {
+    "id": "GV-08",
+    "description": "Three-ball cluster: cue \u2192 object1 \u2192 object2 chain reaction",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -8000,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 1,
+          "x": 0,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 2,
+          "x": 570,
+          "y": 9440,
+          "z": 285
+        }
+      ],
+      "impulse": {
+        "x": 40000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -8000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 9086,
+        "py": 9417,
+        "pz": -10810,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 1,
+        "px": 0,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 2,
+        "px": -2476,
+        "py": 9400,
+        "pz": -10399,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 36
+  }
+]
