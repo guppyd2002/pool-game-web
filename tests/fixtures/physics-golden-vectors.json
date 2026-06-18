@@ -285,7 +285,7 @@
   },
   {
     "id": "GV-06",
-    "description": "Low-speed shot (8000): slide\u2192roll\u2192stop three-phase friction",
+    "description": "Low-speed shot (8000): slide-\u003Eroll-\u003Estop three-phase friction",
     "input": {
       "ballPositions": [
         {
@@ -333,7 +333,7 @@
   },
   {
     "id": "GV-07",
-    "description": "Top-spin follow: forward impulse 20000 \u002B top-spin torque 20000 in \u002Bz axis",
+    "description": "Back-spin draw: forward impulse 20000 \u002B back-spin torque (0,0,\u002B20000) \u2014 ball reverses direction",
     "input": {
       "ballPositions": [
         {
@@ -381,7 +381,7 @@
   },
   {
     "id": "GV-08",
-    "description": "Three-ball cluster: cue \u2192 object1 \u2192 object2 chain reaction",
+    "description": "Three-ball cluster: cue -\u003E object1 -\u003E object2 chain reaction",
     "input": {
       "ballPositions": [
         {
@@ -470,5 +470,171 @@
       }
     ],
     "simSteps": 36
+  },
+  {
+    "id": "GV-09",
+    "description": "Top-spin follow: forward impulse 20000 \u002B top-spin torque (0,0,-20000) \u2014 ball rolls farther forward",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -5000,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 20000,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": -20000
+      },
+      "hitPoint": {
+        "x": -5000,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": -15446,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 67
+  },
+  {
+    "id": "GV-10",
+    "description": "Cue ball scratch: ball aimed directly into side pocket (pocket 4, z=\u002B7100)",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": 0,
+          "y": 9440,
+          "z": 0
+        }
+      ],
+      "impulse": {
+        "x": 0,
+        "y": 0,
+        "z": 30000
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": 0,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 0,
+        "py": 9439,
+        "pz": 7040,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 4
+      }
+    ],
+    "simSteps": 9
+  },
+  {
+    "id": "GV-11",
+    "description": "Target ball into corner pocket 0 (\u002Bx,\u002Bz): b0 hits b1 at 53deg (3:4 slope), b1 pockets",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": 10775,
+          "y": 9440,
+          "z": 3710
+        },
+        {
+          "id": 1,
+          "x": 11975,
+          "y": 9440,
+          "z": 5310
+        }
+      ],
+      "impulse": {
+        "x": 18000,
+        "y": 0,
+        "z": 24000
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": 10775,
+        "y": 9440,
+        "z": 3710
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 12498,
+        "py": 9439,
+        "pz": 5898,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 0
+      },
+      {
+        "id": 1,
+        "px": 12498,
+        "py": 9439,
+        "pz": 6010,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 0
+      }
+    ],
+    "simSteps": 30
   }
 ]

@@ -92,8 +92,9 @@ export function fixSqrtSave(val: Fixed): Fixed {
 }
 
 /**
- * Integer square root using binary search.
- * Matches C# CmSimpleMath.Sqrt exactly.
+ * Integer square root — mirrors C# CmSimpleMath.Sqrt (binary search + Near rounding).
+ * C# Near: returns whichever of (x1², x2²) is closer to val, tie-breaking toward lower.
+ * This matches fixNear exactly.
  */
 export function fixSqrt(val: Fixed): Fixed {
   if (val < 1) return 0;

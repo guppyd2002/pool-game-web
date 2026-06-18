@@ -218,6 +218,7 @@ for (const gv of GOLDEN_VECTORS) {
         expect(body.velocity.x).toBe(expected.vx);
         expect(body.velocity.y).toBe(expected.vy);
         expect(body.velocity.z).toBe(expected.vz);
+        // ax/ay/az intentionally not asserted: angular velocity is always 0 at rest (deactivated state)
         expect(body.isActive).toBe(expected.isActive);
         expect(body.isKinematic).toBe(expected.isKinematic);
         expect(body.isOutOfCube).toBe(expected.isOutOfCube);

@@ -1,0 +1,15 @@
+/home/guppyd/pool-game-web/tools/golden-vector-runner/bin/Release/net8.0/GoldenVectorRunner
+/home/guppyd/pool-game-web/tools/golden-vector-runner/bin/Release/net8.0/GoldenVectorRunner.deps.json
+/home/guppyd/pool-game-web/tools/golden-vector-runner/bin/Release/net8.0/GoldenVectorRunner.runtimeconfig.json
+/home/guppyd/pool-game-web/tools/golden-vector-runner/bin/Release/net8.0/GoldenVectorRunner.dll
+/home/guppyd/pool-game-web/tools/golden-vector-runner/bin/Release/net8.0/GoldenVectorRunner.pdb
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.GeneratedMSBuildEditorConfig.editorconfig
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.AssemblyInfoInputs.cache
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.AssemblyInfo.cs
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.csproj.CoreCompileInputs.cache
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.sourcelink.json
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.dll
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/refint/GoldenVectorRunner.dll
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.pdb
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.genruntimeconfig.cache
+/home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/ref/GoldenVectorRunner.dll
