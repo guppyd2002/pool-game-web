@@ -434,20 +434,19 @@ export class CmRigidbody {
     this.angularVelocity = CmVector.add(this.angularVelocity, angularImpulse);
   }
 
-  /** ClampMin helper (matches C# ClampMin) */
+  /** ClampMin helper (matches C# ClampMin / ClampMagnitude) */
   private _clampMin(vector: CmVector, min: Fixed, normal: CmVector): CmVector {
     const project = CmVector.project(vector, normal);
     const delta = CmVector.sub(vector, project);
-    // ClampMagnitude(project, (15*min)/10, maxValue)
     const minLen = Math.trunc((15 * min) / 10);
     const projMag = project.magnitude;
     if (projMag === 0) return vector;
-    if (projMag < fixAbs(minLen)) {
-      // Scale to minLen
-      const clamped = CmVector.multiply(project.normalized, fixAbs(minLen));
-      return CmVector.add(clamped, delta);
-    }
-    return vector;
+    // C# ClampMagnitude unconditionally applies (clamp(mgn) * normalized) / M — even when no
+    // clamping is needed. The normalize+scale cycle introduces fixed-point rounding that TS
+    // must replicate exactly (e.g. 305527 → magnitude 305500 → rescaled -305500, not -305527).
+    const clampedMag = projMag < fixAbs(minLen) ? fixAbs(minLen) : projMag;
+    const clamped = CmVector.multiply(project.normalized, clampedMag);
+    return CmVector.add(clamped, delta);
   }
 
   /** Plane collision response (matches C# CalculatePlaneColliderHit) */
