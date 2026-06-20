@@ -18,6 +18,8 @@ export interface PowerSliderUI {
   update(force: number): void;
   /** Called by CueController.resetForNewTurn(). */
   reset(): void;
+  /** CUE-021: outer overlay element for opacity fade. */
+  readonly element: HTMLElement;
   dispose(): void;
 }
 
@@ -116,6 +118,8 @@ export function createPowerSliderUI(
   // ─── Public interface ────────────────────────────────────────────────────────
 
   return {
+    get element() { return overlay; },
+
     update(force: number): void {
       syncVisual(Math.max(0, Math.min(1, force)));
     },

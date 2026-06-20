@@ -32,6 +32,7 @@ import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
 import { createSpinDiscUI } from './renderer/spin-disc-ui';
 import { createPowerSliderUI } from './renderer/power-slider-ui';
+import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import * as THREE from 'three';
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
@@ -139,6 +140,14 @@ const spinDisc = createSpinDisc({
 });
 const spinDiscUI = createSpinDiscUI(container, spinDisc);
 
+// CUE-021: UI edge fade — fades all overlays when table pockets are above them in screen.
+// Must be after all UI elements are created so their .element refs are valid.
+const uiEdgeFade = createUIEdgeFade(scene.camera, [
+  powerBar.element,
+  powerSliderUI.element,
+  spinDiscUI.element,
+]);
+
 // ─── Ball-in-hand pointer handling (CUE-013) ─────────────────────────────────
 // Active only while ballInHand.isActive. Trigger (enter) is wired by P1-T03 rules.
 
@@ -189,6 +198,7 @@ window.addEventListener('beforeunload', () => {
   ghostBall.dispose();
   powerSliderUI.dispose();
   spinDiscUI.dispose();
+  uiEdgeFade.dispose();
   powerBar.dispose();
   cueMesh.dispose();
   placementMarker.dispose();

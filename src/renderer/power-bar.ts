@@ -9,6 +9,8 @@
 export interface PowerBarVisual {
   /** Update bar to fraction [0, 1]. 0 hides the bar. */
   update(fraction: number): void;
+  /** CUE-021: outer container element for opacity fade. */
+  readonly element: HTMLElement;
   dispose(): void;
 }
 
@@ -28,6 +30,8 @@ export function createPowerBar(container: HTMLElement): PowerBarVisual {
   container.appendChild(outer);
 
   return {
+    get element() { return outer; },
+
     update(fraction: number): void {
       const pct = Math.round(Math.max(0, Math.min(fraction, 1)) * 100);
       inner.style.width = `${pct}%`;

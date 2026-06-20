@@ -29,6 +29,8 @@ export interface SpinDiscUI {
   close(): void;
   /** Called by CueController.resetForNewTurn(). */
   reset(): void;
+  /** CUE-021: outer overlay element for opacity fade. */
+  readonly element: HTMLElement;
   dispose(): void;
 }
 
@@ -147,6 +149,8 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
   // ─── Public interface ───────────────────────────────────────────────────────
 
   return {
+    get element() { return overlay; },
+
     close(): void {
       disc.close();
       hidePanel();

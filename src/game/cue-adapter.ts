@@ -57,6 +57,9 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   const raycaster = new THREE.Raycaster();
   let enabled = true;
   let dragging = false;
+  // CUE-023: zoom-suspend flag — set during 2-finger pinch, cleared when fingers lift.
+  // Independent of `enabled` (CUE-019 mutex). Cue input blocked when either is false.
+  let _zoomActive = false;
 
   function toNDC(clientX: number, clientY: number): THREE.Vector2 {
     const rect = element.getBoundingClientRect();
@@ -74,7 +77,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   // ─── Pointer events (mouse + single-touch via PointerEvents API) ─────────────
 
   function onPointerDown(e: PointerEvent): void {
-    if (!enabled) return;
+    if (!enabled || _zoomActive) return;  // CUE-023: block drag during pinch
     const ndc = toNDC(e.clientX, e.clientY);
     raycaster.setFromCamera(ndc, camera);
     // Only begin drag when the pointer hits the cue ball mesh
@@ -89,7 +92,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   }
 
   function onPointerMove(e: PointerEvent): void {
-    if (!dragging || !enabled) return;
+    if (!dragging || !enabled || _zoomActive) return;
     sm.feedPointerMove(e.clientX, e.clientY);
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) {
@@ -134,6 +137,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
       dragging = false;
       controller.cancel();
       opts.onAimUpdate?.();  // clear aim visuals on two-finger interrupt
+      _zoomActive = true;    // CUE-023: suspend cue input during zoom
       sm.feedTouchStart(pts);
       e.preventDefault();
     }
@@ -152,7 +156,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
 
   function onTouchEnd(e: TouchEvent): void {
     const pts = touchPoints(e);
-    if (sm.isTwoTouch) sm.feedTouchEnd(pts);
+    if (sm.isTwoTouch) {
+      sm.feedTouchEnd(pts);
+      _zoomActive = false;  // CUE-023: resume cue input when pinch ends
+    }
   }
 
   // ─── Mouse wheel zoom (desktop, P1-T12) ──────────────────────────────────────
