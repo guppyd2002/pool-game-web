@@ -76,6 +76,9 @@ export function createSimulationLoop(space: CmSpace, scene: SceneAPI) {
   }
 
   return {
+    /** Single physics frame advance — exposed for determinism testing (G2). */
+    step,
+
     /** Start the render/physics loop */
     start() {
       if (running) return;
