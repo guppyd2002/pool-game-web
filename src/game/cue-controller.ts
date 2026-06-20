@@ -100,6 +100,27 @@ export interface CueController {
    * Updated each onDragMove; 0 when idle or no aim direction.
    */
   getVerticalAngle(): number;
+
+  /**
+   * CUE-019: Whether this cue is the active player's cue.
+   * Defaults to true so existing tests need no change.
+   * Set false during simulation / opponent's turn.
+   */
+  readonly isEnabled: boolean;
+
+  /** CUE-019: Enable cue input (called by P1-T03 rules on turn start). */
+  enable(): void;
+
+  /** CUE-019: Disable cue input + cancel any drag. Maps to C# TriggerThis(false). */
+  disable(): void;
+
+  /**
+   * CUE-020: Reset cue parameters for the next turn, then enable.
+   * Matches C# CueManager.ResetState() + ResetParameters():
+   *   zeros backswing / verticalAngle / spinOffset / drag state, enables cue.
+   * Called by P1-T03 rules after simulation ends. Never called internally.
+   */
+  resetForNewTurn(): void;
 }
 
 export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): CueController {
@@ -110,6 +131,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
   let _spinY = 0;  // CUE-005 top/back spin ∈ [-1, 1]
   let _userVertAngle = 0;   // CUE-004: user-set elevation (degrees)
   let _effectiveVertAngle = 0;  // CUE-015: max(user, auto-lift)
+  let _isEnabled = true;    // CUE-019: true = active player's turn (default for compat)
 
   function planeDistXZ(a: TablePoint, b: TablePoint): number {
     const dx = a.x - b.x;
@@ -144,6 +166,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
     get phase() { return _phase; },
 
     onDragStart(point: TablePoint): void {
+      if (!_isEnabled) return;  // CUE-019: no input while disabled
       _phase = 'aiming';
       _startPoint = point;
       _currentPoint = point;
@@ -260,6 +283,33 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
 
     getVerticalAngle(): number {
       return _effectiveVertAngle;
+    },
+
+    get isEnabled() { return _isEnabled; },
+
+    enable(): void {
+      _isEnabled = true;
+    },
+
+    disable(): void {
+      _isEnabled = false;
+      // Cancel any in-progress drag (matches C# TriggerManagers(false))
+      _phase = 'idle';
+      _startPoint = null;
+      _currentPoint = null;
+    },
+
+    resetForNewTurn(): void {
+      // Matches C# ResetParameters() + enable
+      _userVertAngle = 0;
+      _effectiveVertAngle = 0;
+      _spinX = 0;
+      _spinY = 0;
+      // Cancel any drag (matches C# shotManager.ResetShot() + cueBackswingZ = 0)
+      _phase = 'idle';
+      _startPoint = null;
+      _currentPoint = null;
+      _isEnabled = true;
     },
   };
 }

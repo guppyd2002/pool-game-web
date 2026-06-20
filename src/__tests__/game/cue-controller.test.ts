@@ -716,3 +716,125 @@ describe('CUE-015: auto-lift (getVerticalAngle() during aiming)', () => {
     expect(ctrl.getVerticalAngle()).toBe(duringAim);
   });
 });
+
+// ─── CUE-019: enable / disable (activation state) ────────────────────────────
+// Maps to C# CueBaseManager.TriggerThis / TriggerOthers (enabled flag).
+// Default = enabled so existing drag tests remain valid without explicit enable().
+
+describe('CUE-019: isEnabled / enable / disable', () => {
+  it('isEnabled starts true (default enabled for backward compat)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    expect(ctrl.isEnabled).toBe(true);
+  });
+
+  it('disable() sets isEnabled = false', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.disable();
+    expect(ctrl.isEnabled).toBe(false);
+  });
+
+  it('enable() sets isEnabled = true', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.disable();
+    ctrl.enable();
+    expect(ctrl.isEnabled).toBe(true);
+  });
+
+  it('onDragStart while disabled: phase stays idle', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.disable();
+    ctrl.onDragStart({ x: 0, z: 0 });
+    expect(ctrl.phase).toBe('idle');
+  });
+
+  it('onDragEnd while disabled: returns false, no applyShot', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.disable();
+    // Even with start + move before disable, end should be blocked
+    const fired = ctrl.onDragEnd({ x: -1.5, z: 0 });
+    expect(fired).toBe(false);
+    expect(physics.shotLog).toHaveLength(0);
+  });
+
+  it('onDragMove while disabled: phase stays idle', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.disable();
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    expect(ctrl.phase).toBe('idle');
+  });
+
+  it('disable() cancels any in-progress drag (phase → idle)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.onDragStart({ x: 0, z: 0 });
+    expect(ctrl.phase).toBe('aiming');
+    ctrl.disable();
+    expect(ctrl.phase).toBe('idle');
+    expect(ctrl.isEnabled).toBe(false);
+  });
+
+  it('enable() → onDragStart works again', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.disable();
+    ctrl.enable();
+    ctrl.onDragStart({ x: 0, z: 0 });
+    expect(ctrl.phase).toBe('aiming');
+    const fired = ctrl.onDragEnd({ x: -1.5, z: 0 });
+    expect(fired).toBe(true);
+    expect(physics.shotLog).toHaveLength(1);
+  });
+});
+
+// ─── CUE-020: resetForNewTurn ─────────────────────────────────────────────────
+// Maps to C# CueManager.ResetState() + ResetParameters().
+// Called by P1-T03 rules after simulation ends; P1-T02 does not wire the trigger.
+
+describe('CUE-020: resetForNewTurn', () => {
+  it('resetForNewTurn() enables the cue (isEnabled = true)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.disable();
+    ctrl.resetForNewTurn();
+    expect(ctrl.isEnabled).toBe(true);
+  });
+
+  it('resetForNewTurn() resets verticalAngle to 0', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(45);
+    ctrl.resetForNewTurn();
+    expect(ctrl.getVerticalAngle()).toBe(0);
+  });
+
+  it('resetForNewTurn() resets spinOffset to (0, 0)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setSpinOffset(0.8, -0.5);
+    ctrl.resetForNewTurn();
+    expect(ctrl.getSpinOffset()).toEqual({ x: 0, y: 0 });
+  });
+
+  it('resetForNewTurn() cancels any in-progress drag (phase → idle)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.resetForNewTurn();
+    expect(ctrl.phase).toBe('idle');
+  });
+
+  it('after resetForNewTurn(), shot can be fired normally', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.disable();
+    ctrl.resetForNewTurn();
+    ctrl.onDragStart({ x: 0, z: 0 });
+    const fired = ctrl.onDragEnd({ x: -1.5, z: 0 });
+    expect(fired).toBe(true);
+    expect(physics.shotLog).toHaveLength(1);
+  });
+
+  it('resetForNewTurn() resets getPowerFraction() to 0', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    ctrl.resetForNewTurn();
+    expect(ctrl.getPowerFraction()).toBe(0);
+  });
+});
