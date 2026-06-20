@@ -456,6 +456,18 @@ describe('G6 placeBall: sets Fixed position and clears kinematic/OOT state', () 
     expect(physics.getBall(0).velocity.z).toBe(0);
   });
 
+  it('placeBall() zeros angularVelocity', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    b0.angularVelocity = new CmVector(300, 100, 200);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.placeBall(0, new CmVector(0, BALL_Y, 0));
+    expect(physics.getBall(0).angularVelocity.x).toBe(0);
+    expect(physics.getBall(0).angularVelocity.y).toBe(0);
+    expect(physics.getBall(0).angularVelocity.z).toBe(0);
+  });
+
   it('placeBall() updates renderer (mockScene.updateBallPosition called)', () => {
     const calls: number[] = [];
     const trackedScene = {

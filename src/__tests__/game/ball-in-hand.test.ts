@@ -163,6 +163,9 @@ describe('isPositionFree: overlap check', () => {
     const pos = new CmVector(0, BALL_Y, 0);
     const balls = [makeBallState(1, MIN_OVERLAP_DIST, 0)];
     // dist² = MIN_OVERLAP_DIST² → not < MIN_OVERLAP_DIST² → free
+    // KNOWN DIVERGENCE (accepted): C# CueBallMoveManager.cs:116 uses float `< 1.25f * Diameter`
+    // (threshold = 712.5 Fixed). TS integer check is free-at-712; C# would block-at-712.
+    // Delta = 0.5 Fixed (0.05 mm). UI placement gate, non-deterministic, measure-zero. Accepted.
     expect(isPositionFree(pos, balls, 0, FULL_QUAD)).toBe(true);
   });
 
