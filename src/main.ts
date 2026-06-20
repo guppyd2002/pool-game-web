@@ -28,6 +28,8 @@ import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
 import { MULTIPLIER } from './physics/fixed-math';
 import { backswingOffset } from './game/shot-animation';
+import { createSpinDisc } from './game/spin-disc';
+import { createSpinDiscUI } from './renderer/spin-disc-ui';
 import * as THREE from 'three';
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
@@ -117,6 +119,15 @@ const adapter = createCueAdapter({
     scene.camera.position.clampLength(1.0, 5.0);
   },
 });
+
+// CUE-006/CUE-008: spin disc (after adapter so closures can reference it)
+const spinDisc = createSpinDisc({
+  onOpen:  () => { adapter.disable(); },  // CUE-019 mutex: disc open → no aim drag
+  onClose: () => { adapter.enable(); },
+  onSpinChange: (x, y) => cue.setSpinOffset(x, y),
+});
+const spinDiscUI = createSpinDiscUI(container, spinDisc);
+
 // ─── Ball-in-hand pointer handling (CUE-013) ─────────────────────────────────
 // Active only while ballInHand.isActive. Trigger (enter) is wired by P1-T03 rules.
 
@@ -165,6 +176,7 @@ window.addEventListener('beforeunload', () => {
   adapter.dispose();
   aimLine.dispose();
   ghostBall.dispose();
+  spinDiscUI.dispose();
   powerBar.dispose();
   cueMesh.dispose();
   placementMarker.dispose();
