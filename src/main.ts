@@ -26,6 +26,7 @@ import { createWSClient } from './network/ws-client';
 import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
 import { MULTIPLIER } from './physics/fixed-math';
+import { backswingOffset } from './game/shot-animation';
 import * as THREE from 'three';
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
@@ -49,6 +50,9 @@ const _bihRaycaster = new THREE.Raycaster();
 let _bihStartT = 0;
 
 let _lastAimTime = 0;
+// CUE-011: saved for punch animation after drag state is cleared
+let _punchSavedAimDir: CmVector | null = null;
+let _punchSavedCueBallPos: CmVector | null = null;
 
 const adapter = createCueAdapter({
   camera: scene.camera,
@@ -74,7 +78,34 @@ const adapter = createCueAdapter({
           hit.point.z - cueBall.position.z,
         )
       : null;
-    cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle());
+
+    // CUE-011: save for punch animation loop (drag state will be cleared by onDragEnd)
+    if (aimDir) {
+      _punchSavedAimDir = aimDir;
+      _punchSavedCueBallPos = cueBall.position;
+    }
+
+    cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), cue.getPowerFraction());
+  },
+  // CUE-011: on shot fire, animate cue punch then hide
+  onShotFired: (power) => {
+    if (!_punchSavedAimDir || !_punchSavedCueBallPos) return;
+    // Assign after null-check so TypeScript infers CmVector (not CmVector|null)
+    const savedDir = _punchSavedAimDir;
+    const savedPos = _punchSavedCueBallPos;
+
+    let punchDone = false;
+    let lastTs = 0;
+    cueMesh.startPunchAnimation(backswingOffset(power), () => { punchDone = true; });
+
+    function punchFrame(ts: number): void {
+      if (punchDone) return;
+      const dt = lastTs === 0 ? 0.016 : Math.min((ts - lastTs) / 1000, 0.1);
+      lastTs = ts;
+      cueMesh.update(savedPos, savedDir, dt, 0, 0);
+      if (!punchDone) requestAnimationFrame(punchFrame);
+    }
+    requestAnimationFrame(punchFrame);
   },
   onZoom: (delta) => {
     const dir = scene.camera.position.clone().normalize();

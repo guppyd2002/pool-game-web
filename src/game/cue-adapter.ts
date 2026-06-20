@@ -43,6 +43,8 @@ export interface CueAdapterOptions {
   onAimUpdate?: () => void;
   /** Called on pinch or wheel zoom (delta > 0 = zoom in). */
   onZoom?: (delta: number) => void;
+  /** CUE-011: Called when a shot fires, with the power fraction [0,1] at release. */
+  onShotFired?: (powerFraction: number) => void;
 }
 
 export function createCueAdapter(opts: CueAdapterOptions): {
@@ -104,7 +106,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) {
-      controller.onDragEnd(pt);
+      // CUE-011: capture power before onDragEnd clears drag state
+      const powerAtRelease = controller.getPowerFraction();
+      const shotFired = controller.onDragEnd(pt);
+      if (shotFired) opts.onShotFired?.(powerAtRelease);
     } else {
       controller.cancel();  // pointer went off-table: cancel drag, clears aim line
     }

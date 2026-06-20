@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import type { CmVector } from '../physics/cm-vector';
 import { MULTIPLIER } from '../physics/fixed-math';
+import { backswingOffset, shotPunchOffset, SHOT_ANIM_DURATION } from '../game/shot-animation';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,8 +51,15 @@ export interface CueMeshController {
    * @param vertAngle CUE-004: elevation angle in degrees (0 = horizontal, 70 = nearly vertical).
    *                  Mesh rotates with 'YXZ' Euler order so Y-aim is applied first,
    *                  then X-pitch elevates the butt relative to the tip.
+   * @param powerFraction CUE-011: current power [0,1] for backswing visual offset.
    */
-  update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number, vertAngle?: number): void;
+  update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number, vertAngle?: number, powerFraction?: number): void;
+  /**
+   * CUE-011: Begin the shot punch animation.
+   * The cue stick lerps from startOffset (meters behind pivot) to 0 over SHOT_ANIM_DURATION.
+   * onComplete is called when the animation ends; caller is responsible for hiding the cue.
+   */
+  startPunchAnimation(startOffset: number, onComplete?: () => void): void;
   dispose(): void;
 }
 
@@ -72,30 +80,47 @@ export function createCueMesh(scene: THREE.Scene): CueMeshController {
   group.visible = false;
 
   let _currentYAngle = 0;
-  let _currentXAngle = 0;  // CUE-004: elevation pitch (radians)
+  let _currentXAngle = 0;   // CUE-004: elevation pitch (radians)
+  let _punchElapsed = -1;   // CUE-011: -1 = not animating; ≥0 = elapsed seconds into punch
+  let _punchStartOffset = 0;
+  let _punchCallback: (() => void) | null = null;
+  let _savedAimDir: CmVector | null = null;      // CUE-011: held for punch frames after drag ends
+  let _savedCueBallPos: CmVector | null = null;
 
   return {
-    update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number, vertAngle = 0): void {
-      if (!aimDir) {
-        group.visible = false;
+    update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number, vertAngle = 0, powerFraction = 0): void {
+      const isPunching = _punchElapsed >= 0;
+
+      // During punch animation, use saved direction if caller has no current aim
+      const effectiveAimDir = aimDir ?? (isPunching ? _savedAimDir : null);
+      const effectiveCueBallPos = (isPunching && !aimDir && _savedCueBallPos) ? _savedCueBallPos : cueBallPos;
+
+      if (!effectiveAimDir) {
+        if (!isPunching) group.visible = false;
         return;
       }
 
+      // Persist direction for punch frames that arrive after onDragEnd clears aim
+      if (aimDir) {
+        _savedAimDir = aimDir;
+        _savedCueBallPos = cueBallPos;
+      }
+
       // Convert aim direction from Fixed to float and normalize
-      const dxF = aimDir.x / MULTIPLIER;
-      const dzF = aimDir.z / MULTIPLIER;
+      const dxF = effectiveAimDir.x / MULTIPLIER;
+      const dzF = effectiveAimDir.z / MULTIPLIER;
       const mag = Math.sqrt(dxF * dxF + dzF * dzF);
       if (mag < 1e-9) {
-        group.visible = false;
+        if (!isPunching) group.visible = false;
         return;
       }
 
       group.visible = true;
 
       // Lerp position toward cue ball center
-      const targetX = cueBallPos.x / MULTIPLIER;
-      const targetY = cueBallPos.y / MULTIPLIER;
-      const targetZ = cueBallPos.z / MULTIPLIER;
+      const targetX = effectiveCueBallPos.x / MULTIPLIER;
+      const targetY = effectiveCueBallPos.y / MULTIPLIER;
+      const targetZ = effectiveCueBallPos.z / MULTIPLIER;
       const t = Math.min(CUE_LERP_SPEED * dt, 1);
       group.position.set(
         group.position.x + (targetX - group.position.x) * t,
@@ -115,6 +140,31 @@ export function createCueMesh(scene: THREE.Scene): CueMeshController {
 
       group.rotation.order = 'YXZ';
       group.rotation.set(_currentXAngle, _currentYAngle, 0, 'YXZ');
+
+      // CUE-011: Z offset — backswing during aiming, or shrinking punch offset during animation
+      let zOffset: number;
+      if (isPunching) {
+        _punchElapsed += dt;
+        if (_punchElapsed >= SHOT_ANIM_DURATION) {
+          // Punch complete — hide cue and fire callback
+          _punchElapsed = -1;
+          group.visible = false;
+          const cb = _punchCallback;
+          _punchCallback = null;
+          cb?.();
+          return;
+        }
+        zOffset = shotPunchOffset(_punchElapsed, SHOT_ANIM_DURATION, _punchStartOffset);
+      } else {
+        zOffset = backswingOffset(powerFraction);
+      }
+      stick.position.z = -(CUE_LENGTH / 2 + CUE_OFFSET + zOffset);
+    },
+
+    startPunchAnimation(startOffset: number, onComplete?: () => void): void {
+      _punchElapsed = 0;
+      _punchStartOffset = startOffset;
+      _punchCallback = onComplete ?? null;
     },
 
     dispose(): void {
