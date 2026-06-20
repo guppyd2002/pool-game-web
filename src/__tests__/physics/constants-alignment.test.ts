@@ -9,6 +9,7 @@
  * RED before G9: table-setup used BALL_MASS=10000 (MULTIPLIER). GREEN after: 1700.
  */
 import { describe, it, expect } from 'vitest';
+import { CmVector } from '../../physics/cm-vector';
 import {
   BALL_MASS, BALL_RADIUS, TABLE_Y, BALL_Y,
   BALL_MATERIAL, CLOTH_MATERIAL, RAIL_MATERIAL,
@@ -240,4 +241,14 @@ describe('G9: table-setup collider materials — plane CLOTH + rails RAIL (5/5 e
       expect(rail.material.staticFriction).toBe(RAIL_MATERIAL.staticFriction);
     }
   });
+});
+
+// ─── Gravity ──────────────────────────────────────────────────────────────────
+
+describe('G9: CmVector.gravity — pinned vs C# (0, -98100, 0)', () => {
+  // CmRigidbody.cs: gravity = new CmVector(0, -9.81f * defoultMultiplier, 0) = (0, -98100, 0)
+  // Used every physics step in friction/rest calculations — drift breaks determinism.
+  it('CmVector.gravity.x === 0', () => { expect(CmVector.gravity.x).toBe(0); });
+  it('CmVector.gravity.y === -98100 (−9.81 m/s² × 10000)', () => { expect(CmVector.gravity.y).toBe(-98100); });
+  it('CmVector.gravity.z === 0', () => { expect(CmVector.gravity.z).toBe(0); });
 });
