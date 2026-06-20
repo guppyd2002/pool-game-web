@@ -16,6 +16,13 @@ import { CmSphereCollider, CmPlaneCollider } from '../../physics/colliders';
 import { CmRigidbody, CmForceMode } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
 import type { CmSpaceCube } from '../../physics/cm-collision';
+import {
+  BALL_MASS, BALL_RADIUS, TABLE_Y,
+  PLANE_SCALE_X, PLANE_RADIUS,
+  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
+  BALL_MATERIAL as BALL_MAT,
+  CLOTH_MATERIAL as CLOTH_MAT,
+} from '../../physics/constants';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,15 +61,6 @@ function expectKSEqual(a: CmKinematicState, b: CmKinematicState): void {
   expect(a.isOutOfCube).toBe(b.isOutOfCube);
 }
 
-const BALL_MAT = {
-  bounciness: 9499, rollingFriction: 49, twistingFriction: 200000,
-  dynamicFriction: 500, staticFriction: 599,
-};
-const CLOTH_MAT = {
-  bounciness: 500, rollingFriction: 99, twistingFriction: 200000,
-  dynamicFriction: 8000, staticFriction: 8999,
-};
-
 function makeBall(id: number, x: number, y: number, z: number): CmRigidbody {
   const col = new CmSphereCollider();
   col.id = id;
@@ -70,23 +68,23 @@ function makeBall(id: number, x: number, y: number, z: number): CmRigidbody {
   col.right = new CmVector(MULTIPLIER, 0, 0);
   col.up = new CmVector(0, MULTIPLIER, 0);
   col.forward = new CmVector(0, 0, MULTIPLIER);
-  col.scale = new CmVector(285, 285, 285);
-  col.radius = 285;
+  col.scale = new CmVector(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
+  col.radius = BALL_RADIUS;
   col.material = { ...BALL_MAT };
   const b = new CmRigidbody();
-  b.id = id; b.mass = 1700; b.collider = col;
+  b.id = id; b.mass = BALL_MASS; b.collider = col;
   return b;
 }
 
 function makePlane(): CmPlaneCollider {
   const p = new CmPlaneCollider();
   p.id = 0;
-  p.position = new CmVector(0, 9154, 0);
+  p.position = new CmVector(0, TABLE_Y, 0);
   p.right = new CmVector(MULTIPLIER, 0, 0);
   p.up = new CmVector(0, MULTIPLIER, 0);
   p.forward = new CmVector(0, 0, MULTIPLIER);
-  p.scale = new CmVector(25399, 5000, 12699);
-  p.radius = 12699;
+  p.scale = new CmVector(PLANE_SCALE_X, 5000, PLANE_RADIUS);
+  p.radius = PLANE_RADIUS;
   p.material = { ...CLOTH_MAT };
   return p;
 }
@@ -95,7 +93,7 @@ function makeSpace(bodies: CmRigidbody[]): CmSpace {
   const space = new CmSpace();
   const cube: CmSpaceCube = {
     position: CmVector.zero,
-    scale: new CmVector(30000, 20000, 20000),
+    scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
   };
   space.init(cube, bodies, [makePlane()], []);
   return space;

@@ -11,10 +11,14 @@ import { CmRigidbody, CmForceMode, CmKinematicTrigger } from '../../physics/cm-r
 import { CmSpace } from '../../physics/cm-space';
 import { CmSpaceCube } from '../../physics/cm-collision';
 
-// ─── Constants (real pool ball geometry) ──────────────────────────────────────
+// ─── Abstract physics constants (intentionally different from constants.ts) ────
+// These are engine-level regression values, NOT production pool ball geometry.
+// BALL_RADIUS=2850 (0.285 m if scale=0.001 m/unit) and BALL_MASS=10000 (1.0 kg)
+// are chosen to make the physics observable at this scale.  Do NOT replace with
+// constants.ts values — that would change test semantics.
 
-const BALL_RADIUS = 2850; // 0.285 in fixed-point
-const BALL_MASS = MULTIPLIER; // 1.0
+const BALL_RADIUS = 2850; // abstract physics test scale (see comment above)
+const BALL_MASS = MULTIPLIER; // 1.0 in abstract scale
 
 // Realistic pool ball material
 const ballMaterial = {

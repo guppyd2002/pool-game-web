@@ -18,8 +18,11 @@ const long BALL_Y      = 9440;  // TABLE_Y + BALL_RADIUS (rounded as in scene)
 
 // Material: ball-ball contact
 var BALL_MAT  = new CmMaterial(9499, 49, 200000, 500, 599);
-// Material: table cloth (plane)
-var CLOTH_MAT = new CmMaterial(500, 99, 200000, 8000, 8999);
+// Material: table cloth (plane collider)
+// Source: Game.unity PlaneCollider serialized field (lines 14171-14176), the result of
+// CmMath.FromFloat(PlaneCmMateria.asset: 0.1/0.01/20/0.2/0.3) baked by Unity Editor.
+// Runtime reads the serialized struct directly; FromFloat only runs in #if UNITY_EDITOR.
+var CLOTH_MAT = new CmMaterial(1000, 99, 200000, 2000, 3000);
 // Material: cushion rail
 var RAIL_MAT  = new CmMaterial(6000, 0, 0, 0, 2000);
 
@@ -290,6 +293,93 @@ var results = new List<GoldenVector>();
         "Target ball into corner pocket 0 (+x,+z): b0 hits b1 at 53deg (3:4 slope), b1 pockets",
         new List<CmRigidbody>{b0, b1}, colls, pockets, space,
         18000,0,24000,  0,0,0));
+}
+
+// GV-12: Side-spin (english): impulse (30000,0,0) + left-spin torque (0,+25000,0)
+//   Top-down: left-spin = clockwise when viewed from above → ball curves right after sliding phase.
+//   Tests that y-axis angular velocity affects trajectory via the rolling constraint.
+{
+    var b0 = MakeBody(0, MakeBall(-5000, BALL_Y, 0, BALL_MAT));
+    results.Add(RunShot("GV-12",
+        "Side-spin (left english): impulse (30000,0,0) + y-axis spin torque (0,+25000,0) — ball curves right",
+        new List<CmRigidbody>{b0}, colls, pockets, space,
+        30000,0,0,  0,25000,0));
+}
+
+// GV-13: Diagonal shot with back-spin: impulse at 45° + back-spin torque on z
+//   Tests spin on a non-axis-aligned trajectory (combined x+z motion with spin).
+{
+    var b0 = MakeBody(0, MakeBall(0, BALL_Y, 0, BALL_MAT));
+    results.Add(RunShot("GV-13",
+        "Diagonal back-spin: impulse (21213,0,21213) ~30000 at 45deg + back-spin (0,0,+15000) — ball reverses diagonally",
+        new List<CmRigidbody>{b0}, colls, pockets, space,
+        21213,0,21213,  0,0,15000));
+}
+
+// ─── Fuzz: 1000 random ShotData cases (seeded, deterministic) ────────────────
+// Covers: max-force, spin (back/top), multi-ball (2-3), rail-bounce angles,
+//         diagonal shots, pocket-aimed shots.
+// Seed = 42 for reproducibility. Output appended to same JSON array as GV-01~11.
+{
+    var rng = new System.Random(42);
+
+    long RandRange(long lo, long hi) => lo + (long)(rng.NextDouble() * (hi - lo));
+
+    // Discretised angle set: 0=+x, 1=+z, 2=-x, 3=-z, 4=+x+z(diag), 5=+x-z(diag), 6=-x+z, 7=-x-z
+    long[] cosTable = {10000, 0,      -10000, 0,      7071,  7071, -7071, -7071};
+    long[] sinTable = {0,     10000,  0,     -10000,  7071, -7071,  7071, -7071};
+
+    // Safe ball-spawn zones: x ∈ [-10000,10000], z ∈ [-5000,5000]
+    long RandX() => RandRange(-10000, 10000);
+    long RandZ() => RandRange(-5000,   5000);
+
+    for (int fi = 0; fi < 1000; fi++)
+    {
+        int   category = fi % 5; // 0=straight,1=spin,2=two-ball,3=three-ball,4=high-force
+        int   angleIdx = rng.Next(8);
+        long  force    = category == 4 ? RandRange(55000, 65000) : RandRange(8000, 45000);
+        long  impX     = force * cosTable[angleIdx] / 10000;
+        long  impZ     = force * sinTable[angleIdx] / 10000;
+        long  torZ     = category == 1 ? (rng.Next(2) == 0 ? 1L : -1L) * RandRange(5000, 20000) : 0L;
+
+        long bx0 = RandX();
+        long bz0 = RandZ();
+        // Ensure ball is not in pocket zone (x²+z² relative to each pocket < 600²)
+        // Simple guard: avoid corners
+        if (bx0 > 11000 && bz0 > 4000) bx0 = -bx0;
+        if (bx0 > 11000 && bz0 < -4000) bz0 = -bz0;
+        if (bx0 < -11000 && bz0 > 4000) bx0 = -bx0;
+        if (bx0 < -11000 && bz0 < -4000) bz0 = -bz0;
+
+        var bodies = new List<CmRigidbody> { MakeBody(0, MakeBall(bx0, BALL_Y, bz0, BALL_MAT)) };
+
+        if (category == 2 || category == 3)
+        {
+            // Second ball offset from first in shot direction
+            long dx = cosTable[angleIdx] * 2000 / 10000;
+            long dz = sinTable[angleIdx] * 2000 / 10000;
+            long bx1 = bx0 + dx, bz1 = bz0 + dz;
+            if (bx1 > 11000) bx1 = bx0 - dx;
+            if (bx1 < -11000) bx1 = bx0 - dx;
+            if (bz1 > 5500) bz1 = bz0 - dz;
+            if (bz1 < -5500) bz1 = bz0 - dz;
+            bodies.Add(MakeBody(1, MakeBall(bx1, BALL_Y, bz1, BALL_MAT)));
+        }
+        if (category == 3)
+        {
+            long bx2 = bx0 + cosTable[angleIdx] * 4000 / 10000;
+            long bz2 = bz0 + sinTable[angleIdx] * 4000 / 10000;
+            if (bx2 > 11000) bx2 = bx0;
+            if (bx2 < -11000) bx2 = bx0;
+            if (bz2 > 5500) bz2 = bz0;
+            if (bz2 < -5500) bz2 = bz0;
+            bodies.Add(MakeBody(2, MakeBall(bx2, BALL_Y, bz2, BALL_MAT)));
+        }
+
+        string fid  = $"FUZZ-{fi+1:D4}";
+        string desc = $"cat={category} angle={angleIdx} force={force} torZ={torZ} balls={bodies.Count}";
+        results.Add(RunShot(fid, desc, bodies, colls, pockets, space, impX, 0, impZ, 0, 0, torZ));
+    }
 }
 
 var opts = new JsonSerializerOptions { WriteIndented = true };

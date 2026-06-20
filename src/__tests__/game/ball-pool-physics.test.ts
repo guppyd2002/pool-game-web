@@ -1,0 +1,413 @@
+/**
+ * G6: IBallPoolPhysics contract tests (PHY-019).
+ *
+ * Verifies:
+ *   C1  applyShot() uses same simulateToCompletion() as golden/fuzz (G2-B parity)
+ *   C2  contacts/finalStates are Fixed integers (no floats in physics output)
+ *   C3  step() never mutates rigidbodies (I1); interface exposes no frameIdx (I2);
+ *       getBall() reads space.rigidbodies not frames[] (I3)
+ *   S1  contacts: onset-only — cushion hit repeated across 3+ steps records once
+ *   S2  ball-ball: reciprocal dedup (ballId=min)
+ *   S3  intra-step sort: (ball < cushion, ballId asc, other asc)
+ *   predictAimLine: returns 'ball' when target ball is in path (first-contact geometry)
+ *   getPhysicsConstants: projects from constants.ts (C4)
+ *   Determinism: same ShotData → same ShotResult (bit-exact, second call)
+ */
+
+import { describe, it, expect } from 'vitest';
+import { CmVector } from '../../physics/cm-vector';
+import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from '../../physics/colliders';
+import type { CmMaterial } from '../../physics/colliders';
+import { CmRigidbody, CmKinematicTrigger } from '../../physics/cm-rigidbody';
+import { CmSpace } from '../../physics/cm-space';
+import type { CmSpaceCube } from '../../physics/cm-collision';
+import { createBallPoolPhysics } from '../../game/ball-pool-physics';
+import {
+  BALL_MASS, BALL_RADIUS, TABLE_Y, BALL_Y,
+  BALL_MATERIAL as BALL_MAT,
+  CLOTH_MATERIAL as CLOTH_MAT,
+  RAIL_MATERIAL as RAIL_MAT,
+  POCKET_RADIUS, POCKET_POSITIONS,
+  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
+  MAX_FORCE,
+  RAIL_LONG_X, RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS,
+  RAIL_BACK_X, RAIL_BACK_Z, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS,
+  CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
+  CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
+  DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+} from '../../physics/constants';
+
+// ─── Mock SceneAPI (renderer not under test) ──────────────────────────────────
+
+const mockScene = {
+  updateBallPosition: () => {},
+  render: () => {},
+};
+
+// ─── Table geometry (mirrors golden-vector.test.ts) ───────────────────────────
+
+const SPACE_CUBE: CmSpaceCube = {
+  position: CmVector.zero,
+  scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
+};
+
+function makeBall(id: number, x: number, y: number, z: number): CmRigidbody {
+  const col = new CmSphereCollider();
+  col.id = id;
+  col.position = new CmVector(x, y, z);
+  col.right   = new CmVector(10000, 0, 0);
+  col.up      = new CmVector(0, 10000, 0);
+  col.forward = new CmVector(0, 0, 10000);
+  col.scale   = new CmVector(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
+  col.radius  = BALL_RADIUS;
+  col.material = { ...BALL_MAT };
+  const body = new CmRigidbody();
+  body.id   = id;
+  body.mass = BALL_MASS;
+  body.collider = col;
+  return body;
+}
+
+function makeLine(
+  id: number,
+  px: number, py: number, pz: number,
+  rx: number, ry: number, rz: number,
+  ux: number, uy: number, uz: number,
+  fx: number, fy: number, fz: number,
+  scaleX: number, radius: number,
+  mat: CmMaterial,
+): CmLineCollider {
+  const c = new CmLineCollider();
+  c.id       = id;
+  c.position = new CmVector(px, py, pz);
+  c.right    = new CmVector(rx, ry, rz);
+  c.up       = new CmVector(ux, uy, uz);
+  c.forward  = new CmVector(fx, fy, fz);
+  c.scale    = new CmVector(scaleX, 5000, 5000);
+  c.radius   = radius;
+  c.material = { ...mat };
+  return c;
+}
+
+function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
+  const list: (CmPlaneCollider | CmLineCollider)[] = [];
+  let id = 0;
+
+  const plane = new CmPlaneCollider();
+  plane.id       = id++;
+  plane.position = new CmVector(0, TABLE_Y, 0);
+  plane.right    = new CmVector(10000, 0, 0);
+  plane.up       = new CmVector(0, 10000, 0);
+  plane.forward  = new CmVector(0, 0, 10000);
+  plane.scale    = new CmVector(PLANE_SCALE_X, 5000, PLANE_RADIUS);
+  plane.radius   = PLANE_RADIUS;
+  plane.material = { ...CLOTH_MAT };
+  list.push(plane);
+
+  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y, 0,    0,0,10000,  0,10000,0, -10000,0,0, RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y, 0,    0,0,-10000, 0,10000,0, 10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z, -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,  10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+
+  return list;
+}
+
+function makePockets(): CmKinematicTrigger[] {
+  return POCKET_POSITIONS.map(([px, pz], i) => {
+    const t = new CmKinematicTrigger();
+    t.id       = i;
+    t.position = new CmVector(px, BALL_Y, pz);
+    t.radius   = POCKET_RADIUS;
+    return t;
+  });
+}
+
+/** GV-01 single-ball space at x=-5000 */
+function makeGV01Space() {
+  const ball = makeBall(0, -5000, BALL_Y, 0);
+  const space = new CmSpace();
+  space.init(SPACE_CUBE, [ball], makeTable(), makePockets());
+  return { space, ball };
+}
+
+const GV01_SHOT = {
+  impulse:  new CmVector(30000, 0, 0),
+  position: new CmVector(-5000, BALL_Y, 0),
+  torque:   CmVector.zero,
+};
+
+// ─── C1 / G2-B: production path == GV-01 golden ───────────────────────────────
+
+describe('G6 C1: applyShot canonical endpoint (G2-B parity)', () => {
+  it('applyShot() gives GV-01 golden final position px=9480', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const result = physics.applyShot(GV01_SHOT);
+
+    expect(result.finalStates[0].position.x).toBe(9480);
+    expect(result.finalStates[0].position.y).toBe(9439);
+    expect(result.finalStates[0].position.z).toBe(0);
+  });
+
+  it('applyShot() frames[] has same endpoint as finalStates (last frame matches)', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const result = physics.applyShot(GV01_SHOT);
+
+    const lastFrame = result.frames[result.frames.length - 1];
+    const ball0pos = lastFrame.positions.find(p => p.id === 0)!;
+    expect(ball0pos.x).toBe(9480);
+  });
+});
+
+// ─── Determinism: same ShotData → same ShotResult ────────────────────────────
+
+describe('G6 determinism: same ShotData → identical ShotResult', () => {
+  it('two consecutive applyShot() calls produce identical contacts and finalStates', () => {
+    const { space: s1 } = makeGV01Space();
+    const { space: s2 } = makeGV01Space();
+    const p1 = createBallPoolPhysics(s1, mockScene);
+    const p2 = createBallPoolPhysics(s2, mockScene);
+
+    const r1 = p1.applyShot(GV01_SHOT);
+    const r2 = p2.applyShot(GV01_SHOT);
+
+    expect(r1.finalStates[0].position.x).toBe(r2.finalStates[0].position.x);
+    expect(r1.finalStates[0].position.z).toBe(r2.finalStates[0].position.z);
+    expect(r1.frames.length).toBe(r2.frames.length);
+    expect(r1.contacts.length).toBe(r2.contacts.length);
+    for (let i = 0; i < r1.contacts.length; i++) {
+      expect(r1.contacts[i].kind).toBe(r2.contacts[i].kind);
+      expect(r1.contacts[i].stepIndex).toBe(r2.contacts[i].stepIndex);
+      expect(r1.contacts[i].ballId).toBe(r2.contacts[i].ballId);
+    }
+  });
+});
+
+// ─── C3-I3: getBall() reads space.rigidbodies ────────────────────────────────
+
+describe('G6 C3-I3: getBall() reads canonical state', () => {
+  it('getBall(0) returns position matching space.rigidbodies[0] after applyShot', () => {
+    const { space, ball } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.applyShot(GV01_SHOT);
+
+    const state = physics.getBall(0);
+    // C3-I3: same reference as canonical body position
+    expect(state.position.x).toBe(ball.collider.position.x);
+    expect(state.position.y).toBe(ball.collider.position.y);
+    expect(state.position.z).toBe(ball.collider.position.z);
+    expect(state.isActive).toBe(false); // at rest
+    expect(state.isKinematic).toBe(false);
+  });
+});
+
+// ─── C3-I1: step() must not mutate rigidbodies ────────────────────────────────
+
+describe('G6 C3-I1: step() does not mutate space.rigidbodies', () => {
+  it('ball position unchanged after calling step() multiple times', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.applyShot(GV01_SHOT);
+
+    const pxAfterShot = space.rigidbodies[0].collider.position.x;
+    const pyAfterShot = space.rigidbodies[0].collider.position.y;
+
+    // Drive replay animation — step() must only update renderer, not rigidbodies
+    for (let i = 0; i < 500; i++) physics.step(0.016);
+
+    expect(space.rigidbodies[0].collider.position.x).toBe(pxAfterShot);
+    expect(space.rigidbodies[0].collider.position.y).toBe(pyAfterShot);
+  });
+});
+
+// ─── S1: onset-only contacts ─────────────────────────────────────────────────
+
+describe('G6 S1: contacts are onset-only (same pair not in consecutive steps)', () => {
+  it('GV-01: for each (pair), no two contact records appear at consecutive step indices', () => {
+    // S1 invariant: if ball is in contact at step i, activeContacts gains the key,
+    // so step i+1 cannot record a new onset for the same pair.
+    // Multiple bounces (e.g. ball hits same rail at steps 100, 500, 900) are valid
+    // onsets; only back-to-back step indices (diff=1) would indicate S1 failure.
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const result = physics.applyShot(GV01_SHOT);
+
+    const byPair = new Map<string, number[]>();
+    for (const c of result.contacts) {
+      const key = `${c.kind}:${c.ballId}:${c.cushionId ?? c.otherBallId}`;
+      if (!byPair.has(key)) byPair.set(key, []);
+      byPair.get(key)!.push(c.stepIndex);
+    }
+
+    for (const steps of byPair.values()) {
+      steps.sort((a, b) => a - b);
+      for (let i = 1; i < steps.length; i++) {
+        // Two onsets for the same pair cannot be at adjacent steps (S1 proof)
+        expect(steps[i] - steps[i - 1]).toBeGreaterThan(1);
+      }
+    }
+  });
+});
+
+// ─── S2: ball-ball reciprocal dedup ──────────────────────────────────────────
+
+describe('G6 S2: ball-ball contacts are deduplicated (ballId=min)', () => {
+  it('two-ball collision produces exactly one ball contact record with ballId<otherBallId', () => {
+    // Ball 0 at (-5000, BALL_Y, 0), Ball 1 at (1000, BALL_Y, 0) — in the path
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  1000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const result = physics.applyShot({
+      impulse:  new CmVector(30000, 0, 0),
+      position: new CmVector(-5000, BALL_Y, 0),
+      torque:   CmVector.zero,
+    });
+
+    const ballContacts = result.contacts.filter(c => c.kind === 'ball');
+    expect(ballContacts.length).toBeGreaterThan(0);
+
+    // All ball-ball records must have ballId < otherBallId (S2)
+    for (const c of ballContacts) {
+      expect(c.ballId).toBeLessThan(c.otherBallId!);
+    }
+
+    // No duplicate pair at the same stepIndex
+    const seenFirstHit = new Set<string>();
+    let dupes = 0;
+    for (const c of ballContacts) {
+      const key = `${c.stepIndex}:${c.ballId}:${c.otherBallId}`;
+      if (seenFirstHit.has(key)) dupes++;
+      seenFirstHit.add(key);
+    }
+    expect(dupes).toBe(0);
+  });
+});
+
+// ─── predictAimLine: ball hit detection ───────────────────────────────────────
+
+describe('G6 predictAimLine: ball geometry detection', () => {
+  it('returns hitType=ball when target ball is directly in the ray path', () => {
+    // Ball 1 at (2000, BALL_Y, 0), ball 0 at (-5000, BALL_Y, 0)
+    // Ray from (-5000, BALL_Y, 0) in +X direction should hit ball 1
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const from = new CmVector(-5000, BALL_Y, 0);
+    const dir  = new CmVector(10000, 0, 0); // unit in +X
+    const hit  = physics.predictAimLine(from, dir);
+
+    expect(hit.hitType).toBe('ball');
+    expect(hit.ballId).toBe(1);
+    expect(hit.distance).toBeGreaterThan(0);
+  });
+
+  it('returns hitType=cushion when ray hits the long rail before any ball', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    // Shoot directly at right long rail (no ball in path)
+    const from = new CmVector(-5000, BALL_Y, 0);
+    const dir  = new CmVector(10000, 0, 0);
+    const hit  = physics.predictAimLine(from, dir);
+
+    expect(hit.hitType).toBe('cushion');
+    expect(hit.cushionId).not.toBeNull();
+  });
+
+  it('returns hitType=none for zero direction', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), CmVector.zero);
+    expect(hit.hitType).toBe('none');
+  });
+});
+
+// ─── getPhysicsConstants (C4) ────────────────────────────────────────────────
+
+describe('G6 C4: getPhysicsConstants projects from constants.ts', () => {
+  it('returns correct constants without hardcoding', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const c = physics.getPhysicsConstants();
+
+    expect(c.ballMass).toBe(BALL_MASS);
+    expect(c.ballRadius).toBe(BALL_RADIUS);
+    expect(c.maxForce).toBe(MAX_FORCE);
+    expect(c.tableScaleX).toBe(SPACE_SCALE_X);
+    expect(c.tableScaleZ).toBe(SPACE_SCALE_Z);
+  });
+});
+
+// ─── shotFrames / replay ─────────────────────────────────────────────────────
+
+describe('G6: shotFrames and replay state', () => {
+  it('shotFrames is populated after applyShot', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    expect(physics.shotFrames.length).toBe(0);
+    physics.applyShot(GV01_SHOT);
+    expect(physics.shotFrames.length).toBeGreaterThan(0);
+  });
+
+  it('isSimulating becomes false after replay completes', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.applyShot(GV01_SHOT);
+
+    const MAX_CALLS = 2_000_000;
+    let calls = 0;
+    while (physics.isSimulating && calls < MAX_CALLS) {
+      physics.step(0.016);
+      calls++;
+    }
+    expect(physics.isSimulating).toBe(false);
+  });
+});
+
+// ─── getStateAsString / resetToStartState ────────────────────────────────────
+
+describe('G6: state serialization and reset', () => {
+  it('resetToStartState restores ball to initial position', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const initPx = physics.getBall(0).position.x;
+
+    physics.applyShot(GV01_SHOT);
+    expect(physics.getBall(0).position.x).not.toBe(initPx);
+
+    physics.resetToStartState();
+    expect(physics.getBall(0).position.x).toBe(initPx);
+  });
+
+  it('getStateAsString/setStateFromString round-trips ball position', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.applyShot(GV01_SHOT);
+
+    const snapshot = physics.getStateAsString();
+    const pxAfterShot = physics.getBall(0).position.x;
+
+    physics.resetToStartState();
+    expect(physics.getBall(0).position.x).not.toBe(pxAfterShot);
+
+    physics.setStateFromString(snapshot);
+    expect(physics.getBall(0).position.x).toBe(pxAfterShot);
+  });
+});

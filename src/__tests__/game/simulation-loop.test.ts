@@ -1,56 +1,57 @@
 /**
- * G2 spike: simulation-loop accumulator determinism test.
+ * G2: simulation-loop full-simulate-then-replay determinism tests.
  *
- * Characterizes whether the current accumulator loop in simulation-loop.ts:54
- * produces bit-exact results regardless of the dt chunk size passed to step().
+ * Architecture (post-G2 fix):
+ *   applyShot() runs the canonical integer loop to completion synchronously.
+ *   The float accumulator in step() only paces replay animation — it never calls
+ *   space.calculate() and therefore never gates physics step count.
  *
- * Known bug (Challenge #020 / G2 diagnosis):
- *   while (accumulator >= toFloat(space.timestep)) {
- *     space.calculate(...)                   ← updates space.timestep (adaptive)
- *     accumulator -= toFloat(space.timestep) ← uses NEW timestep, not comparison value
- *   }
- *   Also: toFloat(MIN_TS) = toFloat(50) = 0.005 cannot be exactly represented in
- *   IEEE 754 binary (= 1/200 — requires infinite binary expansion), so different
- *   dt patterns accumulate float rounding errors → different total step counts
- *   → non-deterministic final positions.
+ * G2-A: Two independent calls to applyShot() with different dt arguments produce
+ *   bit-exact final positions and calculateTime.  (dt is now irrelevant to physics;
+ *   this is trivially true but confirms the canonical loop is self-consistent.)
  *
- * Test A: run1 dt=0.010 / run2 dt=0.016 — assert final positions bit-exact.
- * Test B: GV-01 golden endpoint check.
+ * G2-B: The production applyShot() path produces the GV-01 golden final position
+ *   px=9480 — identical to the direct space.calculate() loop in golden-vector tests.
+ *   This is satisfied by construction: both paths run the same canonical while-loop.
  *
- * GV-01 scenario: single ball at (-4000, 9440, 0), impulse (30000, 0, 0), mass=1700.
- * GV-01 golden final: px=-6979, py=9439, pz=0.
+ * GV-01 scenario: single ball at (-5000, 9440, 0), impulse (30000, 0, 0), mass=1700.
+ * GV-01 golden final: px=9480, py=9439, pz=0.
+ * (G9 B: CLOTH_MATERIAL updated to Game.unity runtime values — lower friction → ball rolls farther)
  */
 import { describe, it, expect } from 'vitest';
-import { MULTIPLIER } from '../../physics/fixed-math';
 import { CmVector } from '../../physics/cm-vector';
 import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from '../../physics/colliders';
-import { CmRigidbody, CmForceMode, CmKinematicTrigger } from '../../physics/cm-rigidbody';
+import type { CmMaterial } from '../../physics/colliders';
+import { CmRigidbody, CmKinematicTrigger } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
 import type { CmSpaceCube } from '../../physics/cm-collision';
-import type { CmMaterial } from '../../physics/colliders';
 import { createSimulationLoop } from '../../game/simulation-loop';
+import {
+  BALL_MASS, BALL_RADIUS, TABLE_Y, BALL_Y,
+  BALL_MATERIAL as BALL_MAT,
+  CLOTH_MATERIAL as CLOTH_MAT,
+  RAIL_MATERIAL as RAIL_MAT,
+  POCKET_RADIUS, POCKET_POSITIONS,
+  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
+  RAIL_LONG_X, RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS,
+  RAIL_BACK_X, RAIL_BACK_Z, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS,
+  CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
+  CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
+  DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+} from '../../physics/constants';
 
-// ─── SceneAPI mock (no rendering needed) ─────────────────────────────────────
+// ─── SceneAPI mock ────────────────────────────────────────────────────────────
 
 const mockScene = {
   updateBallPosition: () => {},
   render: () => {},
 };
 
-// ─── Full table geometry — mirrors golden-vector.test.ts ──────────────────────
-
-const BALL_MASS   = 1700;
-const BALL_RADIUS = 285;
-const TABLE_Y     = 9154;
-const BALL_Y      = 9440;
-
-const BALL_MAT: CmMaterial  = { bounciness: 9499, rollingFriction: 49,  twistingFriction: 200000, dynamicFriction: 500,  staticFriction: 599  };
-const CLOTH_MAT: CmMaterial = { bounciness: 500,  rollingFriction: 99,  twistingFriction: 200000, dynamicFriction: 8000, staticFriction: 8999 };
-const RAIL_MAT: CmMaterial  = { bounciness: 6000, rollingFriction: 0,   twistingFriction: 0,      dynamicFriction: 0,    staticFriction: 2000 };
+// ─── Full table geometry ──────────────────────────────────────────────────────
 
 const SPACE_CUBE: CmSpaceCube = {
   position: CmVector.zero,
-  scale: new CmVector(30000, 20000, 20000),
+  scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
 };
 
 function makeBallGV(id: number, x: number, y: number, z: number): CmRigidbody {
@@ -101,64 +102,49 @@ function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
   plane.right    = new CmVector(10000, 0, 0);
   plane.up       = new CmVector(0, 10000, 0);
   plane.forward  = new CmVector(0, 0, 10000);
-  plane.scale    = new CmVector(25399, 5000, 12699);
-  plane.radius   = 12699;
+  plane.scale    = new CmVector(PLANE_SCALE_X, 5000, PLANE_RADIUS);
+  plane.radius   = PLANE_RADIUS;
   plane.material = { ...CLOTH_MAT };
   list.push(plane);
 
-  list.push(makeLine(id++,  12699, BALL_Y,     0,   0,0,10000,  0,10000,0, -10000,0,0,  11150, 5575, RAIL_MAT));
-  list.push(makeLine(id++, -12699, BALL_Y,     0,   0,0,-10000, 0,10000,0,  10000,0,0,  11150, 5575, RAIL_MAT));
-  list.push(makeLine(id++,   6290, BALL_Y,  6349,  -10000,0,0,  0,10000,0,  0,0,-10000, 11269, 5634, RAIL_MAT));
-  list.push(makeLine(id++,  -6290, BALL_Y, -6349,   10000,0,0,  0,10000,0,  0,0, 10000, 11269, 5634, RAIL_MAT));
-  list.push(makeLine(id++,   12128, BALL_Y,  6552,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  570, 285, RAIL_MAT));
-  list.push(makeLine(id++,   12901, BALL_Y,  5778,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  569, 284, RAIL_MAT));
-  list.push(makeLine(id++,  -12128, BALL_Y, -6552,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  570, 285, RAIL_MAT));
-  list.push(makeLine(id++,  -12901, BALL_Y, -5778,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  569, 284, RAIL_MAT));
+  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y,     0,   0,0,10000,  0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y,     0,   0,0,-10000, 0,10000,0,  10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0,  0,10000,0,  0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0,  0,10000,0,  0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
   return list;
 }
 
 function makePockets(): CmKinematicTrigger[] {
-  const positions: [number, number, number][] = [
-    [ 12875, BALL_Y,  6510], [ 12875, BALL_Y, -6510],
-    [-12875, BALL_Y,  6510], [-12875, BALL_Y, -6510],
-    [     0, BALL_Y,  7100], [     0, BALL_Y, -7100],
-  ];
-  return positions.map(([x, y, z], i) => {
+  return POCKET_POSITIONS.map(([px, pz], i) => {
     const t = new CmKinematicTrigger();
     t.id       = i;
-    t.position = new CmVector(x, y, z);
-    t.radius   = 450;
+    t.position = new CmVector(px, BALL_Y, pz);
+    t.radius   = POCKET_RADIUS;
     return t;
   });
 }
 
 function makeGV01Space(): { space: CmSpace; ball: CmRigidbody } {
-  const ball = makeBallGV(0, -4000, BALL_Y, 0);
+  const ball = makeBallGV(0, -5000, BALL_Y, 0);
   const space = new CmSpace();
   space.init(SPACE_CUBE, [ball], makeTable(), makePockets());
   return { space, ball };
 }
 
-// ─── Drive simulation via step() to completion ────────────────────────────────
+// ─── Drive simulation via applyShot() — for G2-B canonical endpoint check ───
 
-function runToStop(dt: number): {
-  px: number; py: number; pz: number;
-  calculateTime: number;
-} {
+function runToStop(): { px: number; py: number; pz: number; calculateTime: number } {
   const { space, ball } = makeGV01Space();
   const loop = createSimulationLoop(space, mockScene);
-
-  space.activate();
-  ball.isActive = true;
-  ball.addImpulse(new CmVector(30000, 0, 0), ball.collider.position, CmForceMode.Impulse);
-
-  const MAX_ITERATIONS = 500_000;
-  let iterations = 0;
-  while (space.isActive && iterations < MAX_ITERATIONS) {
-    loop.step(dt);
-    iterations++;
-  }
-
+  loop.applyShot({
+    impulse:  new CmVector(30000, 0, 0),
+    position: new CmVector(ball.collider.position.x, ball.collider.position.y, ball.collider.position.z),
+    torque:   CmVector.zero,
+  });
   return {
     px: ball.collider.position.x,
     py: ball.collider.position.y,
@@ -167,77 +153,95 @@ function runToStop(dt: number): {
   };
 }
 
-// ─── Test A: dt=0.010 vs dt=0.016 determinism ────────────────────────────────
+// ─── Drive replay via step() — real render-path dt regression guard ───────────
+//
+// applyShot() runs physics synchronously to rest.  step(dt) then paces replay.
+// If step() ever re-introduced space.calculate() calls, dt would gate physics and
+// the last rendered position would differ across dt values — this test catches that.
 
-describe('G2 spike: simulation-loop accumulator determinism', () => {
-  it('G2-A: simulation reaches GV-01 vicinity with dt=0.016', () => {
-    const r = runToStop(0.016);
-    // GV-01 golden: px=-6979, py=9439, pz=0
-    // Log actual value for diagnostic purposes regardless of match
-    console.log(`[G2-A dt=0.016] px=${r.px} py=${r.py} pz=${r.pz} calcTime=${r.calculateTime}`);
-    expect(r.py).toBe(9439);
-    expect(r.pz).toBe(0);
+function replayToEnd(dt: number): { lastPxFixed: number; lastPyFixed: number; lastPzFixed: number } {
+  const { space, ball } = makeGV01Space();
+
+  let lastPx = 0, lastPy = 0, lastPz = 0;
+  const trackingScene = {
+    updateBallPosition: (id: number, x: number, y: number, z: number) => {
+      if (id === 0) { lastPx = x; lastPy = y; lastPz = z; }
+    },
+    render: () => {},
+  };
+
+  const loop = createSimulationLoop(space, trackingScene);
+  loop.applyShot({
+    impulse:  new CmVector(30000, 0, 0),
+    position: new CmVector(ball.collider.position.x, ball.collider.position.y, ball.collider.position.z),
+    torque:   CmVector.zero,
   });
 
-  it('G2-A KEY: dt=0.010 vs dt=0.016 → bit-exact final position', () => {
-    // Core determinism invariant: the same physics must produce identical final state
-    // regardless of how wall-clock dt is chunked into physics steps.
-    // EXPECTED RESULT: FAIL if accumulator floating-point drift differs step counts.
-    const r1 = runToStop(0.010);
-    const r2 = runToStop(0.016);
+  const MAX_STEP_CALLS = 1_000_000;
+  let calls = 0;
+  while (loop.isSimulating && calls < MAX_STEP_CALLS) {
+    loop.step(dt);
+    calls++;
+  }
 
-    console.log(`[G2-A dt=0.010] px=${r1.px} py=${r1.py} pz=${r1.pz} calcTime=${r1.calculateTime}`);
-    console.log(`[G2-A dt=0.016] px=${r2.px} py=${r2.py} pz=${r2.pz} calcTime=${r2.calculateTime}`);
+  return {
+    lastPxFixed: Math.round(lastPx * 10000),
+    lastPyFixed: Math.round(lastPy * 10000),
+    lastPzFixed: Math.round(lastPz * 10000),
+  };
+}
 
-    const pxMatch = r1.px === r2.px;
-    const pyMatch = r1.py === r2.py;
-    const pzMatch = r1.pz === r2.pz;
-    const timeMatch = r1.calculateTime === r2.calculateTime;
-    console.log(`[G2-A] match: px=${pxMatch} py=${pyMatch} pz=${pzMatch} physTime=${timeMatch}`);
+// ─── Test A: render-path dt regression guard ─────────────────────────────────
 
-    expect(r1.px).toBe(r2.px);
-    expect(r1.py).toBe(r2.py);
-    expect(r1.pz).toBe(r2.pz);
-    expect(r1.calculateTime).toBe(r2.calculateTime);
+describe('G2: simulation-loop full-simulate-then-replay determinism', () => {
+  it('G2-A: replay with dt=0.016 → last rendered position == GV-01 canonical endpoint', () => {
+    // Drives the actual step() replay path and checks the final scene position.
+    // Pre-G2 regression: if step() gated physics via float accumulator, different dt
+    // would run different step counts → different final positions.
+    const r = replayToEnd(0.016);
+    console.log(`[G2-A dt=0.016] lastPxFixed=${r.lastPxFixed} lastPyFixed=${r.lastPyFixed}`);
+    expect(r.lastPxFixed).toBe(9480);
+    expect(r.lastPyFixed).toBe(9439);
+    expect(r.lastPzFixed).toBe(0);
   });
 
-  it('G2-A: dt=0.001 (very small) vs dt=0.050 (large) → bit-exact', () => {
-    const r1 = runToStop(0.001);
-    const r2 = runToStop(0.050);
+  it('G2-A KEY: replay endpoint is float-exact across dt=0.016 vs dt=0.033', () => {
+    // If step() re-introduced accumulator-gated physics, dt=0.016 and dt=0.033 would
+    // consume different numbers of physics steps and produce different final positions.
+    const r1 = replayToEnd(0.016);
+    const r2 = replayToEnd(0.033);
 
-    console.log(`[G2-A dt=0.001] px=${r1.px} py=${r1.py} calcTime=${r1.calculateTime}`);
-    console.log(`[G2-A dt=0.050] px=${r2.px} py=${r2.py} calcTime=${r2.calculateTime}`);
+    console.log(`[G2-A] dt=0.016 lastPxFixed=${r1.lastPxFixed} | dt=0.033 lastPxFixed=${r2.lastPxFixed}`);
 
-    expect(r1.px).toBe(r2.px);
-    expect(r1.py).toBe(r2.py);
-    expect(r1.pz).toBe(r2.pz);
-    expect(r1.calculateTime).toBe(r2.calculateTime);
+    expect(r1.lastPxFixed).toBe(r2.lastPxFixed);
+    expect(r1.lastPyFixed).toBe(r2.lastPyFixed);
+    expect(r1.lastPzFixed).toBe(r2.lastPzFixed);
+  });
+
+  it('G2-A: replay endpoint float-exact for dt=0.002 vs dt=0.050', () => {
+    const r1 = replayToEnd(0.002);
+    const r2 = replayToEnd(0.050);
+
+    console.log(`[G2-A] dt=0.002 lastPxFixed=${r1.lastPxFixed} | dt=0.050 lastPxFixed=${r2.lastPxFixed}`);
+
+    expect(r1.lastPxFixed).toBe(r2.lastPxFixed);
+    expect(r1.lastPyFixed).toBe(r2.lastPyFixed);
+    expect(r1.lastPzFixed).toBe(r2.lastPzFixed);
   });
 });
 
-// ─── Test B: GV-01 golden position check ─────────────────────────────────────
-//
-// G2-B FINDING: accumulator loop gives px=-9032, not GV-01 golden px=-6979.
-// Divergence = 2053 units (20.53 cm). Root cause: the accumulator may accumulate
-// extra physics time due to float drift in the timestep comparison/subtraction,
-// causing the ball to travel further before triggering the isActive=false sleep check.
-// This is the key G2 bug to ratify: direct space.calculate() loop vs accumulator loop
-// give different final positions for the same physics scenario.
+// ─── Test B: production path == golden (G2-B) ────────────────────────────────
 
-describe('G2 spike: GV-01 golden endpoint check (diagnostic)', () => {
-  it('G2-B: documents accumulator vs direct simulate divergence', () => {
-    // This test documents the divergence — NOT a determinism bug (G2-A is deterministic)
-    // but a total-step-count discrepancy between accumulator and direct simulate paths.
+describe('G2-B: production path final position == GV-01 golden', () => {
+  it('G2-B: applyShot() canonical loop gives px=9480 (golden)', () => {
+    // Full-simulate-then-replay: production path == golden-vector path by construction.
+    // Failure history: test used ball at x=-4000 (fixture says x=-5000); canonical loop
+    // gives different positions per cloth material. G9-B updated CLOTH_MATERIAL to the
+    // Game.unity runtime values (1000/2000/3000), regen'd fixtures → new golden px=9480.
     const r = runToStop(0.016);
-    console.log(`[G2-B] accumulator result: px=${r.px}, py=${r.py}, pz=${r.pz}`);
-    console.log(`[G2-B] GV-01 golden:       px=-6979, py=9439, pz=0`);
-    console.log(`[G2-B] divergence px: ${r.px - (-6979)} units`);
-
-    // Assert only non-diverging axes (y and z are expected to match)
+    console.log(`[G2-B] production result: px=${r.px}, py=${r.py}, pz=${r.pz}`);
+    expect(r.px).toBe(9480);
     expect(r.py).toBe(9439);
     expect(r.pz).toBe(0);
-    // x diverges — we log but do not assert to document without blocking CI.
-    // px expected: -6979 (GV-01 golden), px actual: reported above.
-    // RATIFICATION NEEDED: CTO to decide if accumulator must match direct simulate.
   });
 });

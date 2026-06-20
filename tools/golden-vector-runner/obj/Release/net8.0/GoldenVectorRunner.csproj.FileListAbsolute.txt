@@ -13,3 +13,8 @@
 /home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.pdb
 /home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/GoldenVectorRunner.genruntimeconfig.cache
 /home/guppyd/pool-game-web/tools/golden-vector-runner/obj/Release/net8.0/ref/GoldenVectorRunner.dll
+/tmp/gv-build/GoldenVectorRunner
+/tmp/gv-build/GoldenVectorRunner.deps.json
+/tmp/gv-build/GoldenVectorRunner.runtimeconfig.json
+/tmp/gv-build/GoldenVectorRunner.dll
+/tmp/gv-build/GoldenVectorRunner.pdb
