@@ -26,6 +26,12 @@ export const CUE_MAX_DRAG = 1.5;
 /** Minimum drag (meters) required to fire a shot. Exclusive lower bound. */
 export const CUE_MIN_DRAG = 0.01;
 
+/**
+ * CUE-005: Maximum spin torque magnitude at full power + full offset (Fixed units).
+ * Matches C# default cueItemData.maxSpin = 0.5 × maxForce = 0.5 × 65000 = 32500.
+ */
+export const CUE_MAX_SPIN = Math.trunc(MAX_FORCE / 2); // 32500
+
 /** Table plane coordinate (float world coords, y implicit = ball height). */
 export interface TablePoint { x: number; z: number; }
 
@@ -67,12 +73,25 @@ export interface CueController {
    * Clamped to [0, MAX_FORCE]. Returns a Fixed integer (truncated).
    */
   dragDistToForce(distMeters: number): Fixed;
+
+  /**
+   * CUE-005: Set the spin offset for the next shot.
+   * x = side english ∈ [-1, 1]: negative = right, positive = left.
+   * y = top/back spin ∈ [-1, 1]: positive = topspin, negative = backspin.
+   * Persists across shots; reset by calling setSpinOffset(0, 0).
+   */
+  setSpinOffset(x: number, y: number): void;
+
+  /** CUE-005: Read the current spin offset. */
+  getSpinOffset(): { x: number; y: number };
 }
 
 export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): CueController {
   let _phase: 'idle' | 'aiming' = 'idle';
   let _startPoint: TablePoint | null = null;
   let _currentPoint: TablePoint | null = null;
+  let _spinX = 0;  // CUE-005 side english ∈ [-1, 1]
+  let _spinY = 0;  // CUE-005 top/back spin ∈ [-1, 1]
 
   function planeDistXZ(a: TablePoint, b: TablePoint): number {
     const dx = a.x - b.x;
@@ -121,6 +140,19 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       const nz = dz / nd;
       const force = dragDistToForce(d);
 
+      // CUE-005/CUE-012: torque synthesis from spin offset + aim direction.
+      // C# formula: torque = maxSpin * force * (-spinX * worldUp + spinY * slider.right)
+      // slider.right (horizontal, perpendicular to aim) = (-nz, 0, nx)
+      const spinMag = Math.trunc(force * CUE_MAX_SPIN / MAX_FORCE);
+      // Use `|| 0` on each component to collapse -0 (IEEE 754 negative zero) to 0.
+      const torque = (_spinX === 0 && _spinY === 0 || spinMag === 0)
+        ? CmVector.zero
+        : new CmVector(
+            Math.trunc(_spinY * spinMag * (-nz)) || 0,  // top/back → X
+            Math.trunc(-_spinX * spinMag) || 0,          // side english → Y
+            Math.trunc(_spinY * spinMag * nx) || 0,      // top/back → Z
+          );
+
       const cueBall = physics.getBall(cueBallId);
       physics.applyShot({
         position: cueBall.position,
@@ -129,7 +161,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           0,
           Math.trunc(nz * force),
         ),
-        torque: CmVector.zero,
+        torque,
       });
       return true;
     },
@@ -162,5 +194,14 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
 
     hasEnergy,
     dragDistToForce,
+
+    setSpinOffset(x: number, y: number): void {
+      _spinX = Math.max(-1, Math.min(1, x));
+      _spinY = Math.max(-1, Math.min(1, y));
+    },
+
+    getSpinOffset(): { x: number; y: number } {
+      return { x: _spinX, y: _spinY };
+    },
   };
 }

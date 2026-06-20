@@ -155,8 +155,7 @@ describe("computeAimLinePoints — hitType 'cushion'", () => {
   });
 
   it('angle of incidence equals angle of reflection', () => {
-    // 45° diagonal shot, right-rail normal = (-1,0,0)
-    const diag = Math.trunc(Math.sqrt(2) / 2 * 100000); // ~70711
+    // ~27° diagonal shot (px=12.699, pz=6.3495), right-rail normal = (-1,0,0)
     const hit = makeHit('cushion', 126990, BALL_Y, 63495, -MULTIPLIER, 0, 0);
     const pts = computeAimLinePoints(CUE_POS, hit, 1.0);
     const norm = new THREE.Vector3(-1, 0, 0);

@@ -103,7 +103,11 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     dragging = false;
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
-    if (pt) controller.onDragEnd(pt);
+    if (pt) {
+      controller.onDragEnd(pt);
+    } else {
+      controller.cancel();  // pointer went off-table: cancel drag, clears aim line
+    }
     opts.onAimUpdate?.();  // clear aim+power visuals when shot fires or drag drops
   }
 

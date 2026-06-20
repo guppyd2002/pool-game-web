@@ -463,3 +463,172 @@ describe('getAimHit', () => {
     expect(ctrl.getAimHit()).toBeNull();
   });
 });
+
+// ─── CUE-005: spin offset (English / side-spin) ───────────────────────────────
+
+import { CUE_MAX_SPIN } from '../../game/cue-controller';
+
+describe('CUE-005: setSpinOffset / getSpinOffset — CUE-012 torque synthesis', () => {
+  it('getSpinOffset() returns (0, 0) initially', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    expect(ctrl.getSpinOffset()).toEqual({ x: 0, y: 0 });
+  });
+
+  it('setSpinOffset() updates getSpinOffset()', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setSpinOffset(0.5, -0.3);
+    expect(ctrl.getSpinOffset()).toEqual({ x: 0.5, y: -0.3 });
+  });
+
+  it('zero spin → torque (0, 0, 0) in applyShot', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0, 0);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });
+    const t = physics.shotLog[0].torque;
+    expect(t.x).toBe(0);
+    expect(t.y).toBe(0);
+    expect(t.z).toBe(0);
+  });
+
+  it('full left side-spin, aim +X at max power → torque.y = -CUE_MAX_SPIN', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(1, 0);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });  // aim +X, max power
+    const t = physics.shotLog[0].torque;
+    expect(t.y).toBe(-CUE_MAX_SPIN);
+    expect(t.x).toBe(0);
+    expect(t.z).toBe(0);
+  });
+
+  it('full right side-spin, aim +X at max power → torque.y = +CUE_MAX_SPIN', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(-1, 0);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });
+    expect(physics.shotLog[0].torque.y).toBe(CUE_MAX_SPIN);
+  });
+
+  it('side spin scales with power: half drag → half torque.y', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(1, 0);
+
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });
+    const fullTorqueY = physics.shotLog[0].torque.y;
+
+    physics.shotLog.length = 0;
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG / 2, z: 0 });
+    const halfTorqueY = physics.shotLog[0].torque.y;
+
+    expect(halfTorqueY).toBe(Math.trunc(fullTorqueY / 2));
+  });
+
+  it('backspin, aim +X at max power → torque.z = -CUE_MAX_SPIN, torque.x = 0', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0, -1);  // full backspin
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });  // aim +X
+    const t = physics.shotLog[0].torque;
+    expect(t.x).toBe(0);      // nz=0 → slider.right.x = -nz = 0
+    expect(t.y).toBe(0);      // spinX=0
+    expect(t.z).toBe(-CUE_MAX_SPIN);  // spinY*spinMag*nx = -1*CUE_MAX_SPIN*1
+  });
+
+  it('topspin, aim +X at max power → torque.z = +CUE_MAX_SPIN', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0, 1);  // full topspin
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });
+    expect(physics.shotLog[0].torque.z).toBe(CUE_MAX_SPIN);
+  });
+
+  it('backspin, aim +Z → torque.x = +CUE_MAX_SPIN, torque.z = 0', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0, -1);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: 0, z: -CUE_MAX_DRAG });  // aim +Z: dz=(0-(-MAX_DRAG))=+MAX_DRAG, nz=1
+    const t = physics.shotLog[0].torque;
+    expect(t.x).toBe(CUE_MAX_SPIN);   // spinY*spinMag*(-nz) = -1*CUE_MAX_SPIN*(-1) = +CUE_MAX_SPIN
+    expect(t.y).toBe(0);
+    expect(t.z).toBe(0);
+  });
+
+  it('aim direction affects backspin torque orientation', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0, -1);
+
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });  // aim +X
+    const shotX = physics.shotLog[0].torque;
+
+    physics.shotLog.length = 0;
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: 0, z: -CUE_MAX_DRAG });  // aim +Z
+    const shotZ = physics.shotLog[0].torque;
+
+    expect(shotX.x).toBe(0);
+    expect(shotX.z).not.toBe(0);
+
+    expect(shotZ.x).not.toBe(0);
+    expect(shotZ.z).toBe(0);
+  });
+
+  it('mixed spin (side + back) → correct X/Y/Z torque', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0.5, -0.5);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });  // aim +X, max power
+    const t = physics.shotLog[0].torque;
+    const spinMag = CUE_MAX_SPIN;
+    expect(t.y).toBe(Math.trunc(-0.5 * spinMag));  // side english → Y
+    expect(t.z).toBe(Math.trunc(-0.5 * spinMag));  // backspin on +X aim → Z
+    expect(t.x).toBe(0);
+  });
+
+  it('spin persists across multiple shots', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0.5, 0);
+
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });
+
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG, z: 0 });
+
+    expect(physics.shotLog[0].torque.y).toBe(physics.shotLog[1].torque.y);
+    expect(physics.shotLog[0].torque.y).not.toBe(0);
+  });
+
+  it('cancel does not reset spin offset', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setSpinOffset(0.7, -0.3);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.cancel();
+    expect(ctrl.getSpinOffset()).toEqual({ x: 0.7, y: -0.3 });
+  });
+
+  it('torque components are Fixed integers (no fractional part)', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.setSpinOffset(0.333, -0.7);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -CUE_MAX_DRAG * 0.6, z: CUE_MAX_DRAG * 0.4 });
+    const t = physics.shotLog[0].torque;
+    expect(t.x).toBe(Math.trunc(t.x));
+    expect(t.y).toBe(Math.trunc(t.y));
+    expect(t.z).toBe(Math.trunc(t.z));
+  });
+});
