@@ -143,4 +143,39 @@ export class CmKinematicState {
       this.kinematicTriggerId + ':' + this.isOutOfCube + ':' +
       this.velocity.toString() + ':' + this.angularVelocity.toString() + ':';
   }
+
+  /** Deserialize from toString() output (single state, trailing colon included or omitted).
+   *
+   *  Serialization order (toString):  id:time:isActive:pos:isKinematic:triggerId:isOutOfCube:vel:angVel:
+   *  Constructor order:               id, time, isActive, pos, vel, angVel, isKinematic, triggerId, isOutOfCube
+   *  The two orders differ — vel/angVel appear at serialized slots 7/8 but are constructed at slots 4/5.
+   */
+  static fromString(s: string): CmKinematicState {
+    // CmSimpleVector.toString() never emits ':', so split(':') on a single state gives 10 parts (last = '').
+    const p = s.split(':');
+    return new CmKinematicState(
+      parseInt(p[0], 10),               // id
+      parseInt(p[1], 10),               // time
+      p[2] === 'true',                   // isActive
+      CmSimpleVector.fromString(p[3]),   // position   (serialized slot 3, constructed slot 3)
+      CmSimpleVector.fromString(p[7]),   // velocity   (serialized slot 7, constructed slot 4)
+      CmSimpleVector.fromString(p[8]),   // angVel     (serialized slot 8, constructed slot 5)
+      p[4] === 'true',                   // isKinematic (serialized slot 4, constructed slot 6)
+      parseInt(p[5], 10) || 0,         // triggerId  (serialized slot 5, constructed slot 7)
+      p[6] === 'true',                   // isOutOfCube (serialized slot 6, constructed slot 8)
+    );
+  }
+
+  /** Parse the concatenated kinematicStates stream back into individual states.
+   *  Each state is 9 colon-delimited fields followed by a trailing ':', so every
+   *  9 tokens in the split array forms one state. */
+  static parseStream(stream: string): CmKinematicState[] {
+    if (!stream) return [];
+    const parts = stream.split(':');
+    const states: CmKinematicState[] = [];
+    for (let i = 0; i + 9 <= parts.length; i += 9) {
+      states.push(CmKinematicState.fromString(parts.slice(i, i + 9).join(':') + ':'));
+    }
+    return states;
+  }
 }
