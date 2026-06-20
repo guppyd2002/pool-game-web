@@ -13,9 +13,11 @@
  */
 
 import { toFloat } from '../physics/fixed-math';
+import { MULTIPLIER } from '../physics/fixed-math';
 import type { Fixed } from '../physics/fixed-math';
 import { CmVector } from '../physics/cm-vector';
 import { CmSpace } from '../physics/cm-space';
+import { CmLineCollider } from '../physics/colliders';
 import { CmForceMode } from '../physics/cm-rigidbody';
 import type { CmRigidbody } from '../physics/cm-rigidbody';
 import type { SceneAPI } from '../renderer/scene';
@@ -112,6 +114,126 @@ function bodyToBallState(body: CmRigidbody): BallState {
     isKinematic: body.isKinematic,
     isOutOfTable: body.isOutOfCube,
   };
+}
+
+// ─── PHY-009: Analytic SphereCast (matches C# SphereCastManager.SphereCast) ──
+// UX-only, non-deterministic (float arithmetic). Not used in physics simulation.
+
+function analyticSphereCast(from: CmVector, dir: CmVector, space: CmSpace): AimHit {
+  const M = MULTIPLIER;
+  const noneHit: AimHit = { hitType: 'none', ballId: null, cushionId: null, point: from, normal: CmVector.zero, distance: 0 };
+
+  if (dir.x === 0 && dir.y === 0 && dir.z === 0) return noneHit;
+
+  const r = BALL_RADIUS / M;          // ball radius in float meters
+  const maxD = (SPACE_SCALE_X * 2) / M;  // max search in float meters
+
+  // From/dir in float
+  const fx = from.x / M, fy = from.y / M, fz = from.z / M;
+  const rawMag = Math.sqrt((dir.x * dir.x + dir.y * dir.y + dir.z * dir.z) / (M * M));
+  if (rawMag < 1e-9) return noneHit;
+  const dx = dir.x / M / rawMag, dy = dir.y / M / rawMag, dz = dir.z / M / rawMag;
+
+  // ── Ball detection (C# SphereCastManager ball loop) ──────────────────────
+  let bestBallD = maxD;
+  let bestBallHit: AimHit | null = null;
+  const diam2 = 4 * r * r;  // diameter squared
+
+  for (const body of space.rigidbodies) {
+    if (body.isKinematic || body.isOutOfCube) continue;
+    const bx = body.collider.position.x / M;
+    const by = body.collider.position.y / M;
+    const bz = body.collider.position.z / M;
+    if (bx === fx && by === fy && bz === fz) continue;  // skip cue ball at origin
+
+    const tx = bx - fx, ty = by - fy, tz = bz - fz;
+    const dotFwd = dx * tx + dy * ty + dz * tz;
+    if (dotFwd <= 0) continue;  // behind
+
+    const perpX = tx - dx * dotFwd, perpY = ty - dy * dotFwd, perpZ = tz - dz * dotFwd;
+    const perpD2 = perpX * perpX + perpY * perpY + perpZ * perpZ;
+    if (perpD2 >= diam2) continue;  // miss
+
+    const cDist = dotFwd - Math.sqrt(diam2 - perpD2);
+    if (cDist <= 0 || cDist >= bestBallD) continue;
+
+    bestBallD = cDist;
+    const spX = fx + dx * cDist, spY = fy + dy * cDist, spZ = fz + dz * cDist;
+    const nm = Math.sqrt((spX - bx) ** 2 + (spY - by) ** 2 + (spZ - bz) ** 2) || 1;
+    const nX = (spX - bx) / nm, nY = (spY - by) / nm, nZ = (spZ - bz) / nm;
+    bestBallHit = {
+      hitType: 'ball', ballId: body.id, cushionId: null,
+      point: new CmVector(Math.round((bx + r * nX) * M), Math.round((by + r * nY) * M), Math.round((bz + r * nZ) * M)),
+      normal: new CmVector(Math.round(nX * M), Math.round(nY * M), Math.round(nZ * M)),
+      distance: Math.round(cDist * M),
+    };
+  }
+
+  // ── Board/Rail detection (C# SphereCastManager board loop) ───────────────
+  let bestBoardD = maxD;
+  let bestBoardHit: AimHit | null = null;
+
+  for (const collider of space.colliders) {
+    if (!(collider instanceof CmLineCollider)) continue;
+
+    // board.normal = collider.forward (inward-pointing unit vector in Fixed)
+    const nX = collider.forward.x / M, nY = collider.forward.y / M, nZ = collider.forward.z / M;
+    const cX = collider.position.x / M, cY = collider.position.y / M, cZ = collider.position.z / M;
+    const aX = collider.right.x / M, aY = collider.right.y / M, aZ = collider.right.z / M;
+    const halfLen = collider.scale.x / (2 * M);
+
+    // dot = -Dot(dir, normal) — must be > 0 (moving toward board)
+    const dotDN = dx * nX + dy * nY + dz * nZ;
+    const dotBoard = -dotDN;
+    if (dotBoard <= 0) continue;
+
+    // sideCheck = Dot(from - center, normal) — must be ≥ 0 (on correct side)
+    const sideCheck = (fx - cX) * nX + (fy - cY) * nY + (fz - cZ) * nZ;
+    if (sideCheck <= r) continue;  // already touching or on wrong side
+
+    const distH = sideCheck;
+    const length = distH / dotBoard;
+    const distL = Math.sqrt(Math.max(0, length * length - distH * distH));
+    const distP = distL * (1 - r / distH);
+
+    // projDir = ProjectOnPlane(dir, normal).normalized
+    const prX = dx - dotDN * nX, prY = dy - dotDN * nY, prZ = dz - dotDN * nZ;
+    const prMag = Math.sqrt(prX * prX + prY * prY + prZ * prZ);
+    const pdX = prMag > 1e-9 ? prX / prMag : aX;
+    const pdY = prMag > 1e-9 ? prY / prMag : aY;
+    const pdZ = prMag > 1e-9 ? prZ / prMag : aZ;
+
+    // pointOnLine = from - distH * normal (projection of from onto board plane)
+    const polX = fx - distH * nX, polY = fy - distH * nY, polZ = fz - distH * nZ;
+
+    // hitPoint on board surface
+    const hpX = polX + distP * pdX, hpY = polY + distP * pdY, hpZ = polZ + distP * pdZ;
+
+    // Bounds check: distance of hitPoint from board center along rail axis
+    const hitAxialDist = Math.abs((hpX - cX) * aX + (hpY - cY) * aY + (hpZ - cZ) * aZ);
+    if (hitAxialDist > halfLen) continue;
+
+    // Sphere center at collision
+    const spX = hpX + r * nX, spY = hpY + r * nY, spZ = hpZ + r * nZ;
+    const cDist = Math.sqrt((spX - fx) ** 2 + (spY - fy) ** 2 + (spZ - fz) ** 2);
+    if (cDist <= 0 || cDist >= bestBoardD) continue;
+
+    bestBoardD = cDist;
+    bestBoardHit = {
+      hitType: 'cushion', ballId: null, cushionId: collider.id,
+      point: new CmVector(Math.round(hpX * M), Math.round(hpY * M), Math.round(hpZ * M)),
+      normal: new CmVector(Math.round(nX * M), Math.round(nY * M), Math.round(nZ * M)),
+      distance: Math.round(cDist * M),
+    };
+  }
+
+  if (bestBallD < bestBoardD && bestBallHit) return bestBallHit;
+  if (bestBoardD < bestBallD && bestBoardHit) return bestBoardHit;
+
+  const endX = Math.round((fx + dx * maxD) * M);
+  const endY = Math.round((fy + dy * maxD) * M);
+  const endZ = Math.round((fz + dz * maxD) * M);
+  return { ...noneHit, point: new CmVector(endX, endY, endZ), distance: Math.round(maxD * M) };
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -325,58 +447,7 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
     // ── 瞄準預測（PHY-009，read-only preview）────────────────────────────
 
     predictAimLine(from: CmVector, dir: CmVector): AimHit {
-      const noneHit: AimHit = {
-        hitType: 'none', ballId: null, cushionId: null,
-        point: from, normal: CmVector.zero, distance: 0,
-      };
-
-      const mag = dir.magnitude;
-      if (mag === 0) return noneHit;
-
-      const dirUnit = CmVector.divide(dir, mag);
-      // Step size matches C# SphereCast delta = max(radius/4, 1)
-      const STEP = Math.max(Math.trunc(BALL_RADIUS / 4), 1); // 71
-      const MAX_DIST = SPACE_SCALE_X * 2;
-
-      let currentPoint = from;
-      let distance = 0;
-
-      while (distance <= MAX_DIST) {
-        // Advance before checking — skips checking at origin (own ball position)
-        const delta = CmVector.multiply(dirUnit, STEP);
-        currentPoint = CmVector.add(currentPoint, delta);
-        distance += STEP;
-
-        // Check balls first
-        for (const body of space.rigidbodies) {
-          if (body.isKinematic || body.isOutOfCube) continue;
-          // Skip the ball at the ray origin (the shooting ball)
-          if (body.collider.position.x === from.x &&
-              body.collider.position.y === from.y &&
-              body.collider.position.z === from.z) continue;
-
-          const result = body.collider.isHitSphere(currentPoint, BALL_RADIUS + body.collider.radius);
-          if (result.hit) {
-            return {
-              hitType: 'ball', ballId: body.id, cushionId: null,
-              point: result.hitInfo.point, normal: result.hitInfo.normal, distance,
-            };
-          }
-        }
-
-        // Check static colliders (rails; CmPlaneCollider.isHitSphere always returns false)
-        for (const collider of space.colliders) {
-          const result = collider.isHitSphere(currentPoint, BALL_RADIUS + collider.radius);
-          if (result.hit) {
-            return {
-              hitType: 'cushion', ballId: null, cushionId: collider.id,
-              point: result.hitInfo.point, normal: result.hitInfo.normal, distance,
-            };
-          }
-        }
-      }
-
-      return { ...noneHit, point: currentPoint, distance: MAX_DIST };
+      return analyticSphereCast(from, dir, space);
     },
 
     // ── render replay（renderer 專用，C3-I1: no rigidbody mutation）───────

@@ -411,3 +411,154 @@ describe('G6: state serialization and reset', () => {
     expect(physics.getBall(0).position.x).toBe(pxAfterShot);
   });
 });
+
+// ─── PHY-009: analytic SphereCast geometry ────────────────────────────────────
+//
+// Tests verifying that predictAimLine() uses the analytic SphereCastManager port
+// (not step-cast approximation). Float arithmetic, UX-only precision.
+
+describe('PHY-009 analytic SphereCast: ball detection geometry', () => {
+  it('ball directly in path: hitType=ball, correct ballId', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    expect(hit.hitType).toBe('ball');
+    expect(hit.ballId).toBe(1);
+  });
+
+  it('ball hit: distance is between 0 and rail distance (ball wins over cushion)', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    // Right rail is ~17414 Fixed away; ball at 2000 should be hit first
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    expect(hit.distance).toBeGreaterThan(0);
+    expect(hit.distance).toBeLessThan(17414);
+  });
+
+  it('ball hit: hit.point ≈ target ball contact surface (ballCenter + r*normal)', () => {
+    // b0 at (-5000, BALL_Y, 0), b1 at (2000, BALL_Y, 0), shooting +X
+    // contact: sphere of b0 just touching b1 → at x = b1.x - 2r = 2000 - 570 = 1430
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    // The contact point is on b1's surface toward the cue: b1.x - BALL_RADIUS
+    expect(hit.point.x).toBeCloseTo(2000 - BALL_RADIUS, -1);  // within ~10 Fixed
+    expect(hit.point.z).toBeCloseTo(0, 0);
+  });
+
+  it('ball hit: normal points from target ball center toward cue (inward on +X shot = -X normal)', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    // Normal points FROM b1 toward cue ball sphere center = -X direction
+    expect(hit.normal.x).toBeLessThan(0);
+    expect(hit.normal.z).toBeCloseTo(0, 0);
+  });
+
+  it('ball behind ray origin is skipped (dotFwd <= 0 guard)', () => {
+    // b0 at (-5000, BALL_Y, 0), b1 at (-8000, BALL_Y, 0) — behind the ray in +X direction
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1, -8000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    // b1 is behind → should not be detected; expect cushion or none
+    expect(hit.hitType).not.toBe('ball');
+  });
+
+  it('kinematic (pocketed) ball is skipped', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+    // Mark b1 as kinematic (pocketed)
+    space.rigidbodies[1].isKinematic = true;
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    expect(hit.hitType).not.toBe('ball');
+  });
+});
+
+describe('PHY-009 analytic SphereCast: cushion detection geometry', () => {
+  it('straight shot in +X: hits right long rail, hitType=cushion', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    expect(hit.hitType).toBe('cushion');
+    expect(hit.cushionId).not.toBeNull();
+  });
+
+  it('straight shot in -X: hits left long rail, hitType=cushion', () => {
+    const b0 = makeBall(0, 5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(5000, BALL_Y, 0), new CmVector(-10000, 0, 0));
+    expect(hit.hitType).toBe('cushion');
+    expect(hit.distance).toBeGreaterThan(0);
+  });
+
+  it('cushion hit: normal is the inward-facing unit vector of the rail', () => {
+    // Right long rail forward = (-10000, 0, 0), i.e. normal.x = -1 in float
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    expect(hit.hitType).toBe('cushion');
+    // Normal should be the rail's forward = (-10000, 0, 0) normalized
+    expect(hit.normal.x).toBeLessThan(0);
+    expect(Math.abs(hit.normal.z)).toBeLessThanOrEqual(1);
+  });
+
+  it('cushion hit: distance ≈ (rail_x - cue_x - BALL_RADIUS) for perpendicular shot', () => {
+    // cue at x = -5000, rail at x = RAIL_LONG_X = 12699
+    // float: separation = (12699 - (-5000)) / 10000 = 1.7699 m
+    // sphere center reaches rail when front of sphere touches: dist = (1.7699 - BALL_RADIUS/10000) = 1.7414
+    // So Fixed distance ≈ 17414
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0));
+    expect(hit.hitType).toBe('cushion');
+    // Allow ±30 Fixed (±0.003 m) tolerance for float arithmetic
+    expect(hit.distance).toBeGreaterThan(17414 - 30);
+    expect(hit.distance).toBeLessThan(17414 + 30);
+  });
+
+  it('zero direction: returns hitType=none', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+
+    const hit = physics.predictAimLine(new CmVector(-5000, BALL_Y, 0), CmVector.zero);
+    expect(hit.hitType).toBe('none');
+  });
+});
