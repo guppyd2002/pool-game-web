@@ -18,6 +18,7 @@ import { createCueController } from './game/cue-controller';
 import { createCueAdapter } from './game/cue-adapter';
 import { createAimLine } from './renderer/aim-line';
 import { createPowerBar } from './renderer/power-bar';
+import { createCueMesh } from './renderer/cue-mesh';
 import { createWSClient } from './network/ws-client';
 import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
@@ -35,6 +36,9 @@ const physics = createBallPoolPhysics(space, scene);
 const cue = createCueController(physics);
 const aimLine = createAimLine(scene.scene);
 const powerBar = createPowerBar(container);
+const cueMesh = createCueMesh(scene.scene);
+
+let _lastAimTime = 0;
 
 const adapter = createCueAdapter({
   camera: scene.camera,
@@ -42,9 +46,24 @@ const adapter = createCueAdapter({
   cueBallMesh: scene.balls[0],
   controller: cue,
   onAimUpdate: () => {
+    const now = performance.now() / 1000;
+    const dt = _lastAimTime === 0 ? 0.016 : Math.min(now - _lastAimTime, 0.1);
+    _lastAimTime = now;
+
     const cueBall = physics.getBall(0);
-    aimLine.update(cueBall.position, cue.getAimHit());
+    const hit = cue.getAimHit();
+    aimLine.update(cueBall.position, hit);
     powerBar.update(cue.getPowerFraction());
+
+    // CUE-001/016: derive aim direction from hit.point - cueBall.position
+    const aimDir = hit
+      ? new CmVector(
+          hit.point.x - cueBall.position.x,
+          0,
+          hit.point.z - cueBall.position.z,
+        )
+      : null;
+    cueMesh.update(cueBall.position, aimDir, dt);
   },
   onZoom: (delta) => {
     const dir = scene.camera.position.clone().normalize();
@@ -56,6 +75,7 @@ window.addEventListener('beforeunload', () => {
   adapter.dispose();
   aimLine.dispose();
   powerBar.dispose();
+  cueMesh.dispose();
 });
 
 // ─── Multiplayer ─────────────────────────────────────────────────────────────
