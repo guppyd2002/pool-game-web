@@ -5,6 +5,25 @@
  * 1.0 = 10000, 0.5 = 5000, 2.0 = 20000.
  *
  * CRITICAL: Every division MUST use Math.trunc() to match C# long division (truncate toward zero).
+ *
+ * ─── DETERMINISM INVARIANT — JS Number safety bounds ────────────────────────
+ * The physics engine uses JS Number (IEEE 754 double, exact integers up to 2^53).
+ * The only ≥3-factor multiply site is cm-rigidbody.ts:401
+ *   sf × tFactor × right.x  where
+ *     sf      = fixSqrtSave(fixMul(m1.sf, m2.sf)) — always a multiple of SQRT_MULTIPLIER=100 (=2²×5²)
+ *     tFactor = trunc(velocityT × MULTIPLIER / velocityN) — at velocityN=1 is velocityT × 10000 (=2⁴×5⁴)
+ *     right.x ∈ [-MULTIPLIER, MULTIPLIER]
+ *
+ * Worst-case product (MAX_FORCE=65000, mass=1700, velocityN=1):
+ *   maxVelocityFP = trunc(65000 × 10000 / 1700) = 382352
+ *   worst         = 2300 × (382352 × 10000) × 10000 ≈ 8.79 × 10^16  (~2^56.3)
+ *   ULP at 2^56   = 2^4 = 16.  Product is divisible by 100 × 10000 = 10^6 = 2^6 × 5^6.
+ *   2^6 > 2^4 → product is always exactly representable as IEEE 754 double. ✓
+ *
+ * GUARD: If MAX_FORCE is ever raised above ~5× (>~325000), the worst product
+ *   enters 2^59+ where IEEE 754 ULP > 10^6 and precision loss WILL occur.
+ *   Any change to MAX_FORCE in input-handler.ts MUST re-validate this invariant
+ *   and update the G1 guard tests in fixed-math-overflow.test.ts.
  */
 
 /** Fixed-point number type alias. All physics values use this. */
@@ -37,6 +56,22 @@ export function fixMul(a: Fixed, b: Fixed): Fixed {
 /** Fixed-point divide: (a * MULTIPLIER) / b */
 export function fixDiv(a: Fixed, b: Fixed): Fixed {
   return Math.trunc((a * MULTIPLIER) / b);
+}
+
+/**
+ * Three-factor fixed-point multiply: trunc(a × b × c / MULTIPLIER²).
+ *
+ * Uses BigInt internally to prevent IEEE 754 precision loss. This is the ONLY
+ * site in the engine where three factors are multiplied before dividing — the
+ * friction direction computation at cm-rigidbody.ts:401-403. Products can reach
+ * ~2^56.8, which is above 2^53 and may not be divisible by ULP, causing JS Number
+ * to round the intermediate differently from C# long.
+ *
+ * All other multiply sites are two-factor (well within 2^53 range) and remain as
+ * plain JS Number arithmetic.
+ */
+export function fixMul3(a: Fixed, b: Fixed, c: Fixed): Fixed {
+  return Number(BigInt(a) * BigInt(b) * BigInt(c) / BigInt(MULTIPLIER * MULTIPLIER));
 }
 
 /** Absolute value */

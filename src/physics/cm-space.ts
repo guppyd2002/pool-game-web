@@ -14,12 +14,7 @@ import { CmCollisionManager } from './cm-collision';
 import type { CmSpaceCube } from './cm-collision';
 import { CmRigidbodyState, CmSpaceState, CmKinematicState } from './cm-state';
 import { CmSimpleVector } from './cm-vector';
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const PRECISION = 2;
-const MIN_TS: Fixed = 50;
-const MAX_TS: Fixed = 200;
+import { MIN_TS, MAX_TS, PRECISION } from './constants';
 
 // ─── Spatial hash key ────────────────────────────────────────────────────────
 
@@ -46,7 +41,7 @@ export class CmSpace {
   private dynamicSubspaces = new Map<string, number[]>();
   private staticSubspaces = new Map<string, number[]>();
   private kinematicSubspaces = new Map<string, number[]>();
-  private calculateTime: Fixed = 0;
+  calculateTime: Fixed = 0;
   private savedState: CmSpaceState | null = null;
   private bodyUpdateCallback: ((body: CmRigidbody) => void) | null = null;
 
@@ -477,5 +472,88 @@ export class CmSpace {
   /** Set body position by id */
   setBodyPosition(bodyId: number, position: CmVector): void {
     this.rigidbodies[bodyId].collider.position = position;
+  }
+
+  /**
+   * PHY-016: Place a ball on a plane collider at the first unoccupied grid cell.
+   *
+   * Port of C# CmSpace.PutBallOnPlane.  Walks a cross pattern from the plane center:
+   *   center → +right arm → -right arm → +forward arm → -forward arm
+   * Each step is 3 * ball.radius.  Five subspace cells are checked per candidate
+   * (center ± right*radius, center ± forward*radius).  Falls back to plane center
+   * if all candidates are occupied or numberOfChecks exhausted.
+   *
+   * Reads dynamicSubspaces (populated by calculate() or setState()) for occupancy.
+   * Does NOT update dynamicSubspaces after placement — the next calculate() will.
+   */
+  putBallOnPlane(
+    bodyId: number,
+    planeId: number,
+    numberOfChecks: number,
+    bodyUpdateCallback: ((body: CmRigidbody) => void) | null,
+  ): void {
+    const plane = this.colliders[planeId];
+    const moveBody = this.rigidbodies[bodyId];
+    moveBody.isKinematic = false;
+    moveBody.isOutOfCube = false;
+
+    const deltaY = CmVector.multiply(plane.up, moveBody.collider.radius);
+    let currentPoint = CmVector.add(plane.position, deltaY);
+    let delta = CmVector.zero;
+    let puted = false;
+    let directionX = 1;
+    let directionZ = 0;
+    let andCheck = false;
+    const displacement = numberOfChecks * 3 * moveBody.collider.radius;
+
+    while (!puted && !andCheck) {
+      currentPoint = CmVector.add(CmVector.add(delta, plane.position), deltaY);
+
+      if (delta.x > displacement) {
+        delta = CmVector.zero;
+        directionX = -1;
+      } else if (delta.x < -displacement) {
+        delta = CmVector.zero;
+        directionX = 0;
+        directionZ = 1;
+      } else if (delta.z > displacement) {
+        delta = CmVector.zero;
+        directionX = 0;
+        directionZ = -1;
+      } else if (delta.z < -displacement) {
+        andCheck = true;
+      }
+
+      delta = CmVector.add(
+        delta,
+        CmVector.add(
+          CmVector.multiply(plane.right, 3 * directionX * moveBody.collider.radius),
+          CmVector.multiply(plane.forward, 3 * directionZ * moveBody.collider.radius),
+        ),
+      );
+
+      const r = moveBody.collider.radius;
+      const p0 = this._getOnePosition(currentPoint);
+      const p1 = this._getOnePosition(CmVector.add(currentPoint, CmVector.multiply(plane.right,    r)));
+      const p2 = this._getOnePosition(CmVector.add(currentPoint, CmVector.multiply(plane.right,   -r)));
+      const p3 = this._getOnePosition(CmVector.add(currentPoint, CmVector.multiply(plane.forward,  r)));
+      const p4 = this._getOnePosition(CmVector.add(currentPoint, CmVector.multiply(plane.forward, -r)));
+
+      if (!this.dynamicSubspaces.has(spaceKey(p0)) &&
+          !this.dynamicSubspaces.has(spaceKey(p1)) &&
+          !this.dynamicSubspaces.has(spaceKey(p2)) &&
+          !this.dynamicSubspaces.has(spaceKey(p3)) &&
+          !this.dynamicSubspaces.has(spaceKey(p4))) {
+        moveBody.collider.position = currentPoint;
+        puted = true;
+      }
+    }
+
+    if (!puted) {
+      currentPoint = CmVector.add(plane.position, deltaY);
+      moveBody.collider.position = currentPoint;
+    }
+
+    bodyUpdateCallback?.(moveBody);
   }
 }

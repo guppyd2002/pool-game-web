@@ -23,6 +23,20 @@ import type { CmMaterial } from '../../physics/colliders';
 import { CmRigidbody, CmForceMode, CmKinematicTrigger } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
 import type { CmSpaceCube } from '../../physics/cm-collision';
+import { simulateToCompletion } from '../../physics/simulate';
+import {
+  BALL_MASS, BALL_RADIUS, TABLE_Y, BALL_Y,
+  BALL_MATERIAL as BALL_MAT,
+  CLOTH_MATERIAL as CLOTH_MAT,
+  RAIL_MATERIAL as RAIL_MAT,
+  POCKET_RADIUS, POCKET_POSITIONS,
+  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
+  RAIL_LONG_X, RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS,
+  RAIL_BACK_X, RAIL_BACK_Z, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS,
+  CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
+  CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
+  DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+} from '../../physics/constants';
 
 // ─── Types mirroring the JSON fixture schema ────────────────────────────────
 
@@ -53,21 +67,9 @@ interface GoldenVector {
 // ─── Load fixture ───────────────────────────────────────────────────────────
 
 const fixtureFile = resolve(__dirname, '../../../tests/fixtures/physics-golden-vectors.json');
-const GOLDEN_VECTORS: GoldenVector[] = JSON.parse(readFileSync(fixtureFile, 'utf-8'));
-
-// ─── Scene constants (from Game.unity — do NOT change) ─────────────────────
-
-const BALL_MASS   = 1700;
-const BALL_RADIUS = 285;
-const TABLE_Y     = 9154;
-const BALL_Y      = 9440; // TABLE_Y + BALL_RADIUS (rounded as in scene)
-
-// Ball-ball contact material
-const BALL_MAT: CmMaterial  = { bounciness: 9499, rollingFriction: 49,  twistingFriction: 200000, dynamicFriction: 500,  staticFriction: 599  };
-// Table cloth (plane)
-const CLOTH_MAT: CmMaterial = { bounciness: 500,  rollingFriction: 99,  twistingFriction: 200000, dynamicFriction: 8000, staticFriction: 8999 };
-// Cushion rail
-const RAIL_MAT: CmMaterial  = { bounciness: 6000, rollingFriction: 0,   twistingFriction: 0,      dynamicFriction: 0,    staticFriction: 2000 };
+const ALL_VECTORS: GoldenVector[] = JSON.parse(readFileSync(fixtureFile, 'utf-8'));
+// GV-NN prefix only — FUZZ-NNNN entries are covered by fuzz-parity.test.ts
+const GOLDEN_VECTORS = ALL_VECTORS.filter(v => v.id.startsWith('GV-'));
 
 // ─── Scene geometry helpers ─────────────────────────────────────────────────
 
@@ -121,60 +123,47 @@ function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
   plane.right    = new CmVector(10000, 0, 0);
   plane.up       = new CmVector(0, 10000, 0);
   plane.forward  = new CmVector(0, 0, 10000);
-  plane.scale    = new CmVector(25399, 5000, 12699);
-  plane.radius   = 12699;
+  plane.scale    = new CmVector(PLANE_SCALE_X, 5000, PLANE_RADIUS);
+  plane.radius   = PLANE_RADIUS;
   plane.material = { ...CLOTH_MAT };
   list.push(plane);
 
-  // Right long rail  x=+12699  (right=(0,0,+1))
-  list.push(makeLine(id++,  12699, BALL_Y,     0,   0,0,10000, 0,10000,0, -10000,0,0,   11150, 5575, RAIL_MAT));
-  // Left long rail   x=-12699  (right=(0,0,-1))
-  list.push(makeLine(id++, -12699, BALL_Y,     0,   0,0,-10000, 0,10000,0, 10000,0,0,   11150, 5575, RAIL_MAT));
-  // Back short rail  z=+6349   (right=(-1,0,0))
-  list.push(makeLine(id++,   6290, BALL_Y,  6349,  -10000,0,0, 0,10000,0, 0,0,-10000,   11269, 5634, RAIL_MAT));
-  // Front short rail z=-6349   (right=(+1,0,0))
-  list.push(makeLine(id++,  -6290, BALL_Y, -6349,   10000,0,0, 0,10000,0, 0,0, 10000,   11269, 5634, RAIL_MAT));
+  // Right long rail  x=+RAIL_LONG_X  (right=(0,0,+1))
+  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y,     0,   0,0,10000, 0,10000,0, -10000,0,0,   RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  // Left long rail   x=-RAIL_LONG_X  (right=(0,0,-1))
+  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y,     0,   0,0,-10000, 0,10000,0, 10000,0,0,   RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  // Back short rail  z=+RAIL_BACK_Z  (right=(-1,0,0))
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000,   RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  // Front short rail z=-RAIL_BACK_Z  (right=(+1,0,0))
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000,   RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
 
-  // Corner pocket cushion guards (angled)
-  list.push(makeLine(id++,   12128, BALL_Y,  6552,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  570, 285, RAIL_MAT));
-  list.push(makeLine(id++,   12901, BALL_Y,  5778,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  569, 284, RAIL_MAT));
-  list.push(makeLine(id++,  -12128, BALL_Y, -6552,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  570, 285, RAIL_MAT));
-  list.push(makeLine(id++,  -12901, BALL_Y, -5778,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  569, 284, RAIL_MAT));
+  // Corner pocket cushion guards (angled ±45°)
+  list.push(makeLine(id++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
 
   return list;
 }
 
-/** 6 pocket triggers from Game.unity */
 function makePockets(): CmKinematicTrigger[] {
-  const positions: [number, number, number][] = [
-    [ 12875, BALL_Y,  6510], [ 12875, BALL_Y, -6510],
-    [-12875, BALL_Y,  6510], [-12875, BALL_Y, -6510],
-    [     0, BALL_Y,  7100], [     0, BALL_Y, -7100],
-  ];
-  return positions.map(([x, y, z], i) => {
+  return POCKET_POSITIONS.map(([px, pz], i) => {
     const t = new CmKinematicTrigger();
     t.id       = i;
-    t.position = new CmVector(x, y, z);
-    t.radius   = 450;
+    t.position = new CmVector(px, BALL_Y, pz);
+    t.radius   = POCKET_RADIUS;
     return t;
   });
 }
 
 const SPACE_CUBE: CmSpaceCube = {
   position: CmVector.zero,
-  scale: new CmVector(30000, 20000, 20000),
+  scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
 };
 
-// ─── Helper: run simulation to completion (or max steps) ───────────────────
-
-function simulate(space: CmSpace, maxSteps: number): number {
-  let steps = 0;
-  while (space.isActive && steps < maxSteps) {
-    space.calculate(null, false);
-    steps++;
-  }
-  return steps;
-}
+// simulateToCompletion() imported from src/physics/simulate.ts — shared with
+// fuzz-parity.test.ts and simulation-loop.ts (applyShot).  "Production path ==
+// golden path" is a code-level guarantee, not an assertion.
 
 // ─── Golden Vector Tests ────────────────────────────────────────────────────
 
@@ -202,7 +191,7 @@ for (const gv of GOLDEN_VECTORS) {
         cueBall.addTorque(new CmVector(torq.x, torq.y, torq.z), CmForceMode.Impulse);
       }
 
-      simulate(space, 2_000_000);
+      simulateToCompletion(space);
 
       // Assert each ball's final state against golden output
       for (const expected of gv.output) {
@@ -218,7 +207,12 @@ for (const gv of GOLDEN_VECTORS) {
         expect(body.velocity.x).toBe(expected.vx);
         expect(body.velocity.y).toBe(expected.vy);
         expect(body.velocity.z).toBe(expected.vz);
-        // ax/ay/az intentionally not asserted: angular velocity is always 0 at rest (deactivated state)
+        // PHY-017: angular velocity at rest must be 0 (isActive=false setter zeroes angularVelocity).
+        // Non-zero ax/ay/az during flight is verified by GV-07/GV-09 final-position parity
+        // (the spin phase drives a different trajectory, so any spin error shows up in px/pz).
+        expect(body.angularVelocity.x).toBe(expected.ax);
+        expect(body.angularVelocity.y).toBe(expected.ay);
+        expect(body.angularVelocity.z).toBe(expected.az);
         expect(body.isActive).toBe(expected.isActive);
         expect(body.isKinematic).toBe(expected.isKinematic);
         expect(body.isOutOfCube).toBe(expected.isOutOfCube);

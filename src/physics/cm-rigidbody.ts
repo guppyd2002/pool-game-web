@@ -6,12 +6,13 @@
  */
 
 import type { Fixed } from './fixed-math';
-import { MULTIPLIER, fixMul, fixSqrtSave, fixPowSave, fixAbs } from './fixed-math';
+import { MULTIPLIER, fixMul, fixSqrtSave, fixPowSave, fixAbs, fixMul3 } from './fixed-math';
 import { CmVector } from './cm-vector';
 import type { ICmCollider, CmHitInfo, CollisionResult } from './colliders';
 import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from './colliders';
 import { CmCollisionManager } from './cm-collision';
 import type { CmSpaceCube } from './cm-collision';
+import { MIN_SQR_VELOCITY, C_COUNT } from './constants';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
@@ -81,10 +82,6 @@ export interface CmKinematicState {
   kinematicTriggerId: number;
   isOutOfCube: boolean;
 }
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const MIN_SQR_VELOCITY: Fixed = 100;
 
 // ─── CmRigidbody ─────────────────────────────────────────────────────────────
 
@@ -191,10 +188,10 @@ export class CmRigidbody {
         this.velocity = CmVector.add(this.velocity, CmVector.multiply(CmVector.gravity, timestep));
       }
     } else {
-      this._checkIsActive(2);
+      this._checkIsActive(C_COUNT);
     }
     if (this.hitBodies.length > 0) {
-      this._checkIsActive(2);
+      this._checkIsActive(C_COUNT);
     }
   }
 
@@ -397,10 +394,11 @@ export class CmRigidbody {
     const staticFriction = fixSqrtSave(fixMul(this.collider.material.staticFriction, collider2.material.staticFriction));
 
     // direction = ((staticFriction * tFactor * collider.right) / (M*M) + hitInfo.Normal).Normalized
+    // fixMul3 uses BigInt internally — the only ≥3-factor site, products reach ~2^56.8 (above 2^53).
     const frictionVec = new CmVector(
-      Math.trunc((staticFriction * tFactor * hitInfo.collider!.right.x) / (MULTIPLIER * MULTIPLIER)),
-      Math.trunc((staticFriction * tFactor * hitInfo.collider!.right.y) / (MULTIPLIER * MULTIPLIER)),
-      Math.trunc((staticFriction * tFactor * hitInfo.collider!.right.z) / (MULTIPLIER * MULTIPLIER)),
+      fixMul3(staticFriction, tFactor, hitInfo.collider!.right.x),
+      fixMul3(staticFriction, tFactor, hitInfo.collider!.right.y),
+      fixMul3(staticFriction, tFactor, hitInfo.collider!.right.z),
     );
     const direction = CmVector.add(frictionVec, hitInfo.normal).normalized;
 
@@ -440,10 +438,11 @@ export class CmRigidbody {
     const delta = CmVector.sub(vector, project);
     const minLen = Math.trunc((15 * min) / 10);
     const projMag = project.magnitude;
-    if (projMag === 0) return vector;
-    // C# ClampMagnitude unconditionally applies (clamp(mgn) * normalized) / M — even when no
-    // clamping is needed. The normalize+scale cycle introduces fixed-point rounding that TS
-    // must replicate exactly (e.g. 305527 → magnitude 305500 → rescaled -305500, not -305527).
+    // C# ClampMagnitude returns zero when magnitude == 0 (not the original vector).
+    // When projMag==0, project.normalized==zero → clamped==zero → return delta.
+    // The normalize+scale cycle also introduces fixed-point rounding that TS must replicate
+    // exactly (e.g. 305527 → magnitude 305500 → rescaled -305500, not -305527).
+    if (projMag === 0) return delta;
     const clampedMag = projMag < fixAbs(minLen) ? fixAbs(minLen) : projMag;
     const clamped = CmVector.multiply(project.normalized, clampedMag);
     return CmVector.add(clamped, delta);

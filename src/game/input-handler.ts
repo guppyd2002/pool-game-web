@@ -14,9 +14,7 @@ import { MULTIPLIER, fromFloat } from '../physics/fixed-math';
 import { CmVector } from '../physics/cm-vector';
 import { PointerStateMachine } from './unified-input';
 import type { InputPoint } from './unified-input';
-
-// Max impulse (corresponds to MaxVelocity = 65000 in physics)
-const MAX_FORCE: Fixed = 65000;
+import { MAX_FORCE } from '../physics/constants';
 // Drag distance (in world units) that maps to max force
 const MAX_DRAG = 1.5;
 
