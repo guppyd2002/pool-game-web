@@ -147,7 +147,7 @@ describe('G1 spike: JS Number bit-parity vs BigInt (exact C# long)', () => {
   it('full scan: 0 mismatches across velocityN 1–200, all realistic rightX values', () => {
     // Comprehensive parity test: scan entire realistic parameter space
     const rightXValues = [M, 9999, 9001, 7071, 5000, 3000, 1000, 100, 1, -M, -7071];
-    const velocityTValues = [MAX_VEL_FP, 300000, 200000, 176470, 100000, 65000, 30000, 10000, 1000];
+    const velocityTValues = [MAX_VEL_FP * 2, MAX_VEL_FP, 300000, 200000, 176470, 100000, 65000, 30000, 10000, 1000]; // 2×MAX_VEL_FP=764704: hitRelVel regime (:401)
 
     let mismatches = 0;
     let maxProduct = 0n;
