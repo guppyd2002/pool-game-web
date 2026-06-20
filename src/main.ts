@@ -28,8 +28,10 @@ import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
 import { MULTIPLIER } from './physics/fixed-math';
 import { backswingOffset } from './game/shot-animation';
+import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
 import { createSpinDiscUI } from './renderer/spin-disc-ui';
+import { createPowerSliderUI } from './renderer/power-slider-ui';
 import * as THREE from 'three';
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
@@ -120,6 +122,15 @@ const adapter = createCueAdapter({
   },
 });
 
+// CUE-002: power slider (after adapter so closures can reference it)
+const shotSlider = createShotSlider({
+  onStartControl: () => { adapter.disable(); },  // CUE-019 mutex: slider drag → no aim drag
+  onEndControl:   () => { adapter.enable(); },
+  onMove:  (f) => { powerBar.update(f); },
+  onShot:  (f) => { cue.fireNow(f); },
+});
+const powerSliderUI = createPowerSliderUI(container, shotSlider);
+
 // CUE-006/CUE-008: spin disc (after adapter so closures can reference it)
 const spinDisc = createSpinDisc({
   onOpen:  () => { adapter.disable(); },  // CUE-019 mutex: disc open → no aim drag
@@ -176,6 +187,7 @@ window.addEventListener('beforeunload', () => {
   adapter.dispose();
   aimLine.dispose();
   ghostBall.dispose();
+  powerSliderUI.dispose();
   spinDiscUI.dispose();
   powerBar.dispose();
   cueMesh.dispose();

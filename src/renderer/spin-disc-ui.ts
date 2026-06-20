@@ -15,8 +15,14 @@ const DISC_RADIUS = 60;
 /** Spin dot half-size. */
 const DOT_R = 8;
 
-/** Visual scale: dot reaches 70% of disc radius at max spin (= C# koeficient = 0.7). */
-const VISUAL_SCALE = 0.7;
+/**
+ * C# koeficient = 0.7: limits max spin to 70% of disc radius.
+ * Applied to INPUT (toNormalized multiplies coords by KOEFICIENT) so domain spinX ∈ [-0.7, 0.7].
+ * VISUAL_SCALE = 1.0 because koeficient is already baked into the spin value;
+ * net dot offset = spinX * DISC_RADIUS * 1.0 = 0.7 * 60 = 42px = 70% of radius ✓
+ */
+const KOEFICIENT = 0.7;
+const VISUAL_SCALE = 1.0;
 
 export interface SpinDiscUI {
   /** Two-finger interrupt or programmatic close. */
@@ -101,9 +107,10 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
   function toNormalized(clientX: number, clientY: number): { nx: number; ny: number } {
     const rect = panel.getBoundingClientRect();
     const cx = rect.left + DISC_RADIUS, cy = rect.top + DISC_RADIUS;
+    // Multiply by KOEFICIENT so full-rim drag → spin = 0.7 (matching C# displacement = normalizedPos * koeficient).
     return {
-      nx:  (clientX - cx) / DISC_RADIUS,
-      ny: -(clientY - cy) / DISC_RADIUS,  // Y flipped: screen-down = game-back
+      nx:  (clientX - cx) / DISC_RADIUS * KOEFICIENT,
+      ny: -(clientY - cy) / DISC_RADIUS * KOEFICIENT,  // Y flipped: screen-down = game-back
     };
   }
 

@@ -115,6 +115,14 @@ export interface CueController {
   disable(): void;
 
   /**
+   * CUE-002: Fire with explicit power fraction + last known aim direction.
+   * Enables slider-based shooting without requiring a drag-end gesture.
+   * Returns false if: no aim state saved, physics simulating, or forceFraction = 0.
+   * Does NOT check isEnabled — slider fires independently of the CUE-019 drag mutex.
+   */
+  fireNow(forceFraction: number): boolean;
+
+  /**
    * CUE-020: Reset cue parameters for the next turn, then enable.
    * Matches C# CueManager.ResetState() + ResetParameters():
    *   zeros backswing / verticalAngle / spinOffset / drag state, enables cue.
@@ -137,6 +145,9 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
   let _phase: 'idle' | 'aiming' = 'idle';
   let _startPoint: TablePoint | null = null;
   let _currentPoint: TablePoint | null = null;
+  // CUE-002: saved aim state for fireNow() — persists after onDragEnd
+  let _lastAimStart: TablePoint | null = null;
+  let _lastAimCurrent: TablePoint | null = null;
   let _spinX = 0;  // CUE-005 side english ∈ [-1, 1]
   let _spinY = 0;  // CUE-005 top/back spin ∈ [-1, 1]
   let _userVertAngle = 0;   // CUE-004: user-set elevation (degrees)
@@ -181,11 +192,15 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       _phase = 'aiming';
       _startPoint = point;
       _currentPoint = point;
+      // CUE-002: save aim state for fireNow()
+      _lastAimStart = point;
+      _lastAimCurrent = point;
     },
 
     onDragMove(point: TablePoint): void {
       if (_phase !== 'aiming') return;
       _currentPoint = point;
+      _lastAimCurrent = point;  // CUE-002: keep saved aim in sync
       // CUE-015: recompute auto-lift on every aim update
       if (_startPoint) {
         const dx = _startPoint.x - point.x;
@@ -226,6 +241,44 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
             Math.trunc(_spinY * spinMag * (-nz)) || 0,  // top/back → X
             Math.trunc(-_spinX * spinMag) || 0,          // side english → Y
             Math.trunc(_spinY * spinMag * nx) || 0,      // top/back → Z
+          );
+
+      const cueBall = physics.getBall(cueBallId);
+      physics.applyShot({
+        position: cueBall.position,
+        impulse: new CmVector(
+          Math.trunc(nx * force),
+          0,
+          Math.trunc(nz * force),
+        ),
+        torque,
+      });
+      return true;
+    },
+
+    fireNow(forceFraction: number): boolean {
+      if (!_lastAimStart || !_lastAimCurrent) return false;
+      if (physics.isSimulating) return false;
+
+      const dx = _lastAimStart.x - _lastAimCurrent.x;
+      const dz = _lastAimStart.z - _lastAimCurrent.z;
+      const nd = Math.sqrt(dx * dx + dz * dz);
+      if (nd < 0.001) return false;
+
+      const clamped = Math.max(0, Math.min(1, forceFraction));
+      const force = Math.trunc(clamped * MAX_FORCE);
+      if (force === 0) return false;
+
+      const nx = dx / nd;
+      const nz = dz / nd;
+
+      const spinMag = Math.trunc(force * CUE_MAX_SPIN / MAX_FORCE);
+      const torque = (_spinX === 0 && _spinY === 0 || spinMag === 0)
+        ? CmVector.zero
+        : new CmVector(
+            Math.trunc(_spinY * spinMag * (-nz)) || 0,
+            Math.trunc(-_spinX * spinMag) || 0,
+            Math.trunc(_spinY * spinMag * nx) || 0,
           );
 
       const cueBall = physics.getBall(cueBallId);
