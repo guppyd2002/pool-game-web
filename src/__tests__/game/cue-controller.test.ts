@@ -632,3 +632,87 @@ describe('CUE-005: setSpinOffset / getSpinOffset — CUE-012 torque synthesis', 
     expect(t.z).toBe(Math.trunc(t.z));
   });
 });
+
+// ─── CUE-004: setVerticalAngle / getVerticalAngle ─────────────────────────────
+
+import { MAX_VERTICAL_ANGLE, MIN_VERTICAL_ANGLE } from '../../game/cue-vertical';
+
+describe('CUE-004: setVerticalAngle / getVerticalAngle', () => {
+  it('getVerticalAngle() returns 0 initially', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    expect(ctrl.getVerticalAngle()).toBe(0);
+  });
+
+  it('setVerticalAngle sets getVerticalAngle() when idle', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(30);
+    expect(ctrl.getVerticalAngle()).toBe(30);
+  });
+
+  it('setVerticalAngle clamps negative to MIN_VERTICAL_ANGLE', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(-10);
+    expect(ctrl.getVerticalAngle()).toBe(MIN_VERTICAL_ANGLE);
+  });
+
+  it('setVerticalAngle clamps above MAX_VERTICAL_ANGLE', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(90);
+    expect(ctrl.getVerticalAngle()).toBe(MAX_VERTICAL_ANGLE);
+  });
+
+  it('setVerticalAngle accepts boundary value 0', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(20);
+    ctrl.setVerticalAngle(0);
+    expect(ctrl.getVerticalAngle()).toBe(0);
+  });
+
+  it('setVerticalAngle accepts MAX_VERTICAL_ANGLE exactly', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(MAX_VERTICAL_ANGLE);
+    expect(ctrl.getVerticalAngle()).toBe(MAX_VERTICAL_ANGLE);
+  });
+});
+
+// ─── CUE-015: auto-lift via onDragMove ────────────────────────────────────────
+
+describe('CUE-015: auto-lift (getVerticalAngle() during aiming)', () => {
+  it('getVerticalAngle() ≥ user angle when aiming (auto-lift may add to it)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(5);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    // Auto-lift adds at least the wall-clearance angle; result ≥ user setting
+    expect(ctrl.getVerticalAngle()).toBeGreaterThanOrEqual(5);
+  });
+
+  it('user angle already above auto-lift: getVerticalAngle() returns user angle', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(60);  // well above any geometric minimum
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    expect(ctrl.getVerticalAngle()).toBe(60);
+  });
+
+  it('auto-lift is a positive angle even with zero user setting', () => {
+    // Wall clearance always requires some non-zero elevation
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(0);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    expect(ctrl.getVerticalAngle()).toBeGreaterThanOrEqual(0);
+    expect(ctrl.getVerticalAngle()).toBeLessThanOrEqual(MAX_VERTICAL_ANGLE);
+  });
+
+  it('auto-lift does not change after cancel (back to idle state)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.setVerticalAngle(10);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    const duringAim = ctrl.getVerticalAngle();
+    ctrl.cancel();
+    // After cancel, setVerticalAngle was 10 — still in effect
+    expect(ctrl.getVerticalAngle()).toBe(duringAim);
+  });
+});

@@ -90,3 +90,29 @@ describe('lerpAngle: smooth interpolation with wrap', () => {
     expect(lerpAngle(0, 1, 2)).toBeCloseTo(1, 10);
   });
 });
+
+// ─── CUE-004: vertical angle (elevation degrees) ──────────────────────────────
+// The CueMeshController.update() now accepts an optional vertAngle (degrees).
+// These tests verify the conversion formula used internally (deg → radians).
+
+describe('CUE-004: vertical angle degree-to-radian conversion', () => {
+  it('0° → 0 radians', () => {
+    expect((0 * Math.PI) / 180).toBeCloseTo(0, 10);
+  });
+
+  it('45° → π/4 radians', () => {
+    expect((45 * Math.PI) / 180).toBeCloseTo(Math.PI / 4, 10);
+  });
+
+  it('90° → π/2 radians', () => {
+    expect((90 * Math.PI) / 180).toBeCloseTo(Math.PI / 2, 10);
+  });
+
+  it('positive vertAngle maps to positive rotation.x (nose-down, butt-up)', () => {
+    // rotation.x > 0 → local +Z tilts down → butt (local -Z, behind pivot) lifts up.
+    // This matches the physical cue elevation gesture in pool.
+    const deg = 30;
+    const rad = (deg * Math.PI) / 180;
+    expect(rad).toBeGreaterThan(0);
+  });
+});

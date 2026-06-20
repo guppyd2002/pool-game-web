@@ -45,8 +45,13 @@ export function lerpAngle(current: number, target: number, t: number): number {
 // ─── Three.js mesh (not unit-tested) ─────────────────────────────────────────
 
 export interface CueMeshController {
-  /** Called each drag-update: sets target + applies one Lerp step. */
-  update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number): void;
+  /**
+   * Called each drag-update: sets target + applies one Lerp step.
+   * @param vertAngle CUE-004: elevation angle in degrees (0 = horizontal, 70 = nearly vertical).
+   *                  Mesh rotates with 'YXZ' Euler order so Y-aim is applied first,
+   *                  then X-pitch elevates the butt relative to the tip.
+   */
+  update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number, vertAngle?: number): void;
   dispose(): void;
 }
 
@@ -67,9 +72,10 @@ export function createCueMesh(scene: THREE.Scene): CueMeshController {
   group.visible = false;
 
   let _currentYAngle = 0;
+  let _currentXAngle = 0;  // CUE-004: elevation pitch (radians)
 
   return {
-    update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number): void {
+    update(cueBallPos: CmVector, aimDir: CmVector | null, dt: number, vertAngle = 0): void {
       if (!aimDir) {
         group.visible = false;
         return;
@@ -100,7 +106,15 @@ export function createCueMesh(scene: THREE.Scene): CueMeshController {
       // Lerp Y rotation toward aim angle (CUE-016 smooth follow)
       const targetYAngle = cueYAngle(dxF / mag, dzF / mag);
       _currentYAngle = lerpAngle(_currentYAngle, targetYAngle, t);
-      group.rotation.y = _currentYAngle;
+
+      // CUE-004: Lerp X pitch toward elevation angle.
+      // rotation.x > 0 → nose-down (tip dips, butt rises) = physical cue elevation.
+      // 'YXZ' order: Y-aim first, then X-pitch in local frame (perpendicular to aim).
+      const targetXAngle = (vertAngle * Math.PI) / 180;
+      _currentXAngle += (targetXAngle - _currentXAngle) * t;
+
+      group.rotation.order = 'YXZ';
+      group.rotation.set(_currentXAngle, _currentYAngle, 0, 'YXZ');
     },
 
     dispose(): void {

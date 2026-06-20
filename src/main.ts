@@ -73,7 +73,7 @@ const adapter = createCueAdapter({
           hit.point.z - cueBall.position.z,
         )
       : null;
-    cueMesh.update(cueBall.position, aimDir, dt);
+    cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle());
   },
   onZoom: (delta) => {
     const dir = scene.camera.position.clone().normalize();

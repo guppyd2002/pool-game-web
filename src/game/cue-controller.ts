@@ -19,6 +19,10 @@ import { MULTIPLIER } from '../physics/fixed-math';
 import type { Fixed } from '../physics/fixed-math';
 import { MAX_FORCE } from '../physics/constants';
 import type { IBallPoolPhysics, AimHit } from './ball-pool-physics';
+import {
+  distToWallMeters, computeMinVerticalAngle, applyAutoLift,
+  MIN_VERTICAL_ANGLE, MAX_VERTICAL_ANGLE,
+} from './cue-vertical';
 
 /** Drag distance (meters) that maps to MAX_FORCE. */
 export const CUE_MAX_DRAG = 1.5;
@@ -84,6 +88,18 @@ export interface CueController {
 
   /** CUE-005: Read the current spin offset. */
   getSpinOffset(): { x: number; y: number };
+
+  /**
+   * CUE-004: Set the user-requested vertical (elevation) angle in degrees [0, 70].
+   * The effective angle may be higher if CUE-015 auto-lift applies.
+   */
+  setVerticalAngle(deg: number): void;
+
+  /**
+   * CUE-004: Get the effective vertical angle (degrees) — max(userAngle, autoLiftAngle).
+   * Updated each onDragMove; 0 when idle or no aim direction.
+   */
+  getVerticalAngle(): number;
 }
 
 export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): CueController {
@@ -92,6 +108,8 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
   let _currentPoint: TablePoint | null = null;
   let _spinX = 0;  // CUE-005 side english ∈ [-1, 1]
   let _spinY = 0;  // CUE-005 top/back spin ∈ [-1, 1]
+  let _userVertAngle = 0;   // CUE-004: user-set elevation (degrees)
+  let _effectiveVertAngle = 0;  // CUE-015: max(user, auto-lift)
 
   function planeDistXZ(a: TablePoint, b: TablePoint): number {
     const dx = a.x - b.x;
@@ -100,6 +118,22 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
   }
 
   function hasEnergy(): boolean { return true; }
+
+  // CUE-015: recompute auto-lift angle whenever aim direction changes
+  function _updateAutoLift(nx: number, nz: number): void {
+    const cueBall = physics.getBall(cueBallId);
+    const cueBallF = {
+      x: cueBall.position.x / MULTIPLIER,
+      z: cueBall.position.z / MULTIPLIER,
+    };
+    // Handle direction = −aimDir; wall is behind the cue ball (where the handle swings)
+    const handleWall = distToWallMeters(cueBallF.x, cueBallF.z, -nx, -nz);
+    const otherBalls = physics.allBalls
+      .filter(b => b.id !== cueBallId && !b.isKinematic && !b.isOutOfTable)
+      .map(b => ({ x: b.position.x / MULTIPLIER, z: b.position.z / MULTIPLIER }));
+    const minAngle = computeMinVerticalAngle(cueBallF, { x: nx, z: nz }, otherBalls, handleWall);
+    _effectiveVertAngle = applyAutoLift(_userVertAngle, minAngle);
+  }
 
   function dragDistToForce(distMeters: number): Fixed {
     const clamped = Math.max(0, Math.min(distMeters / CUE_MAX_DRAG, 1.0));
@@ -118,6 +152,13 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
     onDragMove(point: TablePoint): void {
       if (_phase !== 'aiming') return;
       _currentPoint = point;
+      // CUE-015: recompute auto-lift on every aim update
+      if (_startPoint) {
+        const dx = _startPoint.x - point.x;
+        const dz = _startPoint.z - point.z;
+        const nd = Math.sqrt(dx * dx + dz * dz);
+        if (nd >= 0.001) _updateAutoLift(dx / nd, dz / nd);
+      }
     },
 
     onDragEnd(point: TablePoint): boolean {
@@ -202,6 +243,23 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
 
     getSpinOffset(): { x: number; y: number } {
       return { x: _spinX, y: _spinY };
+    },
+
+    setVerticalAngle(deg: number): void {
+      _userVertAngle = Math.max(MIN_VERTICAL_ANGLE, Math.min(MAX_VERTICAL_ANGLE, deg));
+      // Re-apply auto-lift against the new user angle if currently aiming
+      if (_phase === 'aiming' && _startPoint && _currentPoint) {
+        const dx = _startPoint.x - _currentPoint.x;
+        const dz = _startPoint.z - _currentPoint.z;
+        const nd = Math.sqrt(dx * dx + dz * dz);
+        if (nd >= 0.001) _updateAutoLift(dx / nd, dz / nd);
+      } else {
+        _effectiveVertAngle = _userVertAngle;
+      }
+    },
+
+    getVerticalAngle(): number {
+      return _effectiveVertAngle;
     },
   };
 }
