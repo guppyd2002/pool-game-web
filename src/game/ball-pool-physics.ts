@@ -24,6 +24,7 @@ import type { SceneAPI } from '../renderer/scene';
 import {
   BALL_RADIUS, BALL_MASS, MAX_FORCE,
   SPACE_SCALE_X, SPACE_SCALE_Z,
+  BALL_Y, RAIL_LONG_X,
 } from '../physics/constants';
 import { simulateToCompletion, MAX_SIM_STEPS } from '../physics/simulate';
 export type { SimFrame } from '../physics/simulate';
@@ -97,9 +98,9 @@ export interface IBallPoolPhysics {
   setStateFromString(state: string): void;
   resetToStartState(): void;
   getPhysicsConstants(): PhysicsConstants;
-  // G5 seam — placeBall / respotCueBall declared here, implemented in G5 (PHY-016):
-  // placeBall(id: number, position: CmVector): void;
-  // respotCueBall(): void;
+  // CUE-013 / PHY-016 seam — ball-in-hand placement
+  placeBall(id: number, position: CmVector): void;
+  respotCueBall(): void;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -501,6 +502,22 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
         tableScaleX: SPACE_SCALE_X,
         tableScaleZ: SPACE_SCALE_Z,
       };
+    },
+
+    // ── CUE-013 / PHY-016: ball-in-hand placement ─────────────────────────
+
+    placeBall(id: number, position: CmVector): void {
+      const body = space.rigidbodies[id];
+      body.collider.position = position;
+      body.isKinematic = false;
+      body.isOutOfCube = false;
+      body.isActive = false;   // setter also zeros velocity + angularVelocity
+      renderer.updateBallPosition(id, toFloat(position.x), toFloat(position.y), toFloat(position.z));
+    },
+
+    respotCueBall(): void {
+      // Head-spot: x = -RAIL_LONG_X/2, y = BALL_Y, z = 0 (same as table-setup cueBallX)
+      this.placeBall(0, new CmVector(-Math.trunc(RAIL_LONG_X / 2), BALL_Y, 0));
     },
   };
 }

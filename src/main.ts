@@ -19,10 +19,14 @@ import { createCueAdapter } from './game/cue-adapter';
 import { createAimLine } from './renderer/aim-line';
 import { createPowerBar } from './renderer/power-bar';
 import { createCueMesh } from './renderer/cue-mesh';
+import { createPlacementMarker } from './renderer/placement-marker';
+import { createBallInHandController } from './game/ball-in-hand';
+import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
 import { createWSClient } from './network/ws-client';
 import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
 import { MULTIPLIER } from './physics/fixed-math';
+import * as THREE from 'three';
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
 
@@ -37,6 +41,12 @@ const cue = createCueController(physics);
 const aimLine = createAimLine(scene.scene);
 const powerBar = createPowerBar(container);
 const cueMesh = createCueMesh(scene.scene);
+
+// CUE-013 + CUE-014: ball-in-hand mechanism (triggered by P1-T03 rules)
+const ballInHand = createBallInHandController(physics, 0);
+const placementMarker = createPlacementMarker(scene.scene);
+const _bihRaycaster = new THREE.Raycaster();
+let _bihStartT = 0;
 
 let _lastAimTime = 0;
 
@@ -71,11 +81,56 @@ const adapter = createCueAdapter({
     scene.camera.position.clampLength(1.0, 5.0);
   },
 });
+// ─── Ball-in-hand pointer handling (CUE-013) ─────────────────────────────────
+// Active only while ballInHand.isActive. Trigger (enter) is wired by P1-T03 rules.
+
+function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: number } | null {
+  const rect = scene.renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1,
+  );
+  _bihRaycaster.setFromCamera(ndc, scene.camera);
+  return tableIntersection(_bihRaycaster, TABLE_PLANE_Y);
+}
+
+function onBihPointerMove(e: PointerEvent): void {
+  if (!ballInHand.isActive) return;
+  const pt = _bihNdcToTable(e.clientX, e.clientY);
+  if (pt) ballInHand.move(pt.x, pt.z);
+  const t = performance.now() / 1000 - _bihStartT;
+  placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+}
+
+function onBihPointerUp(e: PointerEvent): void {
+  if (!ballInHand.isActive) return;
+  if (ballInHand.commit()) {
+    placementMarker.update(null, false, 0);
+    adapter.enable();
+  }
+}
+
+/** Called by game rules (P1-T03) to enter ball-in-hand mode. */
+export function enterBallInHand(): void {
+  adapter.disable();
+  _bihStartT = performance.now() / 1000;
+  ballInHand.enter();
+  const t = performance.now() / 1000 - _bihStartT;
+  placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+}
+
+const _canvas = scene.renderer.domElement;
+_canvas.addEventListener('pointermove', onBihPointerMove as EventListener);
+_canvas.addEventListener('pointerup', onBihPointerUp as EventListener);
+
 window.addEventListener('beforeunload', () => {
+  _canvas.removeEventListener('pointermove', onBihPointerMove as EventListener);
+  _canvas.removeEventListener('pointerup', onBihPointerUp as EventListener);
   adapter.dispose();
   aimLine.dispose();
   powerBar.dispose();
   cueMesh.dispose();
+  placementMarker.dispose();
 });
 
 // ─── Multiplayer ─────────────────────────────────────────────────────────────

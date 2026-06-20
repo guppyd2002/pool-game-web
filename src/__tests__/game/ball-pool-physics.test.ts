@@ -412,6 +412,86 @@ describe('G6: state serialization and reset', () => {
   });
 });
 
+// ─── CUE-013 / PHY-016: placeBall + respotCueBall ────────────────────────────
+
+describe('G6 placeBall: sets Fixed position and clears kinematic/OOT state', () => {
+  it('placeBall() moves ball to given Fixed position', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const target = new CmVector(3000, BALL_Y, 1000);
+    physics.placeBall(0, target);
+    expect(physics.getBall(0).position.x).toBe(3000);
+    expect(physics.getBall(0).position.y).toBe(BALL_Y);
+    expect(physics.getBall(0).position.z).toBe(1000);
+  });
+
+  it('placeBall() clears isKinematic', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    space.rigidbodies[0].isKinematic = true;  // simulate pocketed
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.placeBall(0, new CmVector(0, BALL_Y, 0));
+    expect(physics.getBall(0).isKinematic).toBe(false);
+  });
+
+  it('placeBall() clears isOutOfTable', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    space.rigidbodies[0].isOutOfCube = true;
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.placeBall(0, new CmVector(0, BALL_Y, 0));
+    expect(physics.getBall(0).isOutOfTable).toBe(false);
+  });
+
+  it('placeBall() stops ball (velocity zeroed)', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    b0.velocity = new CmVector(1000, 0, 500);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.placeBall(0, new CmVector(0, BALL_Y, 0));
+    expect(physics.getBall(0).velocity.x).toBe(0);
+    expect(physics.getBall(0).velocity.z).toBe(0);
+  });
+
+  it('placeBall() updates renderer (mockScene.updateBallPosition called)', () => {
+    const calls: number[] = [];
+    const trackedScene = {
+      updateBallPosition: (id: number, x: number) => calls.push(id),
+      render: () => {},
+    };
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, trackedScene as typeof mockScene);
+    physics.placeBall(0, new CmVector(2000, BALL_Y, 0));
+    expect(calls).toContain(0);
+  });
+});
+
+describe('G6 respotCueBall: places cue ball at head-spot', () => {
+  it('respotCueBall() sets ball 0 to head-spot x = -RAIL_LONG_X/2', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.applyShot(GV01_SHOT);  // move ball away from start
+    physics.respotCueBall();
+    const headSpotX = -Math.trunc(RAIL_LONG_X / 2);
+    expect(physics.getBall(0).position.x).toBe(headSpotX);
+    expect(physics.getBall(0).position.z).toBe(0);
+    expect(physics.getBall(0).position.y).toBe(BALL_Y);
+  });
+
+  it('respotCueBall() clears isKinematic on ball 0', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+    space.rigidbodies[0].isKinematic = true;
+    const physics = createBallPoolPhysics(space, mockScene);
+    physics.respotCueBall();
+    expect(physics.getBall(0).isKinematic).toBe(false);
+  });
+});
+
 // ─── PHY-009: analytic SphereCast geometry ────────────────────────────────────
 //
 // Tests verifying that predictAimLine() uses the analytic SphereCastManager port
