@@ -19,6 +19,7 @@ import { createCueAdapter } from './game/cue-adapter';
 import { createAimLine } from './renderer/aim-line';
 import { createPowerBar } from './renderer/power-bar';
 import { createCueMesh } from './renderer/cue-mesh';
+import { createGhostBall } from './renderer/ghost-ball';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
@@ -42,6 +43,7 @@ const cue = createCueController(physics);
 const aimLine = createAimLine(scene.scene);
 const powerBar = createPowerBar(container);
 const cueMesh = createCueMesh(scene.scene);
+const ghostBall = createGhostBall(scene.scene);
 
 // CUE-013 + CUE-014: ball-in-hand mechanism (triggered by P1-T03 rules)
 const ballInHand = createBallInHandController(physics, 0);
@@ -66,9 +68,11 @@ const adapter = createCueAdapter({
 
     const cueBall = physics.getBall(0);
     const hit = cue.getAimHit();
-    // CUE-008: only render aim line when toggle is on (matches C# TriggerComponents(IsAutoShot))
+    const power = cue.getPowerFraction();
+    // CUE-008: aim line + ghost ball only shown when toggle is on
     aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
-    powerBar.update(cue.getPowerFraction());
+    ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);
+    powerBar.update(power);
 
     // CUE-001/016: derive aim direction from hit.point - cueBall.position
     const aimDir = hit
@@ -85,7 +89,7 @@ const adapter = createCueAdapter({
       _punchSavedCueBallPos = cueBall.position;
     }
 
-    cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), cue.getPowerFraction());
+    cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), power);
   },
   // CUE-011: on shot fire, animate cue punch then hide
   onShotFired: (power) => {
@@ -160,6 +164,7 @@ window.addEventListener('beforeunload', () => {
   _canvas.removeEventListener('pointerup', onBihPointerUp as EventListener);
   adapter.dispose();
   aimLine.dispose();
+  ghostBall.dispose();
   powerBar.dispose();
   cueMesh.dispose();
   placementMarker.dispose();
