@@ -46,6 +46,9 @@ export interface CueController {
    */
   onDragEnd(point: TablePoint): boolean;
 
+  /** Cancel an in-progress drag without firing (e.g. two-touch interrupt). No-op when idle. */
+  cancel(): void;
+
   /** Power fraction [0, 1] for UI bar. 0 when idle or at drag origin. */
   getPowerFraction(): number;
 
@@ -129,6 +132,12 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
         torque: CmVector.zero,
       });
       return true;
+    },
+
+    cancel(): void {
+      _phase = 'idle';
+      _startPoint = null;
+      _currentPoint = null;
     },
 
     getPowerFraction(): number {

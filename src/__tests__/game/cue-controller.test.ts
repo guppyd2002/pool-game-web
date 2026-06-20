@@ -136,6 +136,55 @@ describe('MON-018: hasEnergy() stub', () => {
   });
 });
 
+// ─── cancel() ────────────────────────────────────────────────────────────────
+
+describe('cancel() — abort drag without firing', () => {
+  it('cancel() during aiming → phase=idle, no shot fired', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    ctrl.cancel();
+    expect(ctrl.phase).toBe('idle');
+    expect(physics.shotLog).toHaveLength(0);
+  });
+
+  it('cancel() clears getPowerFraction to 0', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -1.0, z: 0 });
+    ctrl.cancel();
+    expect(ctrl.getPowerFraction()).toBe(0);
+  });
+
+  it('cancel() clears getAimHit to null', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    ctrl.cancel();
+    expect(ctrl.getAimHit()).toBeNull();
+  });
+
+  it('cancel() while idle is a no-op', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.cancel();
+    expect(ctrl.phase).toBe('idle');
+  });
+
+  it('drag cycle works normally after cancel()', () => {
+    const physics = makeMockPhysics();
+    const ctrl = createCueController(physics);
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -1.0, z: 0 });
+    ctrl.cancel();
+    // New drag fires normally
+    ctrl.onDragStart({ x: 0, z: 0 });
+    const fired = ctrl.onDragEnd({ x: -1.0, z: 0 });
+    expect(fired).toBe(true);
+    expect(physics.shotLog).toHaveLength(1);
+  });
+});
+
 // ─── CUE-006: event-driven state transitions (no polling) ─────────────────────
 
 describe('CUE-006: state machine transitions', () => {
