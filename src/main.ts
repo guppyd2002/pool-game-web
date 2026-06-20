@@ -16,6 +16,8 @@ import { createPoolTable } from './game/table-setup';
 import { createBallPoolPhysics } from './game/ball-pool-physics';
 import { createCueController } from './game/cue-controller';
 import { createCueAdapter } from './game/cue-adapter';
+import { createAimLine } from './renderer/aim-line';
+import { createPowerBar } from './renderer/power-bar';
 import { createWSClient } from './network/ws-client';
 import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
@@ -31,19 +33,30 @@ const physics = createBallPoolPhysics(space, scene);
 // ─── Cue control (P1-T02) ────────────────────────────────────────────────────
 
 const cue = createCueController(physics);
+const aimLine = createAimLine(scene.scene);
+const powerBar = createPowerBar(container);
+
 const adapter = createCueAdapter({
   camera: scene.camera,
   element: scene.renderer.domElement,
   cueBallMesh: scene.balls[0],
   controller: cue,
+  onAimUpdate: () => {
+    const cueBall = physics.getBall(0);
+    aimLine.update(cueBall.position, cue.getAimHit());
+    powerBar.update(cue.getPowerFraction());
+  },
   onZoom: (delta) => {
-    // Move camera closer/further along its current look-at direction
     const dir = scene.camera.position.clone().normalize();
     scene.camera.position.addScaledVector(dir, -delta * 0.5);
     scene.camera.position.clampLength(1.0, 5.0);
   },
 });
-window.addEventListener('beforeunload', () => adapter.dispose());
+window.addEventListener('beforeunload', () => {
+  adapter.dispose();
+  aimLine.dispose();
+  powerBar.dispose();
+});
 
 // ─── Multiplayer ─────────────────────────────────────────────────────────────
 
@@ -93,12 +106,6 @@ wsClient.onShotReceived((data: ShotPayload) => {
     torque: CmVector.zero,
   });
 });
-
-// ─── Wire local shots → network send ─────────────────────────────────────────
-
-// Intercept applyShot to also broadcast local shots (wrap physics temporarily)
-// For now this is handled by listening to CueController events via a thin wrapper.
-// TODO(P1-T03): extract shot-event bus once multiplayer protocol is stabilised.
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 

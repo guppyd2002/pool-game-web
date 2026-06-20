@@ -104,6 +104,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) controller.onDragEnd(pt);
+    opts.onAimUpdate?.();  // clear aim+power visuals when shot fires or drag drops
   }
 
   // ─── Touch events for multi-finger pinch (P1-T12 PointerStateMachine) ────────
@@ -123,6 +124,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
       // Two-finger: cancel any in-progress drag, start pinch
       dragging = false;
       controller.cancel();
+      opts.onAimUpdate?.();  // clear aim visuals on two-finger interrupt
       sm.feedTouchStart(pts);
       e.preventDefault();
     }
