@@ -838,3 +838,59 @@ describe('CUE-020: resetForNewTurn', () => {
     expect(ctrl.getPowerFraction()).toBe(0);
   });
 });
+
+// ─── CUE-008: aimLineVisible / toggleAimLine ──────────────────────────────────
+// Maps to C# CueShotManager.IsAutoShot (UI Toggle) + TriggerComponents(isOn).
+// Visibility controls only the aim line rendering; cue mesh tracks aim regardless.
+
+describe('CUE-008: aimLineVisible / toggleAimLine', () => {
+  it('aimLineVisible starts true (aim line shown by default)', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    expect(ctrl.aimLineVisible).toBe(true);
+  });
+
+  it('toggleAimLine() → false on first call', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.toggleAimLine();
+    expect(ctrl.aimLineVisible).toBe(false);
+  });
+
+  it('toggleAimLine() → back to true on second call', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.toggleAimLine();
+    ctrl.toggleAimLine();
+    expect(ctrl.aimLineVisible).toBe(true);
+  });
+
+  it('toggleAimLine() cycles correctly across multiple calls', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    for (let i = 0; i < 6; i++) {
+      expect(ctrl.aimLineVisible).toBe(i % 2 === 0);
+      ctrl.toggleAimLine();
+    }
+  });
+
+  it('aimLineVisible persists across drag cycles', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.toggleAimLine();  // now false
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragEnd({ x: -1.0, z: 0 });
+    expect(ctrl.aimLineVisible).toBe(false);
+  });
+
+  it('resetForNewTurn() does NOT reset aimLineVisible (user preference persists)', () => {
+    // C# IsAutoShot is a persistent UI toggle; ResetState() does not touch it
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.toggleAimLine();  // now false
+    ctrl.resetForNewTurn();
+    expect(ctrl.aimLineVisible).toBe(false);
+  });
+
+  it('disable() does NOT reset aimLineVisible', () => {
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.toggleAimLine();  // false
+    ctrl.disable();
+    ctrl.enable();
+    expect(ctrl.aimLineVisible).toBe(false);
+  });
+});

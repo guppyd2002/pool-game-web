@@ -62,7 +62,8 @@ const adapter = createCueAdapter({
 
     const cueBall = physics.getBall(0);
     const hit = cue.getAimHit();
-    aimLine.update(cueBall.position, hit);
+    // CUE-008: only render aim line when toggle is on (matches C# TriggerComponents(IsAutoShot))
+    aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
     powerBar.update(cue.getPowerFraction());
 
     // CUE-001/016: derive aim direction from hit.point - cueBall.position

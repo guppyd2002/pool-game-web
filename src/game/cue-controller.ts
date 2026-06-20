@@ -121,6 +121,16 @@ export interface CueController {
    * Called by P1-T03 rules after simulation ends. Never called internally.
    */
   resetForNewTurn(): void;
+
+  /**
+   * CUE-008: Whether the aim line is shown during aiming.
+   * Maps to C# CueShotManager.IsAutoShot (the UI toggle that shows/hides hitLine).
+   * Defaults to true. Persists across turns (user preference).
+   */
+  readonly aimLineVisible: boolean;
+
+  /** CUE-008: Flip aim line visibility. Called by UI toggle button. */
+  toggleAimLine(): void;
 }
 
 export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): CueController {
@@ -132,6 +142,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
   let _userVertAngle = 0;   // CUE-004: user-set elevation (degrees)
   let _effectiveVertAngle = 0;  // CUE-015: max(user, auto-lift)
   let _isEnabled = true;    // CUE-019: true = active player's turn (default for compat)
+  let _aimLineVisible = true;  // CUE-008: user preference, persists across turns
 
   function planeDistXZ(a: TablePoint, b: TablePoint): number {
     const dx = a.x - b.x;
@@ -310,6 +321,13 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       _startPoint = null;
       _currentPoint = null;
       _isEnabled = true;
+      // _aimLineVisible intentionally NOT reset — user preference persists across turns
+    },
+
+    get aimLineVisible() { return _aimLineVisible; },
+
+    toggleAimLine(): void {
+      _aimLineVisible = !_aimLineVisible;
     },
   };
 }
