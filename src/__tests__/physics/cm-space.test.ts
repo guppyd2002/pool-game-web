@@ -6,10 +6,10 @@ import * as fc from 'fast-check';
 import { MULTIPLIER } from '../../physics/fixed-math';
 import { CmVector } from '../../physics/cm-vector';
 import { CmSphereCollider, CmPlaneCollider } from '../../physics/colliders';
-import { CmRigidbody, CmForceMode, CmKinematicTrigger } from '../../physics/cm-rigidbody';
+import { CmRigidbody } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
-import { CmRigidbodyState, CmSpaceState } from '../../physics/cm-state';
-import { CmSpaceCube } from '../../physics/cm-collision';
+import { CmRigidbodyState } from '../../physics/cm-state';
+import type { CmSpaceCube } from '../../physics/cm-collision';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

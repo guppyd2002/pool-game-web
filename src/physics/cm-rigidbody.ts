@@ -8,7 +8,7 @@
 import type { Fixed } from './fixed-math';
 import { MULTIPLIER, fixMul, fixSqrtSave, fixPowSave, fixAbs, fixMul3 } from './fixed-math';
 import { CmVector } from './cm-vector';
-import type { ICmCollider, CmHitInfo, CollisionResult } from './colliders';
+import type { ICmCollider, CmHitInfo } from './colliders';
 import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from './colliders';
 import { CmCollisionManager } from './cm-collision';
 import type { CmSpaceCube } from './cm-collision';
@@ -44,7 +44,7 @@ export class CmKinematicTrigger {
   }
 
   /** Check if this trigger overlaps with a subspace */
-  isHitSubspace(subspacesScale: Fixed, subspacesScalePow: Fixed, position: CmVector): boolean {
+  isHitSubspace(subspacesScale: Fixed, _subspacesScalePow: Fixed, position: CmVector): boolean {
     return CmVector.sqrDistance(position, this.position) < fixPowSave(subspacesScale + this.radius);
   }
 }
@@ -211,7 +211,7 @@ export class CmRigidbody {
   }
 
   /** Calculate body-body collision (matches C# CalculateHit for CmRigidbody) */
-  calculateHitBody(timestep: Fixed, body2: CmRigidbody, beforeHit: () => void, afterHit: () => void): void {
+  calculateHitBody(_timestep: Fixed, body2: CmRigidbody, beforeHit: () => void, afterHit: () => void): void {
     if (this.hitBodies.includes(body2.id)) return;
 
     const result = this.collider.isHit(body2.collider);
@@ -385,7 +385,7 @@ export class CmRigidbody {
   }
 
   /** Line/other collider hit response */
-  private _calculateOtherColliderHit(mp: CmVector, collider2: ICmCollider, velocity: CmVector, hitRelVel: CmVector, hitInfo: CmHitInfo, hitRadius: CmVector): void {
+  private _calculateOtherColliderHit(_mp: CmVector, collider2: ICmCollider, velocity: CmVector, hitRelVel: CmVector, hitInfo: CmHitInfo, hitRadius: CmVector): void {
     const bounciness = fixSqrtSave(fixMul(this.collider.material.bounciness, collider2.material.bounciness));
     const velocityT = -CmVector.dot(hitRelVel, hitInfo.collider!.right);
     const velocityN = -CmVector.dot(hitRelVel, hitInfo.normal);

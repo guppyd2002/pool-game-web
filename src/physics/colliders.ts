@@ -105,7 +105,7 @@ export class CmSphereCollider implements ICmCollider {
     return isHitSpherePoint(this, point, radius);
   }
 
-  isHitSubspace(subspacesScale: Fixed, subspacesScalePow: Fixed, pos: CmVector): boolean {
+  isHitSubspace(subspacesScale: Fixed, _subspacesScalePow: Fixed, pos: CmVector): boolean {
     return CmVector.sqrDistance(pos, this.position) < fixPowSave(subspacesScale + this.radius);
   }
 
@@ -151,7 +151,7 @@ export class CmPlaneCollider implements ICmCollider {
     return { hit: false, hitInfo: EMPTY_HIT };
   }
 
-  isHitSubspace(subspacesScale: Fixed, subspacesScalePow: Fixed, pos: CmVector): boolean {
+  isHitSubspace(_subspacesScale: Fixed, subspacesScalePow: Fixed, pos: CmVector): boolean {
     const planePoint = CmVector.projectPointOnPlane(pos, this.position, this.up);
     return CmVector.sqrDistance(pos, planePoint) < subspacesScalePow;
   }
@@ -209,7 +209,7 @@ export class CmLineCollider implements ICmCollider {
     return isHitSphereLinePoint(point, fixPowSave(radius), this);
   }
 
-  isHitSubspace(subspacesScale: Fixed, subspacesScalePow: Fixed, pos: CmVector): boolean {
+  isHitSubspace(_subspacesScale: Fixed, subspacesScalePow: Fixed, pos: CmVector): boolean {
     const axisPoint = CmVector.projectPointOnAxis(pos, this.position, this.right);
     return CmVector.sqrDistance(pos, axisPoint) < subspacesScalePow;
   }

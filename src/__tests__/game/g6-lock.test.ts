@@ -120,7 +120,17 @@ function makePockets(): CmKinematicTrigger[] {
   });
 }
 
-const mockScene = { updateBallPosition: () => {}, render: () => {} };
+import type { SceneAPI } from '../../renderer/scene';
+const mockScene: SceneAPI = {
+  updateBallPosition: () => {},
+  render: () => {},
+  dispose: () => {},
+  renderer: null as unknown as import('three').WebGLRenderer,
+  camera: null as unknown as import('three').PerspectiveCamera,
+  scene: null as unknown as import('three').Scene,
+  balls: [] as unknown as import('three').Mesh[],
+  table: null as unknown as import('three').Group,
+};
 
 // ─── (A) onStep-neutrality guard ─────────────────────────────────────────────
 

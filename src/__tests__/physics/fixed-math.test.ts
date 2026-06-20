@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import {
   MULTIPLIER, SQRT_MULTIPLIER, PI,
   fromFloat, toFloat,
-  fixMul, fixDiv, fixAbs, fixClamp, fixClampMin, fixClampMax,
+  fixMul, fixDiv, fixAbs, fixClamp,
   fixLerp, fixNear, fixSqrt, fixSqrtSave, fixPowSave, fixPow,
   clearCaches,
 } from '../../physics/fixed-math';

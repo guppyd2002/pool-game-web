@@ -6,14 +6,13 @@
  */
 
 import type { Fixed } from './fixed-math';
-import { MULTIPLIER, fixDiv, fixClamp, fixPowSave, fixAbs } from './fixed-math';
+import { fixDiv, fixClamp, fixPowSave } from './fixed-math';
 import { CmVector } from './cm-vector';
 import type { ICmCollider } from './colliders';
 import { CmRigidbody, CmKinematicTrigger } from './cm-rigidbody';
 import { CmCollisionManager } from './cm-collision';
 import type { CmSpaceCube } from './cm-collision';
 import { CmRigidbodyState, CmSpaceState, CmKinematicState } from './cm-state';
-import { CmSimpleVector } from './cm-vector';
 import { MIN_TS, MAX_TS, PRECISION } from './constants';
 
 // ─── Spatial hash key ────────────────────────────────────────────────────────
@@ -46,9 +45,6 @@ export class CmSpace {
   private bodyUpdateCallback: ((body: CmRigidbody) => void) | null = null;
 
   // Per-body tracking for old position optimization
-  private bodyOldPositions = new Map<number, CmVector>();
-  private bodyOnePositions = new Map<number, CmVector>();
-  private bodySubPositions = new Map<number, CmVector>();
 
   /** Initialize space with cube bounds, bodies, colliders, and triggers */
   init(spaceCube: CmSpaceCube, bodies: CmRigidbody[], colliders: ICmCollider[], triggers: CmKinematicTrigger[]): void {
@@ -178,7 +174,7 @@ export class CmSpace {
   }
 
   /** Move body, apply gravity, check deactivation */
-  private _moveAndCheckBody(body: CmRigidbody, timestep: Fixed, addKinematicState: boolean): void {
+  private _moveAndCheckBody(body: CmRigidbody, timestep: Fixed, _addKinematicState: boolean): void {
     if (body.isKinematic || body.isOutOfCube) return;
 
     body.moveAndCheckIsActive(timestep);

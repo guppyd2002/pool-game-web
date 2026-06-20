@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 import type { Fixed } from '../physics/fixed-math';
-import { MULTIPLIER, fromFloat } from '../physics/fixed-math';
+import { fromFloat } from '../physics/fixed-math';
 import { CmVector } from '../physics/cm-vector';
 import { PointerStateMachine } from './unified-input';
 import type { InputPoint } from './unified-input';

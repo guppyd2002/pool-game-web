@@ -10,7 +10,6 @@ import {
   isPositionFree, clampToZone,
   FULL_QUAD, FIRST_QUAD, MIN_OVERLAP_DIST,
   createBallInHandController,
-  type PlacementZone,
 } from '../../game/ball-in-hand';
 import {
   BALL_Y, BALL_RADIUS,

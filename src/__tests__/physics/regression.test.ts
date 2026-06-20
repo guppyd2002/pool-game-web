@@ -4,12 +4,12 @@
  * All 5 cases must PASS before proceeding to T08.
  */
 import { describe, it, expect } from 'vitest';
-import { MULTIPLIER, fixMul, fixPowSave } from '../../physics/fixed-math';
+import { MULTIPLIER } from '../../physics/fixed-math';
 import { CmVector } from '../../physics/cm-vector';
 import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from '../../physics/colliders';
-import { CmRigidbody, CmForceMode, CmKinematicTrigger } from '../../physics/cm-rigidbody';
+import { CmRigidbody, CmKinematicTrigger } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
-import { CmSpaceCube } from '../../physics/cm-collision';
+import type { CmSpaceCube } from '../../physics/cm-collision';
 
 // ─── Abstract physics constants (intentionally different from constants.ts) ────
 // These are engine-level regression values, NOT production pool ball geometry.
@@ -204,6 +204,7 @@ describe('Regression Case 3: Ball hits cushion (LineCollider)', () => {
       }
       if (!space.isActive) break;
     }
+    void hitOccurred;
 
     // The ball should have interacted with either the cushion or decelerated from plane friction
     // Verify velocity has changed significantly from initial

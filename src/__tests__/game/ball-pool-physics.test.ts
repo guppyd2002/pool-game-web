@@ -39,9 +39,16 @@ import {
 
 // ─── Mock SceneAPI (renderer not under test) ──────────────────────────────────
 
-const mockScene = {
+import type { SceneAPI } from '../../renderer/scene';
+const mockScene: SceneAPI = {
   updateBallPosition: () => {},
   render: () => {},
+  dispose: () => {},
+  renderer: null as unknown as import('three').WebGLRenderer,
+  camera: null as unknown as import('three').PerspectiveCamera,
+  scene: null as unknown as import('three').Scene,
+  balls: [] as unknown as import('three').Mesh[],
+  table: null as unknown as import('three').Group,
 };
 
 // ─── Table geometry (mirrors golden-vector.test.ts) ───────────────────────────
@@ -470,12 +477,12 @@ describe('G6 placeBall: sets Fixed position and clears kinematic/OOT state', () 
 
   it('placeBall() updates renderer (mockScene.updateBallPosition called)', () => {
     const calls: number[] = [];
-    const trackedScene = {
-      updateBallPosition: (id: number, x: number) => calls.push(id),
-      render: () => {},
+    const trackedScene: SceneAPI = {
+      ...mockScene,
+      updateBallPosition: (id: number, _x: number, _y: number, _z: number) => calls.push(id),
     };
     const { space } = makeGV01Space();
-    const physics = createBallPoolPhysics(space, trackedScene as typeof mockScene);
+    const physics = createBallPoolPhysics(space, trackedScene);
     physics.placeBall(0, new CmVector(2000, BALL_Y, 0));
     expect(calls).toContain(0);
   });

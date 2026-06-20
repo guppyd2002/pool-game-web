@@ -110,7 +110,6 @@ export function createScene(container: HTMLElement): SceneAPI {
 
   // Rail (outer frame)
   const railMat = new THREE.MeshStandardMaterial({ color: 0x5c3317, roughness: 0.6 });
-  const railH = RAIL_WIDTH;
   const railY = CUSHION_HEIGHT / 2;
 
   // Long rails (left/right along Z)

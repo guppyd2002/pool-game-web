@@ -16,8 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { MULTIPLIER } from '../../physics/fixed-math';
 import { CmVector } from '../../physics/cm-vector';
 import { CmSphereCollider, CmPlaneCollider, CmLineCollider } from '../../physics/colliders';
-import type { CmMaterial } from '../../physics/colliders';
-import { CmRigidbody, CmBodyMovingType, CmKinematicTrigger } from '../../physics/cm-rigidbody';
+import { CmRigidbody, CmBodyMovingType } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
 import { CmCollisionManager } from '../../physics/cm-collision';
 import type { CmSpaceCube } from '../../physics/cm-collision';
@@ -27,7 +26,6 @@ import {
   BALL_MATERIAL as BALL_MAT,
   CLOTH_MATERIAL as CLOTH_MAT,
   RAIL_MATERIAL as RAIL_MAT,
-  POCKET_RADIUS, POCKET_POSITIONS,
   SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
   RAIL_LONG_X, RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS,
   PLANE_SCALE_X, PLANE_RADIUS,

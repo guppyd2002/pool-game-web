@@ -20,7 +20,6 @@ import {
   createCueController,
   CUE_MAX_DRAG,
   CUE_MIN_DRAG,
-  type TablePoint,
 } from '../../game/cue-controller';
 
 // ─── Mock helpers ─────────────────────────────────────────────────────────────
@@ -68,6 +67,8 @@ function makeMockPhysics(opts: { isSimulating?: boolean } = {}): MockPhysics {
       ballMass: 1700, ballRadius: 285, maxForce: MAX_FORCE,
       tableScaleX: 30000, tableScaleZ: 20000,
     }),
+    placeBall: () => {},
+    respotCueBall: () => {},
     shotLog,
     aimLog,
   };

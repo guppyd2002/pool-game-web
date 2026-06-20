@@ -10,8 +10,6 @@ import {
   CmSphereCollider,
   CmPlaneCollider,
   CmLineCollider,
-  CmHitInfo,
-  CmMaterial,
 } from '../../physics/colliders';
 import { CmCollisionManager } from '../../physics/cm-collision';
 

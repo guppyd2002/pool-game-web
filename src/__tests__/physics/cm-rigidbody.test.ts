@@ -4,14 +4,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import { MULTIPLIER, fixMul, fixPowSave } from '../../physics/fixed-math';
+import { MULTIPLIER, fixMul } from '../../physics/fixed-math';
 import { CmVector } from '../../physics/cm-vector';
 import { CmSphereCollider, CmPlaneCollider } from '../../physics/colliders';
 import {
   CmRigidbody,
   CmForceMode,
   CmKinematicTrigger,
-  CmSpaceCube,
 } from '../../physics/cm-rigidbody';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -42,9 +42,16 @@ import {
 
 // ─── SceneAPI mock ────────────────────────────────────────────────────────────
 
-const mockScene = {
+import type { SceneAPI } from '../../renderer/scene';
+const mockScene: SceneAPI = {
   updateBallPosition: () => {},
   render: () => {},
+  dispose: () => {},
+  renderer: null as unknown as import('three').WebGLRenderer,
+  camera: null as unknown as import('three').PerspectiveCamera,
+  scene: null as unknown as import('three').Scene,
+  balls: [] as unknown as import('three').Mesh[],
+  table: null as unknown as import('three').Group,
 };
 
 // ─── Full table geometry ──────────────────────────────────────────────────────
@@ -137,7 +144,7 @@ function makeGV01Space(): { space: CmSpace; ball: CmRigidbody } {
 
 // ─── Drive simulation via applyShot() — for G2-B canonical endpoint check ───
 
-function runToStop(): { px: number; py: number; pz: number; calculateTime: number } {
+function runToStop(_dt?: number): { px: number; py: number; pz: number; calculateTime: number } {
   const { space, ball } = makeGV01Space();
   const loop = createSimulationLoop(space, mockScene);
   loop.applyShot({
@@ -163,11 +170,11 @@ function replayToEnd(dt: number): { lastPxFixed: number; lastPyFixed: number; la
   const { space, ball } = makeGV01Space();
 
   let lastPx = 0, lastPy = 0, lastPz = 0;
-  const trackingScene = {
+  const trackingScene: SceneAPI = {
+    ...mockScene,
     updateBallPosition: (id: number, x: number, y: number, z: number) => {
       if (id === 0) { lastPx = x; lastPy = y; lastPz = z; }
     },
-    render: () => {},
   };
 
   const loop = createSimulationLoop(space, trackingScene);

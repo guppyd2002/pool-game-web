@@ -4,7 +4,6 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import { MULTIPLIER } from '../../physics/fixed-math';
 import { CmVector, CmSimpleVector } from '../../physics/cm-vector';
 
 // ─── CmSimpleVector ──────────────────────────────────────────────────────────

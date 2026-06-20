@@ -169,7 +169,7 @@ function onBihPointerMove(e: PointerEvent): void {
   placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
 }
 
-function onBihPointerUp(e: PointerEvent): void {
+function onBihPointerUp(_e: PointerEvent): void {
   if (!ballInHand.isActive) return;
   if (ballInHand.commit()) {
     placementMarker.update(null, false, 0);

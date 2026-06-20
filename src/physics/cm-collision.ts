@@ -5,7 +5,7 @@
  */
 
 import type { Fixed } from './fixed-math';
-import { MULTIPLIER, fixAbs, fixClampMin } from './fixed-math';
+import { fixAbs, fixClampMin } from './fixed-math';
 import { CmVector } from './cm-vector';
 import type { ICmCollider } from './colliders';
 
