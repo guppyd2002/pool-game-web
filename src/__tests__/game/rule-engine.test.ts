@@ -410,6 +410,29 @@ describe('RULE-005 — win/lose on black ball', () => {
     expect(verdict.winner).toBe(0);
     expect(verdict.reason).toBe(Reason.YouBlackBallInPocket);  // C# GameEnded() reason; TS wipes → Non
   });
+
+  // Same-step pocket/OOT tie-break (parity regression — pins the merged event stream).
+  // When a black pocket and a cue out-of-table share the SAME stepIndex, the merged
+  // pocketed+outOfTable stream sorts by (stepIndex, ballId), so cue id0 is processed
+  // BEFORE black id8 → cueBallIsOutOfTable set first → black drop = LOSE. This mirrors
+  // C# raising OnOutOfTable/OnBecameKinematic from a single id-ordered balls[] foreach
+  // within one tick (BallPool8GameLogic.cs:571). Guards against a future change to the
+  // tie-break order silently flipping this case.
+  it('same-step black pocket + cue out-of-table → LOSE (id-order tie-break: cue id0 before black id8)', () => {
+    const engine = engineReadyForBlack();
+    engine.beginShot();
+    const verdict = engine.processShotResult(makeShotResult({
+      contacts: [cueHits(8)],
+      pocketed: [pocketed(8, 0, 25)],
+      outOfTable: [oot(0, 25)],   // SAME stepIndex as the black pocket
+    }));
+    expect(verdict.gameEnded).toBe(true);
+    expect(verdict.winner).toBe(1);  // current player loses
+    // DIV-002 (faithful-but-odd): cue left the TABLE (not pocketed), yet the on-black
+    // foul reason is YouCueBallInPocket — C# BallPool8GameLogic.cs:518-524 routes ANY
+    // cue foul while on the black through this branch. Faithful port; do NOT "fix".
+    expect(verdict.reason).toBe(Reason.YouCueBallInPocket);
+  });
 });
 
 // ─── RULE-008: no-rail foul (after break) ───────────────────────────────────
