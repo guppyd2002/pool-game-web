@@ -88,6 +88,53 @@ async function cueBallScreenPos(page: Page): Promise<{ x: number; y: number }> {
   return pos;
 }
 
+/**
+ * Fire a shot via the REAL ShotSlider state machine:
+ *   pointerdown → startControl() → setValue(force) → endControl() → fire()
+ *
+ * Using slider.fill() bypasses startControl(), keeping _isSelected=false
+ * so setValue() is a no-op and fire() never calls onShot. This helper
+ * uses mouse.down()/up() to trigger the correct pointer event sequence.
+ */
+async function fireShot(page: Page, forcePct = 80): Promise<void> {
+  const slider = page.locator('input[type="range"]').first();
+  const sbox   = await slider.boundingBox();
+  expect(sbox).not.toBeNull();
+
+  // pointerdown on left edge of slider → startControl() → _isSelected=true
+  const startX = sbox!.x + 4;
+  const midY   = sbox!.y + sbox!.height / 2;
+  await page.mouse.move(startX, midY);
+  await page.mouse.down();
+
+  // Set value + dispatch 'input' event while still held → setValue(fraction) → _force set
+  await slider.evaluate((el, pct) => {
+    (el as HTMLInputElement).value = String(pct);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, forcePct);
+
+  // pointerup → endControl() → _isSelected=false (manual mode: no auto-fire)
+  await page.mouse.up();
+  await page.waitForTimeout(50);
+
+  // Click "Shot" button → fire() → onShot(force) → cue.fireNow(force)
+  await page.locator('button').filter({ hasText: 'Shot' }).click();
+}
+
+/**
+ * Read all 16 ball X/Z positions from the THREE.js scene via __poolDebug.
+ * Returns array of { x, z } in scene-space meters.
+ */
+async function readBallPositions(page: Page): Promise<Array<{ x: number; z: number }>> {
+  return page.evaluate(() => {
+    const debug = (window as unknown as Record<string, unknown>).__poolDebug as {
+      balls: Array<{ position: { x: number; y: number; z: number } }>;
+    } | undefined;
+    if (!debug?.balls) return [];
+    return debug.balls.map(b => ({ x: b.position.x, z: b.position.z }));
+  });
+}
+
 /** Dispatch a synthetic PointerEvent to the canvas element. */
 async function canvasPointerEvent(
   page: Page,
@@ -148,27 +195,56 @@ test('B2 — aim-line + ghost ball visible during drag', async ({ page }) => {
   expect(fs.existsSync(SS('B2-aim-line.png'))).toBe(true);
 });
 
-// ─── B3: Power set + shot fired → balls scatter ───────────────────────────────
-test('B3 — power-set and shot: balls scatter after Shot button click', async ({ page }) => {
+// ─── B3: Real ShotSlider path → balls scatter ────────────────────────────────
+// Previous version used slider.fill('80') which bypasses ShotSlider.startControl()
+// → setValue() no-ops (_isSelected=false) → fire() no-ops (_force=0 ≤ minForce).
+// This test uses the REAL path: mouse.down→input→mouse.up→Shot button.
+test('B3 — real-path shot: balls scatter after proper ShotSlider sequence', async ({ page }) => {
   await loadApp(page);
 
-  // Set power slider to 80%
-  const slider = page.locator('input[type="range"]').first();
-  await slider.fill('80');
-  await page.waitForTimeout(200);
+  // Aim first so cue controller has a valid aim direction
+  const { x: cx, y: cy } = await cueBallScreenPos(page);
+  await canvasPointerEvent(page, 'pointerdown', cx, cy);
+  for (let i = 1; i <= 8; i++) {
+    await canvasPointerEvent(page, 'pointermove', cx + i * 15, cy);
+    await page.waitForTimeout(15);
+  }
+  await canvasPointerEvent(page, 'pointerup', cx + 120, cy, 0);
+  await page.waitForTimeout(100);
 
-  // Click the "Shot" button
-  const shotBtn = page.locator('button').filter({ hasText: 'Shot' });
-  await shotBtn.click();
+  // Capture ball positions before shot
+  const before = await readBallPositions(page);
 
-  // Wait for replay to begin (balls moving)
-  await page.waitForTimeout(600);
+  // ① Fire via real ShotSlider state machine
+  await fireShot(page, 80);
+
+  // ② Mid-flight screenshot (balls moving)
+  await page.waitForTimeout(500);
   await page.screenshot({ path: SS('B3-shot-fired.png') });
-  expect(fs.existsSync(SS('B3-shot-fired.png'))).toBe(true);
 
-  // Also capture the settled state
-  await page.waitForTimeout(3000);
+  // ③ Mid-flight 2 (for extra evidence)
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: SS('B3-shot-mid-flight.png') });
+
+  // ④ Wait for replay to fully settle
+  await page.waitForTimeout(5000);
   await page.screenshot({ path: SS('B3-shot-settled.png') });
+
+  // ─── Smoke assertion: balls moved significantly ───────────────────────────
+  // After a real shot, the total XZ displacement of all 16 balls must exceed
+  // a meaningful threshold. Identical before/after means shot never fired.
+  const after = await readBallPositions(page);
+  const totalDisplacement = before.reduce((sum, b, i) => {
+    if (!after[i]) return sum;
+    const dx = after[i].x - b.x;
+    const dz = after[i].z - b.z;
+    return sum + Math.sqrt(dx * dx + dz * dz);
+  }, 0);
+  console.log(`B3 total ball displacement after shot: ${totalDisplacement.toFixed(3)}m`);
+  // Break shot at 80% power: cue ball travels ~0.5m, rack scatters ~2–5m total
+  expect(totalDisplacement).toBeGreaterThan(0.3);
+
+  expect(fs.existsSync(SS('B3-shot-fired.png'))).toBe(true);
   expect(fs.existsSync(SS('B3-shot-settled.png'))).toBe(true);
 });
 
@@ -201,11 +277,8 @@ test('B4 — side spin: open spin disc, apply left english, fire toward rail', a
     }
   }
 
-  // Set power and fire
-  const slider = page.locator('input[type="range"]').first();
-  await slider.fill('60');
-  const shotBtn = page.locator('button').filter({ hasText: 'Shot' });
-  await shotBtn.click();
+  // Fire via real ShotSlider path
+  await fireShot(page, 60);
   await page.waitForTimeout(800);
 
   await page.screenshot({ path: SS('B4-side-spin-shot.png') });
@@ -291,20 +364,27 @@ test('B8 — auto-raise cue near rail: drag aim toward a cushion, cue elevates',
 test('B9 — post-shot turn reset: cue re-appears after replay ends', async ({ page }) => {
   await loadApp(page);
 
-  // Fire a shot at moderate power
-  const slider = page.locator('input[type="range"]').first();
-  await slider.fill('50');
-  const shotBtn = page.locator('button').filter({ hasText: 'Shot' });
-  await shotBtn.click();
+  // Aim toward rack first
+  const { x: cx, y: cy } = await cueBallScreenPos(page);
+  await canvasPointerEvent(page, 'pointerdown', cx, cy);
+  for (let i = 1; i <= 6; i++) {
+    await canvasPointerEvent(page, 'pointermove', cx + i * 15, cy);
+    await page.waitForTimeout(15);
+  }
+  await canvasPointerEvent(page, 'pointerup', cx + 90, cy, 0);
+  await page.waitForTimeout(100);
+
+  // Fire via real ShotSlider path at 50%
+  await fireShot(page, 50);
 
   // Immediately capture: cue hidden / balls moving
   await page.waitForTimeout(400);
   await page.screenshot({ path: SS('B9-replay-in-progress.png') });
 
-  // Wait for replay to finish (up to 6s) — cue should reappear
+  // Wait for replay to finish — cue should reappear for next turn
   await page.waitForTimeout(5000);
   await page.screenshot({ path: SS('B9-turn-reset.png') });
 
-  console.log('B9: screenshots captured — verify cue visible in B9-turn-reset.png and hidden in B9-replay-in-progress.png');
+  console.log('B9: verify cue visible in B9-turn-reset.png, hidden in B9-replay-in-progress.png');
   expect(fs.existsSync(SS('B9-turn-reset.png'))).toBe(true);
 });

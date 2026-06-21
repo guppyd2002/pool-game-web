@@ -257,11 +257,12 @@ wsClient.onShotReceived((data: ShotPayload) => {
 
 physics.start();
 
-// ─── Debug / test hook ───────────────────────────────────────────────────────
-// Exposes minimal scene refs for Playwright screenshot tests.
-// NOT used in production game logic.
+// ─── Playwright / test hook ──────────────────────────────────────────────────
+// Exposes minimal refs for headless browser smoke tests.
+// NOT used in game logic — read-only from test scripts.
 (window as unknown as Record<string, unknown>).__poolDebug = {
   camera: scene.camera,
   cueBallMesh: scene.balls[0],
+  balls: scene.balls,         // all 16 meshes; .position gives scene-space XYZ
   renderer: scene.renderer,
 };
