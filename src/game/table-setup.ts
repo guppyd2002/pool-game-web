@@ -25,6 +25,7 @@ import {
   POCKET_RADIUS, POCKET_POSITIONS,
   BALL_MATERIAL, CLOTH_MATERIAL, RAIL_MATERIAL,
 } from '../physics/constants';
+import { getAllRackPositions } from './rack-positions';
 
 // ─── Ball factory ─────────────────────────────────────────────────────────────
 
@@ -73,24 +74,14 @@ export function createPoolTable(): CmSpace {
     scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
   };
 
-  // ─── Balls ─────────────────────────────────────────────────────────
+  // ─── Balls: GAME-010 C# delta array positions ─────────────────────
+  // getAllRackPositions() is the single source of truth for rack layout;
+  // physics initial state and visual reset (_placeRack in game-session) both use it.
   const bodies: CmRigidbody[] = [];
-  const spacing = BALL_RADIUS * 2 + 5;
-  const cueBallX = -Math.trunc(RAIL_LONG_X / 2);
-
-  // Cue ball (id=0)
-  bodies.push(makeBall(0, cueBallX, BALL_Y, 0));
-
-  // Triangle rack at +x (ids 1-15)
-  const rackX = Math.trunc(RAIL_LONG_X / 2);
-  const rowDx = Math.trunc(spacing * 866 / 1000);
-  let id = 1;
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col <= row; col++) {
-      const x = rackX + row * rowDx;
-      const z = (col * 2 - row) * Math.trunc(spacing / 2);
-      bodies.push(makeBall(id++, x, BALL_Y, z));
-    }
+  const rackPositions = getAllRackPositions();
+  for (let id = 0; id < 16; id++) {
+    const { x, z } = rackPositions[id];
+    bodies.push(makeBall(id, x, BALL_Y, z));
   }
 
   // ─── Table geometry ─────────────────────────────────────────────────

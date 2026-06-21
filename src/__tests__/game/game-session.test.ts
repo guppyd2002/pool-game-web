@@ -293,8 +293,8 @@ describe('game-session — IGameSession (GAME-018)', () => {
       session.startNewGame();
       cue.fireShotApplied(noShot());
       replayDriver.triggerComplete();
-      // store is now BallInHand; dispatch BALL_PLACED to advance to Aiming
-      session.store.dispatch({ type: 'BALL_PLACED' });
+      // BallInHand phase: simulate ball placement → advance to Aiming
+      session.notifyBallPlaced();
     }
 
     it('calls cue.resetForNewTurn after normal miss', () => {

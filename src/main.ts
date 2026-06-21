@@ -1,14 +1,14 @@
 /**
- * Pool Game Web — main entry point.
- * Integrates: Three.js scene + IBallPoolPhysics + CueController + CueAdapter + multiplayer.
+ * Pool Game Web — P1-T04 main entry point.
  *
- * Architecture (P1-T02):
- *   createPoolTable() → CmSpace
- *   createBallPoolPhysics(space, scene) → IBallPoolPhysics (G6 interface)
- *   createCueController(physics)        → cue UX logic (CUE-006/012, MON-018)
- *   createCueAdapter(...)               → DOM → CueController bridge
+ * GAME-002: Simplified startup — HTML HotSeat menu, no FB/PlayFab/IAP/WebSocket.
+ * GAME-003: "Play HotSeat" button → session.startNewGame() → cue input enabled.
+ * GAME-015 B-lite: camera tween overview↔table on game start/exit.
+ * GAME-018: createBallPool8Session() wires physics + cue + replay → session.
  *
- * No physics quantities are computed in this file — all routes through IBallPoolPhysics.
+ * Ball-in-hand (GAME-014):
+ *   BallInHandController handles physics.placeBall() + free-zone validation.
+ *   After commit(), session.notifyBallPlaced() advances session state.
  */
 
 import { createScene } from './renderer/scene';
@@ -23,26 +23,30 @@ import { createGhostBall } from './renderer/ghost-ball';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
-import { createWSClient } from './network/ws-client';
-import type { ShotPayload } from './network/ws-client';
 import { CmVector } from './physics/cm-vector';
-import { MULTIPLIER } from './physics/fixed-math';
 import { backswingOffset } from './game/shot-animation';
 import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
 import { createSpinDiscUI } from './renderer/spin-disc-ui';
 import { createPowerSliderUI } from './renderer/power-slider-ui';
 import { createUIEdgeFade } from './renderer/ui-edge-fade';
+import { createBallPool8Session } from './game/game-session';
+import { createReplayDriver } from './renderer/replay-driver';
+import { createBallTrail } from './game/ball-trail';
+import { createReasonBanner } from './renderer/reason-banner';
+import { createGameOverUI } from './renderer/game-over-ui';
+import { REASON_MESSAGES } from './game/game-play-reason';
+import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
 import * as THREE from 'three';
 
-// ─── Initialize ──────────────────────────────────────────────────────────────
+// ─── Initialize scene + physics ───────────────────────────────────────────────
 
 const container = document.getElementById('app')!;
 const scene = createScene(container);
 const space = createPoolTable();
 const physics = createBallPoolPhysics(space, scene);
 
-// ─── Cue control (P1-T02) ────────────────────────────────────────────────────
+// ─── Cue control ─────────────────────────────────────────────────────────────
 
 const cue = createCueController(physics);
 const aimLine = createAimLine(scene.scene);
@@ -50,14 +54,13 @@ const powerBar = createPowerBar(container);
 const cueMesh = createCueMesh(scene.scene);
 const ghostBall = createGhostBall(scene.scene);
 
-// CUE-013 + CUE-014: ball-in-hand mechanism (triggered by P1-T03 rules)
+// CUE-013: ball-in-hand placement (GAME-014 BallMoveManager equiv)
 const ballInHand = createBallInHandController(physics, 0);
 const placementMarker = createPlacementMarker(scene.scene);
 const _bihRaycaster = new THREE.Raycaster();
 let _bihStartT = 0;
 
 let _lastAimTime = 0;
-// CUE-011: saved for punch animation after drag state is cleared
 let _punchSavedAimDir: CmVector | null = null;
 let _punchSavedCueBallPos: CmVector | null = null;
 
@@ -74,12 +77,10 @@ const adapter = createCueAdapter({
     const cueBall = physics.getBall(0);
     const hit = cue.getAimHit();
     const power = cue.getPowerFraction();
-    // CUE-008: aim line + ghost ball only shown when toggle is on
     aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
     ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);
     powerBar.update(power);
 
-    // CUE-001/016: derive aim direction from hit.point - cueBall.position
     const aimDir = hit
       ? new CmVector(
           hit.point.x - cueBall.position.x,
@@ -88,7 +89,6 @@ const adapter = createCueAdapter({
         )
       : null;
 
-    // CUE-011: save for punch animation loop (drag state will be cleared by onDragEnd)
     if (aimDir) {
       _punchSavedAimDir = aimDir;
       _punchSavedCueBallPos = cueBall.position;
@@ -96,10 +96,8 @@ const adapter = createCueAdapter({
 
     cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), power);
   },
-  // CUE-011: on shot fire, animate cue punch then hide
   onShotFired: (power) => {
     if (!_punchSavedAimDir || !_punchSavedCueBallPos) return;
-    // Assign after null-check so TypeScript infers CmVector (not CmVector|null)
     const savedDir = _punchSavedAimDir;
     const savedPos = _punchSavedCueBallPos;
 
@@ -123,33 +121,144 @@ const adapter = createCueAdapter({
   },
 });
 
-// CUE-002: power slider (after adapter so closures can reference it)
+// CUE-002: power slider
 const shotSlider = createShotSlider({
-  onStartControl: () => { adapter.disable(); },  // CUE-019 mutex: slider drag → no aim drag
+  onStartControl: () => { adapter.disable(); },
   onEndControl:   () => { adapter.enable(); },
   onMove:  (f) => { powerBar.update(f); },
   onShot:  (f) => { cue.fireNow(f); },
 });
 const powerSliderUI = createPowerSliderUI(container, shotSlider);
 
-// CUE-006/CUE-008: spin disc (after adapter so closures can reference it)
+// CUE-006/CUE-008: spin disc
 const spinDisc = createSpinDisc({
-  onOpen:  () => { adapter.disable(); },  // CUE-019 mutex: disc open → no aim drag
+  onOpen:  () => { adapter.disable(); },
   onClose: () => { adapter.enable(); },
   onSpinChange: (x, y) => cue.setSpinOffset(x, y),
 });
 const spinDiscUI = createSpinDiscUI(container, spinDisc);
 
-// CUE-021: UI edge fade — fades all overlays when table pockets are above them in screen.
-// Must be after all UI elements are created so their .element refs are valid.
+// CUE-021: UI edge fade
 const uiEdgeFade = createUIEdgeFade(scene.camera, [
   powerBar.element,
   powerSliderUI.element,
   spinDiscUI.element,
 ]);
 
-// ─── Ball-in-hand pointer handling (CUE-013) ─────────────────────────────────
-// Active only while ballInHand.isActive. Trigger (enter) is wired by P1-T03 rules.
+// ─── GAME-015 B-lite: camera tween ────────────────────────────────────────────
+
+const cameraTween = createCameraTween(scene.camera);
+
+// Set camera to overview pose immediately (no tween, duration=0)
+cameraTween.tweenTo(POSE_OVERVIEW, 0);
+
+function _runCameraTween(fromNow = true): void {
+  if (!fromNow) return;
+  let lastTs = 0;
+  const tick = (ts: number) => {
+    const dt = lastTs === 0 ? 0 : (ts - lastTs) / 1000;
+    lastTs = ts;
+    cameraTween.update(dt);
+    if (cameraTween.isActive) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+// ─── GAME-018: game session ────────────────────────────────────────────────────
+
+const trail = createBallTrail();
+const replayDriver = createReplayDriver();
+const gameSession = createBallPool8Session({
+  physics, cue, scene, replayDriver, trail,
+});
+
+// ─── GAME-002: main menu UI ────────────────────────────────────────────────────
+
+const mainMenuEl = document.createElement('div');
+mainMenuEl.id = 'main-menu';
+mainMenuEl.style.cssText = [
+  'position:absolute', 'inset:0',
+  'display:flex', 'flex-direction:column',
+  'align-items:center', 'justify-content:center',
+  'background:rgba(10,10,26,0.85)',
+  'color:#fff', 'font-family:sans-serif', 'z-index:300',
+].join(';');
+mainMenuEl.innerHTML = [
+  '<h1 style="font-size:36px;margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
+  '<p style="font-size:14px;opacity:0.6;margin-bottom:32px;">HotSeat — 2 players, same screen</p>',
+  '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
+].join('');
+container.appendChild(mainMenuEl);
+
+const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
+
+// ─── GAME-003: start → Aiming, cue enabled ───────────────────────────────────
+
+startBtn.addEventListener('click', () => {
+  mainMenuEl.style.display = 'none';
+  cameraTween.tweenTo(POSE_TABLE, 0.5);
+  _runCameraTween(true);
+  gameSession.startNewGame();
+});
+
+// ─── Session overlays ─────────────────────────────────────────────────────────
+
+const reasonBanner = createReasonBanner(container);
+
+const gameOverUI = createGameOverUI(container);
+gameOverUI.onPlayAgain = () => {
+  gameOverUI.hide();
+  gameSession.playAgain();
+};
+gameOverUI.onExit = () => {
+  gameOverUI.hide();
+  gameSession.exitGame();
+  cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
+  _runCameraTween(true);
+  mainMenuEl.style.display = 'flex';
+};
+
+// ─── Player turn indicator ────────────────────────────────────────────────────
+
+const playerIndicatorEl = document.createElement('div');
+playerIndicatorEl.id = 'player-indicator';
+playerIndicatorEl.style.cssText = [
+  'position:absolute', 'top:12px', 'left:50%',
+  'transform:translateX(-50%)',
+  'background:rgba(0,0,0,0.55)', 'color:#fff',
+  'padding:6px 20px', 'border-radius:20px',
+  'font-family:sans-serif', 'font-size:14px',
+  'pointer-events:none', 'display:none', 'z-index:100',
+].join(';');
+container.appendChild(playerIndicatorEl);
+
+function _updatePlayerIndicator(playerIndex: 0 | 1, ballInHand: boolean): void {
+  playerIndicatorEl.style.display = 'block';
+  const playerLabel = `Player ${playerIndex + 1}`;
+  playerIndicatorEl.textContent = ballInHand
+    ? `${playerLabel} — Place cue ball`
+    : `${playerLabel}'s turn`;
+}
+
+// ─── Session callbacks ─────────────────────────────────────────────────────────
+
+gameSession.onTurnChanged = (playerIndex, ballInHand) => {
+  _updatePlayerIndicator(playerIndex, ballInHand);
+  if (ballInHand) {
+    _enterBallInHandMode();
+  }
+};
+
+gameSession.onGameEnded = (winner, reason) => {
+  playerIndicatorEl.style.display = 'none';
+  gameOverUI.show(winner, REASON_MESSAGES[reason] ?? '');
+};
+
+gameSession.onReasonMessage = (msg) => {
+  if (msg) reasonBanner.show(msg);
+};
+
+// ─── Ball-in-hand pointer handling (GAME-014 BallMoveManager) ────────────────
 
 function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: number } | null {
   const rect = scene.renderer.domElement.getBoundingClientRect();
@@ -161,24 +270,7 @@ function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: numbe
   return tableIntersection(_bihRaycaster, TABLE_PLANE_Y);
 }
 
-function onBihPointerMove(e: PointerEvent): void {
-  if (!ballInHand.isActive) return;
-  const pt = _bihNdcToTable(e.clientX, e.clientY);
-  if (pt) ballInHand.move(pt.x, pt.z);
-  const t = performance.now() / 1000 - _bihStartT;
-  placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
-}
-
-function onBihPointerUp(_e: PointerEvent): void {
-  if (!ballInHand.isActive) return;
-  if (ballInHand.commit()) {
-    placementMarker.update(null, false, 0);
-    adapter.enable();
-  }
-}
-
-/** Called by game rules (P1-T03) to enter ball-in-hand mode. */
-export function enterBallInHand(): void {
+function _enterBallInHandMode(): void {
   adapter.disable();
   _bihStartT = performance.now() / 1000;
   ballInHand.enter();
@@ -186,9 +278,32 @@ export function enterBallInHand(): void {
   placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
 }
 
+function onBihPointerMove(e: PointerEvent): void {
+  if (!gameSession.isBallInHand || !ballInHand.isActive) return;
+  const pt = _bihNdcToTable(e.clientX, e.clientY);
+  if (pt) ballInHand.move(pt.x, pt.z);
+  const t = performance.now() / 1000 - _bihStartT;
+  placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+}
+
+function onBihPointerUp(_e: PointerEvent): void {
+  if (!gameSession.isBallInHand || !ballInHand.isActive) return;
+  if (ballInHand.commit()) {
+    placementMarker.update(null, false, 0);
+    gameSession.notifyBallPlaced();  // session state (store, trail, cue) — physics already done
+    adapter.enable();
+  }
+}
+
 const _canvas = scene.renderer.domElement;
 _canvas.addEventListener('pointermove', onBihPointerMove as EventListener);
 _canvas.addEventListener('pointerup', onBihPointerUp as EventListener);
+
+// ─── Start physics loop ────────────────────────────────────────────────────────
+
+physics.start();
+
+// ─── Cleanup ──────────────────────────────────────────────────────────────────
 
 window.addEventListener('beforeunload', () => {
   _canvas.removeEventListener('pointermove', onBihPointerMove as EventListener);
@@ -202,68 +317,19 @@ window.addEventListener('beforeunload', () => {
   powerBar.dispose();
   cueMesh.dispose();
   placementMarker.dispose();
+  reasonBanner.dispose();
+  gameOverUI.dispose();
+  replayDriver.dispose();
 });
-
-// ─── Multiplayer ─────────────────────────────────────────────────────────────
-
-const params = new URLSearchParams(window.location.search);
-const room = params.get('room') || crypto.randomUUID();
-if (!params.get('room')) {
-  window.history.replaceState({}, '', `?room=${room}`);
-}
-
-const wsUrl = `ws://${window.location.hostname}:8080`;
-const wsClient = createWSClient(wsUrl, room);
-
-wsClient.connect().then(() => {
-  console.log(`Connected to room: ${room}`);
-}).catch((e) => {
-  console.warn('Multiplayer not available:', e);
-});
-
-// ─── Remote shot (network → physics, bypass CueController) ───────────────────
-
-wsClient.onShotReceived((data: ShotPayload) => {
-  // Stop current replay, restore authoritative state, then apply remote shot
-  physics.stop();
-  physics.setStateFromString(data.ballsState);
-
-  // Sync visual positions to restored physics state
-  for (const body of space.rigidbodies) {
-    scene.updateBallPosition(
-      body.id,
-      body.collider.position.x / MULTIPLIER,
-      body.collider.position.y / MULTIPLIER,
-      body.collider.position.z / MULTIPLIER,
-    );
-  }
-
-  physics.start();
-
-  // Reconstruct impulse from network payload (direction is Fixed unit vector + force scalar)
-  const cueBall = physics.getBall(0);
-  physics.applyShot({
-    position: cueBall.position,
-    impulse: new CmVector(
-      Math.trunc((data.directionX * data.force) / MULTIPLIER),
-      0,
-      Math.trunc((data.directionZ * data.force) / MULTIPLIER),
-    ),
-    torque: CmVector.zero,
-  });
-});
-
-// ─── Start ───────────────────────────────────────────────────────────────────
-
-physics.start();
 
 // ─── Playwright / test hook ──────────────────────────────────────────────────
 // Exposes minimal refs for headless browser smoke tests.
-// NOT used in game logic — read-only from test scripts.
 (window as unknown as Record<string, unknown>).__poolDebug = {
   camera: scene.camera,
   cueBallMesh: scene.balls[0],
-  balls: scene.balls,         // all 16 meshes; .position gives scene-space XYZ
+  balls: scene.balls,
   renderer: scene.renderer,
-  scene: scene.scene,         // THREE.Scene — needed for renderer.render(scene, camera)
+  scene: scene.scene,
+  gameSession,
 };
+

@@ -9,7 +9,13 @@
  * MUST-FIX compliance:
  *   MF-1: ball-hide is in renderer/replay-driver (not here).
  *   MF-2: no setStateFromString on normal turn change; only placeBall/respotCueBall
- *         for ball-in-hand, and resetToStartState for new game.
+ *         for ball-in-hand (handled by BallInHandController in main.ts),
+ *         and resetToStartState for new game.
+ *
+ * Ball-in-hand placement split:
+ *   - BallInHandController (main.ts) calls physics.placeBall() — physics + validation layer.
+ *   - game-session.notifyBallPlaced() — session state layer (store, trail, cue, callbacks).
+ *   - This avoids double physics.placeBall calls.
  */
 
 import type { IBallPoolPhysics } from './ball-pool-physics';
@@ -23,8 +29,7 @@ import type { BallTrail } from './ball-trail';
 import { REASON_MESSAGES } from './game-play-reason';
 import type { ReasonValue } from './game-play-reason';
 import type { ShotVerdict } from './rule-engine';
-import { BALL_Y } from '../physics/constants';
-import { CmVector } from '../physics/cm-vector';
+import { BALL_Y, TABLE_Y } from '../physics/constants';
 import { getAllRackPositions } from './rack-positions';
 
 // ─── GAME-018 interface ───────────────────────────────────────────────────────
@@ -37,8 +42,17 @@ export interface IGameSession {
   startNewGame(): void;
   exitGame(): void;
   playAgain(): void;
+
+  /**
+   * GAME-014 ball-in-hand completion: call after BallInHandController.commit() succeeds.
+   * Handles session-layer updates (store, trail, cue reset, onTurnChanged).
+   * physics.placeBall() is called by BallInHandController, not here.
+   */
+  notifyBallPlaced(): void;
+
   readonly currentPlayerIndex: 0 | 1;
   readonly isGameEnded: boolean;
+  readonly isBallInHand: boolean;
   readonly store: GameStore;
 
   onTurnChanged: ((playerIndex: 0 | 1, ballInHand: boolean) => void) | null;
@@ -55,6 +69,9 @@ export interface GameSessionDeps {
   replayDriver: ReplayDriver;
   trail?: BallTrail;  // GAME-013 optional
 }
+
+/** Ball height above table surface in Three.js scene units (meters). */
+const BALL_SCENE_Y = (BALL_Y - TABLE_Y) / 10000;
 
 export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
   const { physics, cue, scene, replayDriver, trail } = deps;
@@ -98,8 +115,9 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     }
 
     if (verdict.ballInHand) {
-      // C# CueBallMoveManager: enter ball-in-hand for the new current player
-      _enterBallInHand();
+      // Enter ball-in-hand; cue re-enabled by notifyBallPlaced() after placement
+      _ballInHandActive = true;
+      trail?.disable();  // GAME-013: no trail while cue ball is in hand
       session.onTurnChanged?.(s.currentPlayerIndex, true);
       session.onReasonMessage?.(reasonMsg);
       return;
@@ -111,37 +129,13 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     if (reasonMsg) session.onReasonMessage?.(reasonMsg);
   }
 
-  // ── Ball-in-hand helpers (G5 seam: physics.placeBall / respotCueBall) ────
-  function _enterBallInHand(): void {
-    _ballInHandActive = true;
-    trail?.disable();  // GAME-013: no trail while cue ball is in hand
-  }
-
-  function _commitBallInHand(x: number, z: number): void {
-    if (!_ballInHandActive) return;
-    _ballInHandActive = false;
-    // G5 seam: place cue ball at player-chosen position
-    physics.placeBall(0, new CmVector(
-      Math.trunc(x * 10000),
-      BALL_Y,
-      Math.trunc(z * 10000),
-    ));
-    trail?.enable();  // GAME-013: re-enable trail after placement
-    store.dispatch({ type: 'BALL_PLACED' });
-    const s = store.getState();
-    cue.resetForNewTurn();  // CUE-020
-    session.onTurnChanged?.(s.currentPlayerIndex, false);
-  }
-
-  // Exposed for main.ts ball-in-hand pointer handler
-  (physics as unknown as Record<string, unknown>).__commitBallInHand = _commitBallInHand;
-
   // ── Rack placement: use C# delta positions (GAME-010) ────────────────────
   function _placeRack(): void {
     const positions = getAllRackPositions();
     for (let id = 0; id < positions.length; id++) {
       const { x, z } = positions[id];
-      scene.updateBallPosition(id, x / 10000, BALL_Y / 10000, z / 10000);
+      // y = height above table surface (Three.js scene convention, same as physics.placeBall)
+      scene.updateBallPosition(id, x / 10000, BALL_SCENE_Y, z / 10000);
       const mesh = scene.balls[id];
       if (mesh) mesh.visible = true;
     }
@@ -155,16 +149,17 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
 
     get currentPlayerIndex() { return store.getState().currentPlayerIndex; },
     get isGameEnded() { return store.getState().phase === 'GameOver'; },
+    get isBallInHand() { return _ballInHandActive; },
     get store() { return store; },
 
     startNewGame(): void {
-      // Reset physics to canonical start state
+      // Reset physics to canonical start state (GAME-010 rack positions)
       physics.resetToStartState();
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
-      // Reset rule engine by creating fresh one
-      // (we use the outer ruleEngine binding — reset indirectly via new game dispatch)
+      _ballInHandActive = false;
       store.dispatch({ type: 'START_GAME' });
+      // GAME-014: cue bind id=0 + resetForNewTurn initial state
       cue.resetForNewTurn();
       session.onTurnChanged?.(0, false);
     },
@@ -172,6 +167,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     exitGame(): void {
       replayDriver.dispose();
       cue.onShotApplied = null;
+      _ballInHandActive = false;
       store.dispatch({ type: 'EXIT_GAME' });
     },
 
@@ -179,9 +175,20 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       physics.resetToStartState();
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
+      _ballInHandActive = false;
       store.dispatch({ type: 'PLAY_AGAIN' });
+      // GAME-014: re-init cue state for new game
       cue.resetForNewTurn();
       session.onTurnChanged?.(0, false);
+    },
+
+    notifyBallPlaced(): void {
+      if (!_ballInHandActive) return;
+      _ballInHandActive = false;
+      trail?.enable();  // GAME-013: re-enable trail after placement
+      store.dispatch({ type: 'BALL_PLACED' });
+      cue.resetForNewTurn();  // CUE-020
+      session.onTurnChanged?.(store.getState().currentPlayerIndex, false);
     },
   };
 
