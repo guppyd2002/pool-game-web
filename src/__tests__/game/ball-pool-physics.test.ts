@@ -716,3 +716,36 @@ describe('RENDER-001: updateBallPosition Y is scene-space (table at Y=0)', () =>
     }
   });
 });
+
+// ─── G6 §2.2: pocketed/outOfTable ordering guarantee ────────────────────────
+
+describe('G6 §2.2 — pocketed/outOfTable explicit sort (stepIndex asc, ballId asc)', () => {
+  it('pocketed[] invariant holds on a real shot', () => {
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, mockScene);
+    const result = physics.applyShot(GV01_SHOT);
+    for (let i = 1; i < result.pocketed.length; i++) {
+      const p = result.pocketed[i - 1], c = result.pocketed[i];
+      expect(p.stepIndex < c.stepIndex || (p.stepIndex === c.stepIndex && p.ballId <= c.ballId))
+        .toBe(true);
+    }
+  });
+
+  it('outOfTable[] invariant holds on a real shot', () => {
+    // High-speed +Z shot to escape table boundaries
+    const ball = makeBall(0, 0, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [ball], makeTable(), makePockets());
+    const physics = createBallPoolPhysics(space, mockScene);
+    const result = physics.applyShot({
+      position: new CmVector(0, BALL_Y, 0),
+      impulse: new CmVector(0, 0, 80000),
+      torque: CmVector.zero,
+    });
+    for (let i = 1; i < result.outOfTable.length; i++) {
+      const p = result.outOfTable[i - 1], c = result.outOfTable[i];
+      expect(p.stepIndex < c.stepIndex || (p.stepIndex === c.stepIndex && p.ballId <= c.ballId))
+        .toBe(true);
+    }
+  });
+});

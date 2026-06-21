@@ -411,6 +411,11 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
         return (a.otherBallId ?? a.cushionId ?? 0) - (b.otherBallId ?? b.cushionId ?? 0);
       });
 
+      // Explicit sort (G6 §2.2): pocketed/outOfTable guaranteed (stepIndex asc, ballId asc).
+      // Matches push-order in practice but made robust against future storage changes (e.g. Map).
+      pocketed.sort((a, b) => a.stepIndex !== b.stepIndex ? a.stepIndex - b.stepIndex : a.ballId - b.ballId);
+      outOfTable.sort((a, b) => a.stepIndex !== b.stepIndex ? a.stepIndex - b.stepIndex : a.ballId - b.ballId);
+
       // Update replay state
       _frames = frames;
       frameIdx = 0;
