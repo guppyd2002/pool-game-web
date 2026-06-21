@@ -24,7 +24,7 @@ import type { SceneAPI } from '../renderer/scene';
 import {
   BALL_RADIUS, BALL_MASS, MAX_FORCE,
   SPACE_SCALE_X, SPACE_SCALE_Z,
-  BALL_Y, RAIL_LONG_X,
+  BALL_Y, RAIL_LONG_X, TABLE_Y,
 } from '../physics/constants';
 import { simulateToCompletion, MAX_SIM_STEPS } from '../physics/simulate';
 export type { SimFrame } from '../physics/simulate';
@@ -257,7 +257,7 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
   function syncFrame(idx: number): void {
     const frame = _frames[idx];
     for (const p of frame.positions) {
-      renderer.updateBallPosition(p.id, toFloat(p.x), toFloat(p.y), toFloat(p.z));
+      renderer.updateBallPosition(p.id, toFloat(p.x), toFloat(p.y - TABLE_Y), toFloat(p.z));
     }
   }
 
@@ -464,7 +464,7 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
         renderer.updateBallPosition(
           body.id,
           toFloat(body.collider.position.x),
-          toFloat(body.collider.position.y),
+          toFloat(body.collider.position.y - TABLE_Y),
           toFloat(body.collider.position.z),
         );
       }
@@ -512,7 +512,7 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
       body.isKinematic = false;
       body.isOutOfCube = false;
       body.isActive = false;   // setter also zeros velocity + angularVelocity
-      renderer.updateBallPosition(id, toFloat(position.x), toFloat(position.y), toFloat(position.z));
+      renderer.updateBallPosition(id, toFloat(position.x), toFloat(position.y - TABLE_Y), toFloat(position.z));
     },
 
     respotCueBall(): void {

@@ -661,3 +661,58 @@ describe('PHY-009 analytic SphereCast: cushion detection geometry', () => {
     expect(hit.hitType).toBe('none');
   });
 });
+
+// ─── Render bridge coordinate fix (RENDER-001) ──────────────────────────────
+// Physics world: table surface at Y = TABLE_Y/MULTIPLIER ≈ 0.9154m
+// Scene world:   table surface at Y = 0
+// Bridge must subtract TABLE_Y so ball visuals land at ~BALL_RADIUS above scene cloth.
+
+describe('RENDER-001: updateBallPosition Y is scene-space (table at Y=0)', () => {
+  it('placeBall() passes scene-space Y ≈ BALL_RADIUS to renderer (not physics absolute Y)', () => {
+    const capturedY: number[] = [];
+    const trackedScene: SceneAPI = {
+      ...mockScene,
+      updateBallPosition: (_id: number, _x: number, y: number, _z: number) => {
+        capturedY.push(y);
+      },
+    };
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, trackedScene);
+    physics.placeBall(0, new CmVector(0, BALL_Y, 0));
+
+    // Physics BALL_Y = 9440 Fixed → toFloat = 0.944m (WRONG for scene)
+    // Correct: BALL_Y - TABLE_Y = 286 Fixed → 0.0286m ≈ BALL_RADIUS_FLOAT
+    const BALL_RADIUS_FLOAT = BALL_RADIUS / 10000;
+    const lastY = capturedY[capturedY.length - 1];
+    expect(lastY).toBeGreaterThan(BALL_RADIUS_FLOAT - 0.005);
+    expect(lastY).toBeLessThan(BALL_RADIUS_FLOAT + 0.005);
+  });
+
+  it('start() initial body sync passes scene-space Y to renderer for all bodies', () => {
+    const yValues: number[] = [];
+    const trackedScene: SceneAPI = {
+      ...mockScene,
+      updateBallPosition: (_id, _x, y, _z) => { yValues.push(y); },
+    };
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, trackedScene);
+
+    // start() synchronously calls updateBallPosition for all rigidbodies before requestAnimationFrame.
+    // Mock rAF so node test env doesn't throw "requestAnimationFrame is not defined".
+    const origRaf = (globalThis as unknown as Record<string, unknown>).requestAnimationFrame;
+    (globalThis as unknown as Record<string, unknown>).requestAnimationFrame = () => 0;
+    try {
+      physics.start();
+    } finally {
+      (globalThis as unknown as Record<string, unknown>).requestAnimationFrame = origRaf;
+    }
+
+    // All bodies' Y values must be in scene-space (≈ BALL_RADIUS above table at Y=0)
+    const BALL_RADIUS_FLOAT = BALL_RADIUS / 10000;
+    expect(yValues.length).toBeGreaterThan(0);
+    for (const y of yValues) {
+      expect(y).toBeGreaterThan(BALL_RADIUS_FLOAT - 0.005);
+      expect(y).toBeLessThan(0.10);  // never more than 10cm above cloth
+    }
+  });
+});

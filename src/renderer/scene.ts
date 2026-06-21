@@ -53,7 +53,8 @@ export interface SceneAPI {
 
 export function createScene(container: HTMLElement): SceneAPI {
   // Renderer
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // preserveDrawingBuffer: allows Playwright/pixel-sampling smoke tests to read canvas pixels
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.shadowMap.enabled = true;

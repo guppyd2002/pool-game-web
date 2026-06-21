@@ -197,4 +197,78 @@ test.describe('Gate 0 render smoke', () => {
     });
     expect(fs.existsSync(path.join(SCREENSHOT_DIR, '03-power-slider-70.png'))).toBe(true);
   });
+
+  test('RENDER-001 regression: balls on table cloth (not floating at top of canvas)', async ({ page }) => {
+    // Regression guard for the physics→THREE Y-origin bug.
+    // Bug: balls passed physics Y≈0.944m raw → rendered above the camera field, at top of canvas.
+    // Fix: subtract TABLE_Y so scene Y≈0.028m → balls appear in the middle 60% of canvas.
+    //
+    // Strategy: with preserveDrawingBuffer=true on the THREE renderer, drawImage copies
+    // the WebGL canvas into an off-screen 2D canvas so we can read pixel data.
+    // Then we assert:
+    //   (a) the top 20% of the canvas has very few non-background pixels
+    //       (background = scene color 0x1a1a2e ≈ rgb(26,26,46))
+    //   (b) the middle 60% (where table cloth lives) has substantially more content
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(2500); // allow first rAF render frame to complete
+
+    const result = await page.evaluate(() => {
+      const glCanvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      if (!glCanvas) return { ok: false, reason: 'no canvas', topPx: 0, midPx: 0 };
+
+      const w = glCanvas.width;
+      const h = glCanvas.height;
+      if (w === 0 || h === 0) return { ok: false, reason: 'canvas size=0', topPx: 0, midPx: 0 };
+
+      // Copy WebGL frame into an off-screen 2D canvas (requires preserveDrawingBuffer=true)
+      const offscreen = document.createElement('canvas');
+      offscreen.width = w;
+      offscreen.height = h;
+      const ctx2d = offscreen.getContext('2d');
+      if (!ctx2d) return { ok: false, reason: 'no 2d ctx', topPx: 0, midPx: 0 };
+      ctx2d.drawImage(glCanvas, 0, 0);
+
+      const allData = ctx2d.getImageData(0, 0, w, h).data;
+
+      // Background colour 0x1a1a2e = rgb(26, 26, 46) — any pixel significantly
+      // brighter than this is "content" (cloth, cushion, ball, or UI).
+      function countContent(yStart: number, yEnd: number): number {
+        let n = 0;
+        for (let row = yStart; row < yEnd; row++) {
+          for (let col = 0; col < w; col++) {
+            const i = (row * w + col) * 4;
+            const r = allData[i], g = allData[i + 1], b = allData[i + 2];
+            // Background is ~(26,26,46) — content has at least one channel >60
+            if (r > 60 || g > 60 || b > 60) n++;
+          }
+        }
+        return n;
+      }
+
+      const topBand   = Math.floor(h * 0.20);   // top 20% — should be mostly background
+      const midStart  = Math.floor(h * 0.20);
+      const midEnd    = Math.floor(h * 0.80);   // middle 60% — table cloth lives here
+
+      const topPx = countContent(0, topBand);
+      const midPx = countContent(midStart, midEnd);
+
+      // Pass conditions:
+      //   1. top band has < 1% of its pixels as content (balls not floating at top)
+      //   2. middle band has at least 5× more content than the top band
+      //      (the table cloth + balls are visible in the middle)
+      const topArea  = topBand * w;
+      const topRatio = topPx / topArea;
+      const ok = topRatio < 0.01 && midPx > topPx * 5;
+
+      return {
+        ok,
+        reason: `top-band ${(topRatio * 100).toFixed(2)}% content (want <1%), midPx=${midPx} topPx=${topPx}`,
+        topPx,
+        midPx,
+      };
+    });
+
+    console.log(`RENDER-001 regression: ${result.reason}`);
+    expect(result.ok).toBe(true);
+  });
 });
