@@ -372,19 +372,49 @@ export function createRuleEngine(): RuleEngine {
         }
       }
 
-      // ── Ball out of table (C# OnBallOutOfTable) ────────────────────────
-      for (const oot of result.outOfTable) {
-        _turnIsChanged ||= !_gameIsEnded;
-        _cueBallIsOutOfTable ||= !_gameIsEnded && isCueBall(oot.ballId);
+      // ── FAIL-1 fix: merge pocketed+outOfTable into single time-ordered stream ──
+      // C# replays OnBallInPocket / OnBallOutOfTable interleaved by stepIndex.
+      // Processing all OOT before pocketed inverts WIN/LOSE when black pockets
+      // at step N and cue OOTs at step M > N (OOT gate: !GameIsEnded must see
+      // the _gameIsEnded flag already set by the earlier black pocket event).
+      type ShotEvent =
+        | { isPocket: true; ballId: number; pocketId: number; stepIndex: number }
+        | { isPocket: false; ballId: number; stepIndex: number };
+      const events: ShotEvent[] = [
+        ...result.pocketed.map(p => ({ isPocket: true as const, ballId: p.ballId, pocketId: p.pocketId, stepIndex: p.stepIndex })),
+        ...result.outOfTable.map(o => ({ isPocket: false as const, ballId: o.ballId, stepIndex: o.stepIndex })),
+      ];
+      events.sort((a, b) => a.stepIndex !== b.stepIndex ? a.stepIndex - b.stepIndex : a.ballId - b.ballId);
+
+      for (const ev of events) {
+        if (ev.isPocket) {
+          _processPocket(ev.ballId, ev.pocketId);
+        } else {
+          // C# OnBallOutOfTable: gate on !GameIsEnded so events after black pocket are no-ops
+          _turnIsChanged ||= !_gameIsEnded;
+          _cueBallIsOutOfTable ||= !_gameIsEnded && isCueBall(ev.ballId);
+        }
       }
 
-      // ── Pocketed balls in time order (C# OnBallInPocket) ──────────────
-      for (const p of result.pocketed) {
-        _processPocket(p.ballId, p.pocketId);
-      }
-
-      // ── EndShot + TurnChanged ──────────────────────────────────────────
+      // ── EndShot ────────────────────────────────────────────────────────
       _endShot();
+
+      // ── FAIL-2 fix: game-ended → build verdict directly, skip _turnChanged() ──
+      // C# BallPoolGame.EndShot: if(GameEnded) emit game-end; else if(TurnChanged) emit.
+      // _turnChanged() resets _lastReason=Non on first line, wiping the reason
+      // set by _processPocket (YouBlackBallInPocket, YouCueBallInPocket, etc.).
+      if (_gameIsEnded) {
+        _tableIsOpened = true;
+        return {
+          gameEnded: true,
+          winner: _isWinner ? _currentPlayerIndex : _nextPlayerIndex(),
+          turnChanged: false,
+          ballInHand: false,
+          reason: _lastReason,
+          ballTypeAssigned: _ballTypeAssigned,
+        };
+      }
+
       return _turnChanged();
     },
 
