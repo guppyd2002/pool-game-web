@@ -35,6 +35,7 @@ import {
   CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
   CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
   DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+  SIDE_JAW_X, SIDE_JAW_Z, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, SIDE_JAW_SIN, SIDE_JAW_COS,
 } from '../../physics/constants';
 
 // ─── Mock SceneAPI (renderer not under test) ──────────────────────────────────
@@ -111,14 +112,28 @@ function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
   plane.material = { ...CLOTH_MAT };
   list.push(plane);
 
-  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y, 0,    0,0,10000,  0,10000,0, -10000,0,0, RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
-  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y, 0,    0,0,-10000, 0,10000,0, 10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
-  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z, -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
-  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,  10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  // Long side rails
+  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y, 0,   0,0,10000,  0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y, 0,   0,0,-10000, 0,10000,0,  10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  // End cushions (4 half-segments)
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  // Corner jaw cushions (8 total: 2 per corner × 4 corners)
   list.push(makeLine(id++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
   list.push(makeLine(id++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
   list.push(makeLine(id++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
   list.push(makeLine(id++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  // Side pocket jaw cushions (4 total: 2 per side pocket × 2 side pockets)
+  list.push(makeLine(id++, -SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
 
   return list;
 }
@@ -150,15 +165,15 @@ const GV01_SHOT = {
 // ─── C1 / G2-B: production path == GV-01 golden ───────────────────────────────
 
 describe('G6 C1: applyShot canonical endpoint (G2-B parity)', () => {
-  it('applyShot() gives PHY-003-clamped final position px=5018', () => {
-    // GV-01 impulse=30000 > MAX_FORCE=9100; applyShot() clamps to 9100 → px=5018.
+  it('applyShot() gives PHY-003-clamped final position px=-4864', () => {
+    // GV-01 impulse=30000 > MAX_FORCE=13000; applyShot() clamps to 13000 → ball reaches
+    // right long rail, bounces (bounciness=0.6), settles at px=-4864.
     // Direct physics (golden-vector.test.ts) uses unclamped 30000 → px=9480.
-    // B1 fix: MAX_FORCE 65000→9100; old golden 9480 was valid when 30000 < 65000.
     const { space } = makeGV01Space();
     const physics = createBallPoolPhysics(space, mockScene);
     const result = physics.applyShot(GV01_SHOT);
 
-    expect(result.finalStates[0].position.x).toBe(5018);  // B1: PHY-003 clamps 30000 → 9100
+    expect(result.finalStates[0].position.x).toBe(-4864);  // B1: PHY-003 clamps 30000 → 13000 → bounce → px=-4864
     expect(result.finalStates[0].position.y).toBe(9439);
     expect(result.finalStates[0].position.z).toBe(0);
   });
@@ -170,7 +185,7 @@ describe('G6 C1: applyShot canonical endpoint (G2-B parity)', () => {
 
     const lastFrame = result.frames[result.frames.length - 1];
     const ball0pos = lastFrame.positions.find(p => p.id === 0)!;
-    expect(ball0pos.x).toBe(5018);  // B1: PHY-003 clamps 30000 → 9100
+    expect(ball0pos.x).toBe(-4864);  // B1: PHY-003 clamps 30000 → 13000 → bounce → px=-4864
   });
 });
 

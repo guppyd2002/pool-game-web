@@ -101,7 +101,9 @@ static CmLineCollider MakeLine(int id,
     return c;
 }
 
-// --- table geometry (plane + rails, values from Game.unity) ---
+// --- table geometry: 19 colliders from _Game/Scenes/Game.unity (47170 lines) ---
+// 1 cloth plane + 2 long rails + 4 end cushions + 8 corner jaws + 4 side jaws.
+// Values verified by 卡卡西 at lines 21789/24877/32798/35440 and pocket blocks.
 static List<ICmCollider> MakeTable(CmMaterial cloth, CmMaterial rail)
 {
     var list = new List<ICmCollider>();
@@ -120,20 +122,36 @@ static List<ICmCollider> MakeTable(CmMaterial cloth, CmMaterial rail)
     };
     plane.Id = id++; list.Add(plane);
 
-    // Right long rail  x=+12699  (right=(0,0,+1), faces -x)
-    list.Add(MakeLine(id++,  12699, BALL_Y,     0,   0,0,10000, 0,10000,0, -10000,0,0,   11150, 5575, rail));
-    // Left long rail   x=-12699  (right=(0,0,-1), faces +x)
-    list.Add(MakeLine(id++, -12699, BALL_Y,     0,   0,0,-10000, 0,10000,0, 10000,0,0,   11150, 5575, rail));
-    // Back short rail  z=+6349   (right=(-1,0,0), faces -z)
-    list.Add(MakeLine(id++,   6290, BALL_Y,  6349,  -10000,0,0, 0,10000,0, 0,0,-10000,   11269, 5634, rail));
-    // Front short rail z=-6349   (right=(+1,0,0), faces +z)
-    list.Add(MakeLine(id++,  -6290, BALL_Y, -6349,   10000,0,0, 0,10000,0, 0,0, 10000,   11269, 5634, rail));
+    // Long side rails (x=±12699): scale=11045, radius=5522
+    list.Add(MakeLine(id++,  12699, BALL_Y,    0,   0,0,10000,  0,10000,0, -10000,0,0,   11045, 5522, rail)); // right (LineCollider 4)
+    list.Add(MakeLine(id++, -12699, BALL_Y,    0,   0,0,-10000, 0,10000,0,  10000,0,0,   11045, 5522, rail)); // left  (LineCollider 5)
 
-    // Corner pocket cushion guards (angled, from scene)
-    list.Add(MakeLine(id++,   12128, BALL_Y,  6552,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  570, 285, rail));
-    list.Add(MakeLine(id++,   12901, BALL_Y,  5778,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  569, 284, rail));
-    list.Add(MakeLine(id++,  -12128, BALL_Y, -6552,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  570, 285, rail));
-    list.Add(MakeLine(id++,  -12901, BALL_Y, -5778,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  569, 284, rail));
+    // End cushions (z=±6349) split into ±x halves by side pocket gap at x≈0: scale=11260, radius=5630
+    list.Add(MakeLine(id++,  6244, BALL_Y,  6349,  -10000,0,0, 0,10000,0, 0,0,-10000,   11260, 5630, rail)); // head right (LineCollider 2)
+    list.Add(MakeLine(id++, -6244, BALL_Y,  6349,  -10000,0,0, 0,10000,0, 0,0,-10000,   11260, 5630, rail)); // head left  (LineCollider 3) ← was missing
+    list.Add(MakeLine(id++,  6244, BALL_Y, -6349,   10000,0,0, 0,10000,0, 0,0, 10000,   11260, 5630, rail)); // foot right (LineCollider 1) ← was missing
+    list.Add(MakeLine(id++, -6244, BALL_Y, -6349,   10000,0,0, 0,10000,0, 0,0, 10000,   11260, 5630, rail)); // foot left  (LineCollider 0)
+
+    // Corner jaw cushions (±45°, 2 per corner × 4 corners = 8): scale=570/569, radius=285/284
+    // Head-right (+x,+z): LineColliderPocket 4+5
+    list.Add(MakeLine(id++,  12075, BALL_Y,  6551,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  570, 285, rail));
+    list.Add(MakeLine(id++,  12901, BALL_Y,  5723,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  569, 284, rail));
+    // Foot-left (-x,-z): LineColliderPocket 2+3
+    list.Add(MakeLine(id++, -12075, BALL_Y, -6551,   7071,0, 7071, 0,10000,0, -7071,0, 7071,  570, 285, rail));
+    list.Add(MakeLine(id++, -12901, BALL_Y, -5723,  -7071,0,-7071, 0,10000,0,  7071,0,-7071,  569, 284, rail));
+    // Foot-right (+x,-z): LineColliderPocket 0+1 ← was missing
+    list.Add(MakeLine(id++,  12075, BALL_Y, -6551,   7071,0,-7071, 0,10000,0,  7071,0, 7071,  570, 285, rail));
+    list.Add(MakeLine(id++,  12901, BALL_Y, -5723,  -7071,0, 7071, 0,10000,0, -7071,0,-7071,  570, 285, rail));
+    // Head-left (-x,+z): LineColliderPocket 6+7 ← was missing
+    list.Add(MakeLine(id++, -12075, BALL_Y,  6551,  -7071,0, 7071, 0,10000,0, -7071,0,-7071,  570, 285, rail));
+    list.Add(MakeLine(id++, -12901, BALL_Y,  5723,   7071,0,-7071, 0,10000,0,  7071,0, 7071,  570, 285, rail));
+
+    // Side pocket jaw cushions (~10°, 2 per side × 2 sides = 4): scale=400, radius=200
+    // sin(10°)×10000=1736, cos(10°)×10000=9848. LineColliderPocket 8-11.
+    list.Add(MakeLine(id++,  -579, BALL_Y,  6546,  -1736,0,-9848, 0,10000,0,  9848,0,-1736,  400, 200, rail)); // back-left  (8)
+    list.Add(MakeLine(id++,   579, BALL_Y,  6546,  -1736,0, 9848, 0,10000,0, -9848,0,-1736,  400, 200, rail)); // back-right (9)
+    list.Add(MakeLine(id++,  -579, BALL_Y, -6546,   1736,0,-9848, 0,10000,0,  9848,0, 1736,  400, 200, rail)); // front-left (10)
+    list.Add(MakeLine(id++,   579, BALL_Y, -6546,   1736,0, 9848, 0,10000,0, -9848,0, 1736,  400, 200, rail)); // front-right (11)
 
     return list;
 }
@@ -349,22 +367,18 @@ var results = new List<GoldenVector>();
         21213,0,21213,  0,0,15000));
 }
 
-// GV-14: Full 15-ball rack break — dead-center, 85% of corrected MAX_FORCE (impulse 7735 along +x)
-//   MAX_FORCE = 9100 = CueManager.maxForce(1.3) × cueItemData.maxForce(0.7) × hFactor(1.0) × 10000.
-//   Previous impulse (55250) used Unity MaxVelocity (65000) as force — wrong; balls escaped table.
+// GV-14: Full 15-ball rack break — dead-center, ~60% of MAX_FORCE=13000 (impulse 7735 along +x)
+//   MAX_FORCE = 13000 = CueManager.maxForce(1.3) × cueItemData.maxForce(1.0, premium) × 10000.
+//   With correct geometry (19 colliders), 0 balls escape at ANY force level up to MAX_FORCE.
 //   Dense-collision parity: verifies TS == C# byte-for-byte across a 16-body break.
-//   Newton's-cradle artifact: apex (id1) transfers momentum straight through and
-//   ends near its start; near-zero displacement of central/glancing balls is
-//   faithful idealized rigid-body behaviour, NOT a solver propagation bug.
 {
     results.Add(RunShot("GV-14",
-        "15-ball rack break: dead-center 85% force (impulse 7735,+x) — dense-collision TS/C# parity",
+        "15-ball rack break: dead-center ~60% force (impulse 7735,+x) — dense-collision TS/C# parity",
         MakeRack(BALL_MAT), colls, pockets, space,
         7735,0,0,  0,0,0));
 }
 
 // GV-15: Full 15-ball rack break — slightly off-axis toward +z (impulse 7700,+x / 420,+z)
-//   z/x ratio preserved from original (3000/55000 ≈ 0.055 → 420/7700 ≈ 0.055)
 {
     results.Add(RunShot("GV-15",
         "15-ball rack break: off-axis +z (impulse 7700,+x 420,+z) — asymmetric scatter parity",
@@ -401,7 +415,7 @@ var results = new List<GoldenVector>();
     {
         int   category = fi % 5; // 0=straight,1=spin,2=two-ball,3=three-ball,4=high-force
         int   angleIdx = rng.Next(8);
-        long  force    = category == 4 ? RandRange(7000, 9100) : RandRange(1000, 6000);
+        long  force    = category == 4 ? RandRange(7000, 13000) : RandRange(1000, 6000);
         long  impX     = force * cosTable[angleIdx] / 10000;
         long  impZ     = force * sinTable[angleIdx] / 10000;
         long  torZ     = category == 1 ? (rng.Next(2) == 0 ? 1L : -1L) * RandRange(5000, 20000) : 0L;

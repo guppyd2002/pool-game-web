@@ -36,6 +36,7 @@ import {
   CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
   CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
   DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+  SIDE_JAW_X, SIDE_JAW_Z, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, SIDE_JAW_SIN, SIDE_JAW_COS,
 } from '../../physics/constants';
 
 // ─── Types mirroring the JSON fixture schema ────────────────────────────────
@@ -111,7 +112,7 @@ function makeLine(
   return c;
 }
 
-/** Build table geometry (plane + long/short rails) from Game.unity values */
+/** Build table geometry: 19 colliders matching C# golden-vector-runner exactly */
 function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
   const list: (CmPlaneCollider | CmLineCollider)[] = [];
   let id = 0;
@@ -128,20 +129,28 @@ function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
   plane.material = { ...CLOTH_MAT };
   list.push(plane);
 
-  // Right long rail  x=+RAIL_LONG_X  (right=(0,0,+1))
-  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y,     0,   0,0,10000, 0,10000,0, -10000,0,0,   RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
-  // Left long rail   x=-RAIL_LONG_X  (right=(0,0,-1))
-  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y,     0,   0,0,-10000, 0,10000,0, 10000,0,0,   RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
-  // Back short rail  z=+RAIL_BACK_Z  (right=(-1,0,0))
-  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000,   RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
-  // Front short rail z=-RAIL_BACK_Z  (right=(+1,0,0))
-  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000,   RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
-
-  // Corner pocket cushion guards (angled ±45°)
+  // Long side rails
+  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y,    0,   0,0,10000,  0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y,    0,   0,0,-10000, 0,10000,0,  10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  // End cushions (4 half-segments)
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  // Corner jaw cushions (8 total: 2 per corner × 4 corners)
   list.push(makeLine(id++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
   list.push(makeLine(id++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
   list.push(makeLine(id++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
   list.push(makeLine(id++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  // Side pocket jaw cushions (4 total: 2 per side pocket × 2 side pockets)
+  list.push(makeLine(id++, -SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
 
   return list;
 }

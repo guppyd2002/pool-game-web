@@ -10,13 +10,15 @@
  *   bit-exact final positions and calculateTime.  (dt is now irrelevant to physics;
  *   this is trivially true but confirms the canonical loop is self-consistent.)
  *
- * G2-B: The production applyShot() path produces px=5018 via PHY-003 clamp.
- *   GV-01 impulse=30000 > MAX_FORCE=9100 → applyShot() clamps to 9100 → px=5018.
+ * G2-B: The production applyShot() path produces px=-4864 via PHY-003 clamp.
+ *   GV-01 impulse=30000 > MAX_FORCE=13000 → applyShot() clamps to 13000 → ball reaches
+ *   right long rail (x≈12699), bounces (bounciness=0.6), and settles at px=-4864.
  *   Direct physics (golden-vector tests) uses unclamped 30000 → px=9480.
- *   B1 fix updated MAX_FORCE 65000→9100; prior golden px=9480 was unclamped (30000 < 65000).
+ *   B1 fix updated MAX_FORCE 9100→13000 (premium cue: 1.3×1.0×10000); stronger impulse
+ *   now carries ball past the old stopping point to the far rail.
  *
  * GV-01 scenario: single ball at (-5000, 9440, 0), impulse (30000, 0, 0), mass=1700.
- * GV-01 direct-physics final: px=9480. applyShot() final after PHY-003 clamp: px=5018.
+ * GV-01 direct-physics final: px=9480. applyShot() final after PHY-003 clamp: px=-4864.
  * (G9 B: CLOTH_MATERIAL updated to Game.unity runtime values — lower friction → ball rolls farther)
  */
 import { describe, it, expect } from 'vitest';
@@ -39,6 +41,7 @@ import {
   CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
   CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
   DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+  SIDE_JAW_X, SIDE_JAW_Z, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, SIDE_JAW_SIN, SIDE_JAW_COS,
 } from '../../physics/constants';
 
 // ─── SceneAPI mock ────────────────────────────────────────────────────────────
@@ -115,14 +118,28 @@ function makeTable(): (CmPlaneCollider | CmLineCollider)[] {
   plane.material = { ...CLOTH_MAT };
   list.push(plane);
 
-  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y,     0,   0,0,10000,  0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
-  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y,     0,   0,0,-10000, 0,10000,0,  10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
-  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0,  0,10000,0,  0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
-  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0,  0,10000,0,  0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  // Long side rails
+  list.push(makeLine(id++,  RAIL_LONG_X, BALL_Y, 0,   0,0,10000,  0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_LONG_X, BALL_Y, 0,   0,0,-10000, 0,10000,0,  10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  // End cushions (4 half-segments)
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT));
+  // Corner jaw cushions (8 total: 2 per corner × 4 corners)
   list.push(makeLine(id++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
   list.push(makeLine(id++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
   list.push(makeLine(id++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
   list.push(makeLine(id++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  // Side pocket jaw cushions (4 total: 2 per side pocket × 2 side pockets)
+  list.push(makeLine(id++, -SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++, -SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  list.push(makeLine(id++,  SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
   return list;
 }
 
@@ -208,7 +225,7 @@ describe('G2: simulation-loop full-simulate-then-replay determinism', () => {
     // would run different step counts → different final positions.
     const r = replayToEnd(0.016);
     console.log(`[G2-A dt=0.016] lastPxFixed=${r.lastPxFixed} lastPyFixed=${r.lastPyFixed}`);
-    expect(r.lastPxFixed).toBe(5018);  // B1: impulse 30000 clamped to MAX_FORCE=9100
+    expect(r.lastPxFixed).toBe(-4864);  // B1: clamps 30000→13000; ball bounces right rail → px=-4864
     expect(r.lastPyFixed).toBe(9439);
     expect(r.lastPzFixed).toBe(0);
   });
@@ -241,14 +258,14 @@ describe('G2: simulation-loop full-simulate-then-replay determinism', () => {
 // ─── Test B: production path == golden (G2-B) ────────────────────────────────
 
 describe('G2-B: production path final position == GV-01 golden', () => {
-  it('G2-B: applyShot() canonical loop gives px=5018 (PHY-003 clamped)', () => {
+  it('G2-B: applyShot() canonical loop gives px=-4864 (PHY-003 clamped)', () => {
     // applyShot() applies PHY-003: clamps impulse magnitude to MAX_FORCE before calling physics.
-    // GV-01 impulse=30000 > MAX_FORCE=9100 → clamped to 9100 → px=5018.
+    // GV-01 impulse=30000 > MAX_FORCE=13000 → clamped to 13000 → ball reaches right long rail,
+    // bounces (bounciness=0.6), and settles at px=-4864.
     // Direct physics path (golden-vector.test.ts) uses unclamped 30000 → px=9480.
-    // B1 fix changed MAX_FORCE from 65000→9100; old golden 9480 was valid when 30000<65000.
     const r = runToStop(0.016);
     console.log(`[G2-B] production result: px=${r.px}, py=${r.py}, pz=${r.pz}`);
-    expect(r.px).toBe(5018);  // B1: PHY-003 clamps 30000 → 9100
+    expect(r.px).toBe(-4864);  // B1: PHY-003 clamps 30000 → 13000 → bounce → px=-4864
     expect(r.py).toBe(9439);
     expect(r.pz).toBe(0);
   });

@@ -36,22 +36,35 @@ export const SPACE_SCALE_Z = 20000;
 
 // ─── Rail geometry ────────────────────────────────────────────────────────────
 
-export const RAIL_LONG_X  = 12699;  // x of long rails (±)
-export const RAIL_BACK_X  = 6290;   // x offset of short back rail
-export const RAIL_BACK_Z  = 6349;   // z of short rails (±)
-export const RAIL_LONG_SCALE_X  = 11150;
-export const RAIL_LONG_RADIUS   = 5575;
-export const RAIL_SHORT_SCALE_X = 11269;
-export const RAIL_SHORT_RADIUS  = 5634;
+// Authoritative source: _Game/Scenes/Game.unity (47170 lines)
+// LineCollider positions verified at lines 21789/24877/32798/35440 by 卡卡西.
+export const RAIL_LONG_X  = 12699;  // x of long side rails (±)
+export const RAIL_BACK_X  = 6244;   // x offset of end cushion (split segments)
+export const RAIL_BACK_Z  = 6349;   // z of end rails (±), side pocket gap at x≈0
+export const RAIL_LONG_SCALE_X  = 11045;  // Game.unity scale.x=1.1045
+export const RAIL_LONG_RADIUS   = 5522;   // scale/2
+export const RAIL_SHORT_SCALE_X = 11260;  // Game.unity scale.x=1.126
+export const RAIL_SHORT_RADIUS  = 5630;   // scale/2
 
-/** Corner pocket jaw cushions (angled ±45°) */
-export const CORNER_A_X = 12128;  export const CORNER_A_Z = 6552;
-export const CORNER_B_X = 12901;  export const CORNER_B_Z = 5778;
+/** Corner pocket jaw cushions (angled ±45°) — all 4 corners, 2 jaws each = 8 total */
+// LineColliderPocket 0-7 in Game.unity; A=arm along z-axis, B=arm along x-axis.
+export const CORNER_A_X = 12075;  export const CORNER_A_Z = 6551;
+export const CORNER_B_X = 12901;  export const CORNER_B_Z = 5723;
 export const CORNER_A_SCALE_X = 570;  export const CORNER_A_RADIUS = 285;
 export const CORNER_B_SCALE_X = 569;  export const CORNER_B_RADIUS = 284;
 
 /** Diagonal unit vector component for 45° corner guards (trunc(10000 × sin 45°)) */
 export const DIAG_UNIT = 7071;
+
+/** Side pocket jaw cushions (angled ~10° into pocket) — LineColliderPocket 8-11 */
+// 2 jaws per side pocket × 2 side pockets = 4 total.
+// Angle: sin(10°)×10000=1736, cos(10°)×10000=9848.
+export const SIDE_JAW_X      = 579;   // |x| of jaw cushion center
+export const SIDE_JAW_Z      = 6546;  // |z| of jaw cushion center
+export const SIDE_JAW_SCALE  = 400;   // scale.x (= 2×radius)
+export const SIDE_JAW_RADIUS = 200;   // radius
+export const SIDE_JAW_SIN    = 1736;  // sin(10°) × 10000
+export const SIDE_JAW_COS    = 9848;  // cos(10°) × 10000
 
 /** Table cloth plane dimensions */
 export const PLANE_SCALE_X = 25399;
@@ -131,11 +144,11 @@ export const MAX_SIM_STEPS = 2_000_000;
  *
  * Derivation (authoritative Game.unity sources):
  *   impulse = CueManager.maxForce × cueItemData.maxForce × horizontalFactor(0) × power
- *   = 1.3 × 0.7 × 1.0 × 10000  (at full power, horizontal shot, entry-level cue)
- *   = 9100
+ *   = 1.3 × 1.0 × 1.0 × 10000  (at full power, horizontal shot, premium cue)
+ *   = 13000
  * Sources:
  *   CueManager.maxForce = 1.3  (Game.unity MonoBehaviour serialized field)
- *   cueItemData.maxForce = 0.7  (BallPoolConfig.asset, first/entry cue, range 0.7~1.0)
+ *   cueItemData.maxForce = 1.0  (BallPoolConfig.asset, premium cue; range 0.7~1.0)
  *   horizontalFactor.Evaluate(0) = 1.0  (AnimationCurve at vr01=0, no elevation)
  *
  * PREVIOUS BUG: 65000 was CmRigidbody.MaxVelocity — a Unity audio-normalisation constant,
@@ -145,4 +158,4 @@ export const MAX_SIM_STEPS = 2_000_000;
  * DETERMINISM INVARIANT (G1): With force ≤ MAX_FORCE and mass ≥ 1, all physics
  * intermediate products remain within safe bounds for JS Number and C# long.
  */
-export const MAX_FORCE = 9100;
+export const MAX_FORCE = 13000;

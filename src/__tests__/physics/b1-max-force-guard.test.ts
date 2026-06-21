@@ -1,24 +1,22 @@
 /**
- * B1 structural guard — max-force break must NOT tunnel balls through rails or table.
+ * B1 structural guard — complete table geometry seals all ball escapes.
  *
- * The B1 bug (MAX_FORCE=65000):
- *   v_max per adaptive timestep (MIN_TS=50) ≫ rail half-width (285 units).
- *   Ball teleports past rail surface in one step → collision detection misses it →
- *   ball exits table through wall geometry rather than bouncing off it.
+ * Root cause (identified by 卡卡西, second QA round):
+ *   The TS port was missing 2 of 4 end cushion segments AND 8 of 12 jaw cushions.
+ *   Balls escaped through the open gaps in table geometry — NOT because of excessive force.
+ *   卡卡西 experiment: add the 2 missing end segments → ALL force levels (9100~65000) give 0 escapes.
  *
- * After fix (MAX_FORCE=9100):
- *   Per-step displacement at max velocity is ~267 units (< BALL_RADIUS=285).
- *   Collision detection catches every cushion contact; no tunneling.
- *   Some balls may still legitimately escape over the edge in a hard break —
- *   that is expected billiards physics, not a bug.
+ * After geometry fix (19 colliders total):
+ *   1 cloth plane + 2 long rails + 4 end cushions + 8 corner jaws + 4 side jaws.
+ *   With complete geometry, no ball escapes at any force level up to MAX_FORCE=13000.
  *
  * Guard assertions:
- *   A) No ball that remains in the simulation space (not isOutOfCube) goes below TABLE_Y.
- *      Balls below the table surface while still "inside" would indicate a floor tunnel.
- *   B) At most 6 of 16 balls escape (isOutOfCube) at MAX_FORCE.
- *      At 65000, nearly all balls tunnel → ≥ 10 escape.
+ *   A) No ball is isOutOfCube after MAX_FORCE break (0 escapes required, not just "≤6").
+ *   B) No ball goes below TABLE_Y (no floor tunneling regardless of escape status).
  *
- * Discriminant: same test with impulse=65000 must violate both B's upper bound (≥ 7 escape).
+ * Discriminant (GEOMETRY axis — not force axis):
+ *   Remove one end cushion segment → at least 1 ball must escape (isOutOfCube=true).
+ *   This proves the geometry is load-bearing, not force capping.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -38,11 +36,12 @@ import {
   CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
   CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
   DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+  SIDE_JAW_X, SIDE_JAW_Z, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, SIDE_JAW_SIN, SIDE_JAW_COS,
   POCKET_RADIUS, POCKET_POSITIONS,
 } from '../../physics/constants';
 import { getAllRackPositions } from '../../game/rack-positions';
 
-// ─── Scene builders (same as golden-vector.test.ts) ──────────────────────────
+// ─── Scene builders ──────────────────────────────────────────────────────────
 
 function makeBall(id: number, x: number, y: number, z: number): CmRigidbody {
   const col = new CmSphereCollider();
@@ -80,10 +79,11 @@ function makeLine(
 }
 
 /**
- * Build a full table CmSpace with all 16 balls in rack positions.
- * Applies the given impulse to the cue ball (id=0) along +x (toward rack) before returning.
+ * Build the full 19-collider table + 16-ball rack, then apply impulseX to cue ball.
+ * @param omitFootRightEndCushion - set true for discriminant test: removes foot-right end cushion,
+ *   leaving a ~25398-unit open gap at z=-6349, x>0 through which balls can escape.
  */
-function makeBreakSpace(impulseX: number): CmSpace {
+function makeBreakSpace(impulseX: number, omitFootRightEndCushion = false): CmSpace {
   const spaceCube: CmSpaceCube = {
     position: CmVector.zero,
     scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
@@ -104,17 +104,32 @@ function makeBreakSpace(impulseX: number): CmSpace {
   plane.scale = new CmVector(PLANE_SCALE_X, 5000, PLANE_RADIUS);
   plane.radius = PLANE_RADIUS; plane.material = { ...CLOTH_MAT };
 
-  const colliders = [
-    plane,
-    makeLine(cid++,  RAIL_LONG_X, BALL_Y, 0,  0,0,10000, 0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT),
-    makeLine(cid++, -RAIL_LONG_X, BALL_Y, 0,  0,0,-10000, 0,10000,0, 10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT),
-    makeLine(cid++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT),
-    makeLine(cid++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT),
-    makeLine(cid++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT),
-    makeLine(cid++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT),
-    makeLine(cid++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT),
-    makeLine(cid++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT),
-  ];
+  const colliders: (CmPlaneCollider | CmLineCollider)[] = [];
+  colliders.push(plane);
+  // Long side rails
+  colliders.push(makeLine(cid++,  RAIL_LONG_X, BALL_Y, 0,   0,0,10000,  0,10000,0, -10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++, -RAIL_LONG_X, BALL_Y, 0,   0,0,-10000, 0,10000,0,  10000,0,0,  RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS, RAIL_MAT));
+  // End cushions (4 half-segments at z=±RAIL_BACK_Z, split by side pocket gap at x≈0)
+  colliders.push(makeLine(cid++,  RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT)); // head right
+  colliders.push(makeLine(cid++, -RAIL_BACK_X, BALL_Y,  RAIL_BACK_Z,  -10000,0,0, 0,10000,0, 0,0,-10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT)); // head left
+  if (!omitFootRightEndCushion) {
+    colliders.push(makeLine(cid++,  RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT)); // foot right
+  }
+  colliders.push(makeLine(cid++, -RAIL_BACK_X, BALL_Y, -RAIL_BACK_Z,   10000,0,0, 0,10000,0, 0,0, 10000, RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS, RAIL_MAT)); // foot left
+  // Corner jaw cushions (8 total: 2 per corner × 4 corners)
+  colliders.push(makeLine(cid++,  CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++,  CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++, -CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++, -CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++,  CORNER_A_X, BALL_Y, -CORNER_A_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++,  CORNER_B_X, BALL_Y, -CORNER_B_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++, -CORNER_A_X, BALL_Y,  CORNER_A_Z,  -DIAG_UNIT,0, DIAG_UNIT, 0,10000,0, -DIAG_UNIT,0,-DIAG_UNIT, CORNER_A_SCALE_X, CORNER_A_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++, -CORNER_B_X, BALL_Y,  CORNER_B_Z,   DIAG_UNIT,0,-DIAG_UNIT, 0,10000,0,  DIAG_UNIT,0, DIAG_UNIT, CORNER_B_SCALE_X, CORNER_B_RADIUS, RAIL_MAT));
+  // Side pocket jaw cushions (4 total: 2 per side pocket × 2 side pockets)
+  colliders.push(makeLine(cid++, -SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++,  SIDE_JAW_X, BALL_Y,  SIDE_JAW_Z,  -SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0,-SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++, -SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0,-SIDE_JAW_COS, 0,10000,0,  SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
+  colliders.push(makeLine(cid++,  SIDE_JAW_X, BALL_Y, -SIDE_JAW_Z,   SIDE_JAW_SIN,0, SIDE_JAW_COS, 0,10000,0, -SIDE_JAW_COS,0, SIDE_JAW_SIN, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, RAIL_MAT));
 
   const triggers: CmKinematicTrigger[] = POCKET_POSITIONS.map(([px, pz], i) => {
     const t = new CmKinematicTrigger();
@@ -136,37 +151,33 @@ function makeBreakSpace(impulseX: number): CmSpace {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe('B1 structural guard — max-force break', () => {
+describe('B1 structural guard — geometry seals table (complete collider set)', () => {
 
-  it('MAX_FORCE (9100) break: no in-table ball sinks below TABLE_Y (no floor tunneling)', () => {
-    // Balls that legitimately escape (isOutOfCube=true) may fall below TABLE_Y in free-fall.
-    // Only balls still within the simulation space must stay above the table surface.
+  it('MAX_FORCE (13000) break: 0 balls escape (isOutOfCube=false for all 16)', () => {
+    // With complete geometry, no ball can exit the space cube at any valid force.
+    // Pre-fix: 2 missing end cushion segments left open quadrants → balls flew out.
     const space = makeBreakSpace(MAX_FORCE);
     simulateToCompletion(space);
-    const sunk = space.rigidbodies.filter(
-      b => !b.isOutOfCube && !b.isKinematic && b.collider.position.y < TABLE_Y,
-    );
+    const escaped = space.rigidbodies.filter(b => b.isOutOfCube);
+    expect(escaped.map(b => b.id)).toEqual([]);
+  });
+
+  it('MAX_FORCE (13000) break: no ball below TABLE_Y (no floor tunneling)', () => {
+    // All 16 balls (including kinematic/pocketed ones) must remain at or above TABLE_Y.
+    const space = makeBreakSpace(MAX_FORCE);
+    simulateToCompletion(space);
+    const sunk = space.rigidbodies.filter(b => b.collider.position.y < TABLE_Y);
     expect(sunk.map(b => b.id)).toEqual([]);
   });
 
-  it('MAX_FORCE (9100) break: at most 6 of 16 balls escape (excessive escape = tunneling)', () => {
-    // A hard break at true MAX_FORCE may send a few balls over the edge (expected physics).
-    // With pre-fix impulse=65000, virtually all balls tunnel → ≥ 10 escape.
-    // The threshold 6 is derived from C# golden output: GV-14 at 85% shows 2 escapes; 100% shows 5.
-    const space = makeBreakSpace(MAX_FORCE);
+  it('DISCRIMINANT: remove foot-right end cushion → at least 1 ball escapes (geometry is load-bearing)', () => {
+    // Removes the end cushion at z=-6349, x>0, exposing a gap in the z=-6349 wall.
+    // With correct geometry present, 0 balls escape; without it, balls fly through the gap.
+    // This test uses the GEOMETRY axis as discriminant, not the force axis.
+    const space = makeBreakSpace(MAX_FORCE, /* omitFootRightEndCushion = */ true);
     simulateToCompletion(space);
     const escaped = space.rigidbodies.filter(b => b.isOutOfCube);
-    expect(escaped.length).toBeLessThanOrEqual(6);
-  });
-
-  it('DISCRIMINANT: impulse=65000 (pre-fix) causes mass-escape ≥ 7 — guard is effective', () => {
-    // Proves the threshold (≤ 6) has real discrimination power.
-    // At 65000, per-step velocity is ~670× rail thickness → collision detection misses rails →
-    // nearly all balls tunnel out of the space cube.
-    const space = makeBreakSpace(65000);
-    simulateToCompletion(space);
-    const escaped = space.rigidbodies.filter(b => b.isOutOfCube);
-    expect(escaped.length).toBeGreaterThanOrEqual(7);
+    expect(escaped.length).toBeGreaterThanOrEqual(1);
   });
 
 });

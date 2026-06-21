@@ -20,6 +20,7 @@ import {
   CORNER_A_X, CORNER_A_Z, CORNER_A_SCALE_X, CORNER_A_RADIUS,
   CORNER_B_X, CORNER_B_Z, CORNER_B_SCALE_X, CORNER_B_RADIUS,
   DIAG_UNIT, PLANE_SCALE_X, PLANE_RADIUS,
+  SIDE_JAW_X, SIDE_JAW_Z, SIDE_JAW_SCALE, SIDE_JAW_RADIUS, SIDE_JAW_SIN, SIDE_JAW_COS,
   PHYSICS_MULTIPLIER, MIN_TS, MAX_TS, PRECISION, MIN_SQR_VELOCITY, C_COUNT,
 } from '../../physics/constants';
 import { createPoolTable } from '../../game/table-setup';
@@ -67,10 +68,10 @@ describe('G9: physics constants — single source of truth', () => {
     expect(RAIL_MATERIAL.staticFriction).toBe(2000);
   });
 
-  it('authoritative MAX_FORCE == 9100 (B1: CueManager.maxForce×cueItemData.maxForce×10000 = 1.3×0.7×10000)', () => {
+  it('authoritative MAX_FORCE == 13000 (B1: CueManager.maxForce×cueItemData.maxForce×10000 = 1.3×1.0×10000)', () => {
     // B1 fix: 65000 was CmRigidbody.MaxVelocity (audio constant), never a force cap.
-    // Correct value = CueManager.maxForce(1.3) × cueItemData.maxForce(0.7) × MULTIPLIER(10000) = 9100.
-    expect(MAX_FORCE).toBe(9100);
+    // Correct value = CueManager.maxForce(1.3) × cueItemData.maxForce(1.0, premium) × MULTIPLIER(10000) = 13000.
+    expect(MAX_FORCE).toBe(13000);
   });
 
   it('table-setup ball mass == authoritative BALL_MASS (shipped config matches golden)', () => {
@@ -107,40 +108,42 @@ describe('G9: physics constants — single source of truth', () => {
 
 // ─── Rail geometry ────────────────────────────────────────────────────────────
 
-describe('G9: rail geometry constants — pinned vs Game.unity cmLineCollider blocks', () => {
-  // Long rail (runs along z axis, positioned at ±RAIL_LONG_X)
-  // Source: Game.unity LineCollider "RailRightLong" position.x = 1.2699, scale.x = 1.115
+describe('G9: rail geometry constants — pinned vs _Game/Scenes/Game.unity cmLineCollider blocks', () => {
+  // Authoritative source: _Game/Scenes/Game.unity (47170 lines).
+  // Values verified by 卡卡西 at lines 21789/24877/32798/35440.
+
+  // Long side rails (LineCollider 4+5): position.x=±1.2699, scale.x=1.1045
   it('RAIL_LONG_X == 12699', () => { expect(RAIL_LONG_X).toBe(12699); });
-  it('RAIL_LONG_SCALE_X == 11150, RAIL_LONG_RADIUS == 5575 (scale/2)', () => {
-    expect(RAIL_LONG_SCALE_X).toBe(11150);
-    expect(RAIL_LONG_RADIUS).toBe(5575);
+  it('RAIL_LONG_SCALE_X == 11045, RAIL_LONG_RADIUS == 5522 (scale/2)', () => {
+    expect(RAIL_LONG_SCALE_X).toBe(11045);
+    expect(RAIL_LONG_RADIUS).toBe(5522);
   });
 
-  // Short back rails (runs along x axis, positioned at ±RAIL_BACK_Z)
-  // Source: "RailBackRight" position = (0.629, -, 0.6349), scale.x = 1.1269
-  it('RAIL_BACK_X == 6290, RAIL_BACK_Z == 6349', () => {
-    expect(RAIL_BACK_X).toBe(6290);
+  // End cushion half-segments (LineColliders 0-3): split at x≈0 by side pocket gap
+  // position.x=±0.6244 (each half), position.z=±0.6349, scale.x=1.126
+  it('RAIL_BACK_X == 6244, RAIL_BACK_Z == 6349', () => {
+    expect(RAIL_BACK_X).toBe(6244);
     expect(RAIL_BACK_Z).toBe(6349);
   });
-  it('RAIL_SHORT_SCALE_X == 11269, RAIL_SHORT_RADIUS == 5634 (scale/2)', () => {
-    expect(RAIL_SHORT_SCALE_X).toBe(11269);
-    expect(RAIL_SHORT_RADIUS).toBe(5634);
+  it('RAIL_SHORT_SCALE_X == 11260, RAIL_SHORT_RADIUS == 5630 (scale/2)', () => {
+    expect(RAIL_SHORT_SCALE_X).toBe(11260);
+    expect(RAIL_SHORT_RADIUS).toBe(5630);
   });
 
-  // Corner jaw A (near corner pocket, longer arm): position=(1.2128, -, 0.6552), scale.x=0.057
-  it('CORNER_A_X == 12128, CORNER_A_Z == 6552', () => {
-    expect(CORNER_A_X).toBe(12128);
-    expect(CORNER_A_Z).toBe(6552);
+  // Corner jaw A (LineColliderPocket 0/2/4/6): position.x=±1.2075, |z|=0.6551, scale.x=0.057
+  it('CORNER_A_X == 12075, CORNER_A_Z == 6551', () => {
+    expect(CORNER_A_X).toBe(12075);
+    expect(CORNER_A_Z).toBe(6551);
   });
   it('CORNER_A_SCALE_X == 570, CORNER_A_RADIUS == 285 (scale/2 = BALL_RADIUS)', () => {
     expect(CORNER_A_SCALE_X).toBe(570);
     expect(CORNER_A_RADIUS).toBe(285);
   });
 
-  // Corner jaw B (near corner pocket, shorter arm): position=(1.2901, -, 0.5778), scale.x=0.0569
-  it('CORNER_B_X == 12901, CORNER_B_Z == 5778', () => {
+  // Corner jaw B (LineColliderPocket 1/3/5/7): position.x=±1.2901, |z|=0.5723, scale.x=0.0569
+  it('CORNER_B_X == 12901, CORNER_B_Z == 5723', () => {
     expect(CORNER_B_X).toBe(12901);
-    expect(CORNER_B_Z).toBe(5778);
+    expect(CORNER_B_Z).toBe(5723);
   });
   it('CORNER_B_SCALE_X == 569, CORNER_B_RADIUS == 284 (scale/2)', () => {
     expect(CORNER_B_SCALE_X).toBe(569);
@@ -154,6 +157,20 @@ describe('G9: rail geometry constants — pinned vs Game.unity cmLineCollider bl
   it('PLANE_SCALE_X == 25399, PLANE_RADIUS == 12699', () => {
     expect(PLANE_SCALE_X).toBe(25399);
     expect(PLANE_RADIUS).toBe(12699);
+  });
+
+  // Side pocket jaw cushions (LineColliderPocket 8-11): angled ~10° into pocket
+  it('SIDE_JAW_X == 579, SIDE_JAW_Z == 6546', () => {
+    expect(SIDE_JAW_X).toBe(579);
+    expect(SIDE_JAW_Z).toBe(6546);
+  });
+  it('SIDE_JAW_SCALE == 400, SIDE_JAW_RADIUS == 200', () => {
+    expect(SIDE_JAW_SCALE).toBe(400);
+    expect(SIDE_JAW_RADIUS).toBe(200);
+  });
+  it('SIDE_JAW_SIN == 1736, SIDE_JAW_COS == 9848 (sin/cos 10° × 10000)', () => {
+    expect(SIDE_JAW_SIN).toBe(1736);
+    expect(SIDE_JAW_COS).toBe(9848);
   });
 });
 
@@ -231,10 +248,11 @@ describe('G9: table-setup collider materials — plane CLOTH + rails RAIL (5/5 e
     expect(plane.material.staticFriction).toBe(CLOTH_MATERIAL.staticFriction);
   });
 
-  it('all 8 rail/corner colliders (indices 1-8) carry RAIL_MATERIAL 5/5', () => {
+  it('all 18 rail/jaw/side colliders (indices 1-18) carry RAIL_MATERIAL 5/5', () => {
+    // 2 long + 4 end + 8 corner jaw + 4 side jaw = 18 rail colliders
     const space = createPoolTable();
-    const rails = space.colliders.slice(1); // 2 long + 2 short + 4 corner = 8
-    expect(rails).toHaveLength(8);
+    const rails = space.colliders.slice(1); // index 0 is cloth plane
+    expect(rails).toHaveLength(18);
     for (const rail of rails) {
       expect(rail.material.bounciness).toBe(RAIL_MATERIAL.bounciness);
       expect(rail.material.rollingFriction).toBe(RAIL_MATERIAL.rollingFriction);
