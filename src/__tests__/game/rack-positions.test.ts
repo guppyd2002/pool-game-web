@@ -1,6 +1,18 @@
 /**
  * GAME-010 — rack-positions golden tests.
- * Verifies C# BallPool8Manager.GetBallPosition port is bit-exact.
+ *
+ * C#-derived constants (from BallPool8Manager.cs + physics/constants.ts):
+ *   BALL_RADIUS   = 285
+ *   BALL_SPACING  = 285*2+5 = 575
+ *   RACK_ROW_STEP = Math.trunc(575 * 866 / 1000) = 497   (≈ sqrt(3)*halfSpacing)
+ *   RACK_COL_STEP = Math.trunc(575 / 2)          = 287   (half-spacing)
+ *   RAIL_LONG_X   = 12699
+ *   RACK_APEX_X   = Math.trunc(12699 / 2)        = 6349  (foot spot)
+ *   CUE_BALL_START_X = -6349
+ *
+ * All 16 expected positions below are derived by hand from C# delta array
+ * (BallPool8Manager.cs:10-28) applied to these constants — NOT computed from
+ * the module under test. This proves the port is bit-exact even if constants change.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -13,80 +25,105 @@ import {
   RACK_COL_STEP,
 } from '../../game/rack-positions';
 
+// ─── C#-derived golden constants ─────────────────────────────────────────────
+// These are hardcoded integers, NOT computed from the module.
+// If the module changes a constant, these will fail — that's the point.
+
+const G_APEX_X    = 6349;   // = Math.trunc(12699 / 2)
+const G_ROW_STEP  = 497;    // = Math.trunc(575 * 866 / 1000)
+const G_COL_STEP  = 287;    // = Math.trunc(575 / 2)
+const G_CUE_X     = -6349;
+
+// ─── Full golden table (all 16 balls) ────────────────────────────────────────
+// Derived: id N → DELTA[N] = [dr, dc] → (G_APEX_X + dr*G_ROW_STEP, dc*G_COL_STEP)
+// id 0 is special: (G_CUE_X, 0)
+const GOLDEN: ReadonlyArray<readonly [number, number]> = [
+  [-6349,     0],   //  0: cue ball at break spot
+  [ 6349,     0],   //  1: apex / foot spot   DELTA=(0,0)
+  [ 7840,   861],   //  2:                    DELTA=(3,+3) → 6349+1491, 3*287
+  [ 8337, -1148],   //  3:                    DELTA=(4,-4) → 6349+1988, -4*287
+  [ 8337,     0],   //  4:                    DELTA=(4, 0)
+  [ 6846,   287],   //  5:                    DELTA=(1,+1)
+  [ 7840,  -287],   //  6:                    DELTA=(3,-1)
+  [ 8337,  1148],   //  7:                    DELTA=(4,+4)
+  [ 7343,     0],   //  8: BLACK BALL         DELTA=(2, 0) ← must be center z=0
+  [ 7343,   574],   //  9:                    DELTA=(2,+2)
+  [ 7343,  -574],   // 10:                    DELTA=(2,-2)
+  [ 7840,   287],   // 11:                    DELTA=(3,+1)
+  [ 7840,  -861],   // 12:                    DELTA=(3,-3)
+  [ 6846,  -287],   // 13:                    DELTA=(1,-1)
+  [ 8337,  -574],   // 14:                    DELTA=(4,-2)
+  [ 8337,   574],   // 15:                    DELTA=(4,+2)
+];
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
 describe('rack-positions — GAME-010', () => {
-  it('ball 1 is at apex (row=0, col=0)', () => {
-    const pos = getRackPosition(1);
-    expect(pos.x).toBe(RACK_APEX_X);
-    expect(pos.z).toBe(0);
-  });
 
-  it('ball 8 (black) is at center of 3-ball row (row=2, col=0)', () => {
-    const pos = getRackPosition(8);
-    expect(pos.x).toBe(RACK_APEX_X + 2 * RACK_ROW_STEP);
-    expect(pos.z).toBe(0);
-  });
-
-  it('cue ball (id=0) is at opposite side', () => {
-    const pos = getRackPosition(0);
-    expect(pos.x).toBe(CUE_BALL_START_X);
-    expect(pos.z).toBe(0);
-    expect(CUE_BALL_START_X).toBe(-RACK_APEX_X);
-  });
-
-  it('row-1 balls (5 and 13) are symmetric about z=0', () => {
-    const p5  = getRackPosition(5);   // delta (1, +1)
-    const p13 = getRackPosition(13);  // delta (1, -1)
-    expect(p5.x).toBe(p13.x);
-    expect(p5.x).toBe(RACK_APEX_X + RACK_ROW_STEP);
-    expect(p5.z).toBe(RACK_COL_STEP);
-    expect(p13.z).toBe(-RACK_COL_STEP);
-  });
-
-  it('row-4 has 5 balls at distinct z positions', () => {
-    // Row-4 ball ids (by delta): 3(row4,z=-4), 14(row4,z=-2), 4(row4,z=0), 15(row4,z=+2), 7(row4,z=+4)
-    const row4Ids = [3, 14, 4, 15, 7];
-    const zValues = row4Ids.map(id => getRackPosition(id).z);
-    const unique = new Set(zValues);
-    expect(unique.size).toBe(5);
-    // All on same x
-    const xValues = row4Ids.map(id => getRackPosition(id).x);
-    expect(new Set(xValues).size).toBe(1);
-    expect(xValues[0]).toBe(RACK_APEX_X + 4 * RACK_ROW_STEP);
-  });
-
-  it('all 15 rack balls (1–15) have distinct positions', () => {
-    const positions = Array.from({ length: 15 }, (_, i) => {
-      const p = getRackPosition(i + 1);
-      return `${p.x},${p.z}`;
+  describe('module constants match C#-derived golden integers', () => {
+    it('RACK_APEX_X = 6349 (Math.trunc(RAIL_LONG_X/2) with RAIL_LONG_X=12699)', () => {
+      expect(RACK_APEX_X).toBe(G_APEX_X);
     });
-    expect(new Set(positions).size).toBe(15);
+
+    it('RACK_ROW_STEP = 497 (Math.trunc(575*866/1000))', () => {
+      expect(RACK_ROW_STEP).toBe(G_ROW_STEP);
+    });
+
+    it('RACK_COL_STEP = 287 (Math.trunc(575/2))', () => {
+      expect(RACK_COL_STEP).toBe(G_COL_STEP);
+    });
+
+    it('CUE_BALL_START_X = -6349', () => {
+      expect(CUE_BALL_START_X).toBe(G_CUE_X);
+      expect(CUE_BALL_START_X).toBe(-RACK_APEX_X);
+    });
   });
 
-  it('getAllRackPositions returns array of length 16', () => {
-    const all = getAllRackPositions();
-    expect(all.length).toBe(16);
-  });
-
-  it('getAllRackPositions matches getRackPosition for each id', () => {
-    const all = getAllRackPositions();
+  describe('all 16 ball positions match C#-derived golden table', () => {
     for (let id = 0; id < 16; id++) {
-      const direct = getRackPosition(id);
-      expect(all[id].x).toBe(direct.x);
-      expect(all[id].z).toBe(direct.z);
+      const [expectedX, expectedZ] = GOLDEN[id];
+      it(`ball id=${id} → x=${expectedX}, z=${expectedZ}`, () => {
+        const pos = getRackPosition(id);
+        expect(pos.x).toBe(expectedX);
+        expect(pos.z).toBe(expectedZ);
+      });
     }
   });
 
-  it('RACK_ROW_STEP and RACK_COL_STEP are positive integers', () => {
-    expect(Number.isInteger(RACK_ROW_STEP)).toBe(true);
-    expect(Number.isInteger(RACK_COL_STEP)).toBe(true);
-    expect(RACK_ROW_STEP).toBeGreaterThan(0);
-    expect(RACK_COL_STEP).toBeGreaterThan(0);
-  });
+  describe('structural invariants', () => {
+    it('ball 8 (black) z=0 — center of rack row 2', () => {
+      expect(getRackPosition(8).z).toBe(0);
+    });
 
-  it('row-2 center ball is ball 8 (golden: x = APEX + 2*ROW_STEP, z = 0)', () => {
-    // Regression: ensures black ball is always center, not shifted by delta array changes
-    const black = getRackPosition(8);
-    expect(black.z).toBe(0);
-    expect(black.x).toBeGreaterThan(RACK_APEX_X);
+    it('ball 1 is at apex x=6349', () => {
+      expect(getRackPosition(1).x).toBe(G_APEX_X);
+    });
+
+    it('row-1 pair (5, 13) symmetric about z=0', () => {
+      const p5  = getRackPosition(5);
+      const p13 = getRackPosition(13);
+      expect(p5.x).toBe(p13.x);
+      expect(p5.z).toBe(-p13.z);
+      expect(p5.z).toBeGreaterThan(0);
+    });
+
+    it('all 15 rack balls (1–15) have distinct (x,z) positions', () => {
+      const keys = Array.from({ length: 15 }, (_, i) => {
+        const p = getRackPosition(i + 1);
+        return `${p.x},${p.z}`;
+      });
+      expect(new Set(keys).size).toBe(15);
+    });
+
+    it('getAllRackPositions returns array of length 16', () => {
+      expect(getAllRackPositions().length).toBe(16);
+    });
+
+    it('getAllRackPositions matches getRackPosition element-by-element', () => {
+      const all = getAllRackPositions();
+      for (let id = 0; id < 16; id++) {
+        expect(all[id]).toEqual(getRackPosition(id));
+      }
+    });
   });
 });
