@@ -164,6 +164,30 @@ describe('RULE-002 — ball type assignment on first legal pocket', () => {
     expect(verdict.ballTypeAssigned).toBe(false);
     expect(engine.players[0].currentBallType).toBe(typeBefore);
   });
+
+  // R2 parity pin (鼬 completeness, challenges/017): same-step TYPE-DETERMINING tie-break.
+  // Counterpart to case D's same-step FOUL tie-break. Ball type assignment is foundational
+  // (it drives the whole game), so the id-order of a simultaneous solid+stripe pocket must
+  // be pinned. Solid 1 and stripe 9 pocket at the SAME stepIndex: the merged event stream
+  // sorts by (stepIndex, ballId) → ball 1 (id1) is processed BEFORE ball 9 (id9). The first
+  // pocket sets types (shooter→Solids since ball 1 is a solid), then _hasBallType flips true
+  // (rule-engine.ts:216, AFTER _updatePlayersBalls) so the same-step ball 9 takes the else
+  // branch and does NOT re-flip the type. Mirrors C# UpdatePlayersBalls + OnBallInPocket:553/555
+  // (UpdatePlayersBalls runs, THEN hasBallType is set). Red here would mean a same-step
+  // type-determination ordering bug (same class as FAIL-1/2).
+  it('same-step solid 1 + stripe 9 (same stepIndex) → shooter=Solids (id1<id9 sets type first)', () => {
+    const engine = makeEngine();
+    doBreak(engine, 5);   // open table, no type yet (ball 5 reserved on break)
+    engine.beginShot();
+    const verdict = engine.processShotResult(makeShotResult({
+      contacts: [cueHits(1), railHit(1)],
+      pocketed: [pocketed(1, 0, 25), pocketed(9, 0, 25)],   // SAME stepIndex
+    }));
+    expect(verdict.ballTypeAssigned).toBe(true);
+    expect(engine.players[0].currentBallType).toBe(BallType.Solids);   // shooter (id1 determined type)
+    expect(engine.players[1].currentBallType).toBe(BallType.Stripes);  // opponent
+    expect(verdict.turnChanged).toBe(false);                           // legal pot, turn continues
+  });
 });
 
 // ─── RULE-001: wrong first contact ──────────────────────────────────────────
