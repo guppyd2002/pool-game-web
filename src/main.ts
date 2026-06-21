@@ -256,3 +256,12 @@ wsClient.onShotReceived((data: ShotPayload) => {
 // ─── Start ───────────────────────────────────────────────────────────────────
 
 physics.start();
+
+// ─── Debug / test hook ───────────────────────────────────────────────────────
+// Exposes minimal scene refs for Playwright screenshot tests.
+// NOT used in production game logic.
+(window as unknown as Record<string, unknown>).__poolDebug = {
+  camera: scene.camera,
+  cueBallMesh: scene.balls[0],
+  renderer: scene.renderer,
+};
