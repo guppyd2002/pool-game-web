@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ export interface SceneAPI {
   balls: THREE.Mesh[];
   table: THREE.Group;
   updateBallPosition(id: number, x: number, y: number, z: number): void;
+  /** Hide ball with a sink animation. Replay-driver calls this instead of setting visible=false directly. */
+  hideBall?: (id: number) => void;
   render(): void;
   dispose(): void;
 }
@@ -154,6 +157,9 @@ export function createScene(container: HTMLElement): SceneAPI {
   cBt.position.set(0, railY, TABLE_H / 2 - CUSHION_WIDTH / 2);
   tableGroup.add(cBt);
 
+  // Pocket holes — positions from POCKET_POSITIONS constants (same source as sim triggers)
+  createPocketMeshes(tableGroup);
+
   scene.add(tableGroup);
 
   // ─── Balls ───────────────────────────────────────────────────────────
@@ -221,6 +227,12 @@ export function createScene(container: HTMLElement): SceneAPI {
     table: tableGroup,
     updateBallPosition(id: number, x: number, y: number, z: number) {
       if (balls[id]) balls[id].position.set(x, y, z);
+    },
+    hideBall(id: number) {
+      const mesh = balls[id];
+      if (!mesh || !mesh.visible) return;
+      animateBallSink(mesh, scene);  // visual clone sinks before disappearing
+      mesh.visible = false;
     },
     render() {
       controls.update();

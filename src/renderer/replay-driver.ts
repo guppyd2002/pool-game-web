@@ -76,7 +76,11 @@ export function createReplayDriver(): ReplayDriver {
         for (const [ballId, hideTime] of pocketedAt) {
           if (elapsed >= hideTime) {
             const mesh = scene.balls[ballId];
-            if (mesh?.visible) mesh.visible = false;
+            if (mesh?.visible) {
+              // Use scene.hideBall (sink animation) if available; else direct hide
+              if (scene.hideBall) scene.hideBall(ballId);
+              else mesh.visible = false;
+            }
           }
         }
 
