@@ -265,4 +265,5 @@ physics.start();
   cueBallMesh: scene.balls[0],
   balls: scene.balls,         // all 16 meshes; .position gives scene-space XYZ
   renderer: scene.renderer,
+  scene: scene.scene,         // THREE.Scene — needed for renderer.render(scene, camera)
 };
