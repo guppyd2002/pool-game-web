@@ -3,12 +3,11 @@
  * Each rule mapped to BallPool8GameLogic C# method(s).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createRuleEngine } from '../../game/rule-engine';
 import { BallType } from '../../game/player-ball-info';
 import { Reason } from '../../game/game-play-reason';
 import type { ShotResult, ContactEvent } from '../../game/ball-pool-physics';
-import { CmVector } from '../../physics/cm-vector';
 
 // ─── Test helpers ────────────────────────────────────────────────────────────
 
@@ -39,8 +38,6 @@ function pocketed(ballId: number, pocketId = 0, stepIndex = 30) {
 function oot(ballId: number, stepIndex = 30) {
   return { ballId, stepIndex };
 }
-
-const ZERO_VEC = new CmVector(0, 0, 0);
 
 function makeShotResult(overrides: Partial<ShotResult>): ShotResult {
   return {
