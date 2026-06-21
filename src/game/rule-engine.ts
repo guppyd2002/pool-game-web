@@ -83,7 +83,6 @@ export interface RuleEngine {
 
 function isCueBall(id: number)   { return id === 0; }
 function isBlackBall(id: number) { return id === 8; }
-function isSolidBall(id: number) { return id >= 1 && id <= 7; }
 function isStripeBall(id: number){ return id >= 9; }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
@@ -117,7 +116,6 @@ export function createRuleEngine(): RuleEngine {
 
   function _nextPlayerIndex(): 0 | 1 { return _currentPlayerIndex === 0 ? 1 : 0; }
   function _curPlayer() { return _players[_currentPlayerIndex]; }
-  function _nextPlayer() { return _players[_nextPlayerIndex()]; }
 
   // C# RessetPlayersGameInfo() — zero winner/ballInHand for all
   function _resetPlayersGameInfo(): void {

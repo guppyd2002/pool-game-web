@@ -139,6 +139,14 @@ export interface CueController {
 
   /** CUE-008: Flip aim line visibility. Called by UI toggle button. */
   toggleAimLine(): void;
+
+  /**
+   * P1-T04 game-session hook: called synchronously after physics.applyShot() inside
+   * fireNow() / onDragEnd(). game-session uses this to run ruleEngine.beginShot() +
+   * processShotResult() and start the replay-driver watch.
+   * Optional — existing tests work without setting it.
+   */
+  onShotApplied: ((result: import('./ball-pool-physics').ShotResult) => void) | null;
 }
 
 export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): CueController {
@@ -244,7 +252,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           );
 
       const cueBall = physics.getBall(cueBallId);
-      physics.applyShot({
+      const _dragResult = physics.applyShot({
         position: cueBall.position,
         impulse: new CmVector(
           Math.trunc(nx * force),
@@ -253,6 +261,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
         ),
         torque,
       });
+      this.onShotApplied?.(_dragResult);
       return true;
     },
 
@@ -282,7 +291,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           );
 
       const cueBall = physics.getBall(cueBallId);
-      physics.applyShot({
+      const _fireResult = physics.applyShot({
         position: cueBall.position,
         impulse: new CmVector(
           Math.trunc(nx * force),
@@ -291,6 +300,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
         ),
         torque,
       });
+      this.onShotApplied?.(_fireResult);
       return true;
     },
 
@@ -382,5 +392,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
     toggleAimLine(): void {
       _aimLineVisible = !_aimLineVisible;
     },
+
+    onShotApplied: null,
   };
 }
