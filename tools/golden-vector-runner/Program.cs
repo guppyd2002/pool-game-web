@@ -46,23 +46,36 @@ static CmRigidbody MakeBody(int id, CmSphereCollider col)
     return b;
 }
 
-// --- helper: standard 8-ball triangle rack (cue id0 + 15 object balls id1..15) ---
-// Mirrors src/game/table-setup.ts createPoolTable() EXACTLY (same long-truncation math).
-// Used for the dense-collision break parity fixtures (GV-14/15/16). Apex (id1) is the
-// row nearest the cue; ids increase row-by-row, low-z to high-z within each row.
+// --- helper: standard 8-ball rack — AUTHORITATIVE C# BallPool8Manager.GetBallPosition ---
+// Positions are the C# float GetBallPosition(id) outputs × 10000, (long) trunc-toward-zero,
+// from LIVE Game.unity scene values (firstBall.localPosition.x=0.6413, ballDiameter=0.05715,
+// ballDistance=0 → distance=0.028575). Black ball id8 is centered (z=0). This replaces the
+// earlier sequential-fill break-test rack (apex 6349 + fabricated 5-unit gap), which never
+// matched Unity — GV-14/15/16 are regenerated on THIS rack so break parity mirrors the
+// shipped rack (== rack-positions.ts single source of truth). See tools/rack-golden dump.
 static List<CmRigidbody> MakeRack(CmMaterial ballMat)
 {
+    long[,] rackXZ = {
+        { -6413,    0 }, //  0 cue
+        {  6413,    0 }, //  1 apex
+        {  7897,  857 }, //  2
+        {  8392, -1143}, //  3
+        {  8392,    0 }, //  4
+        {  6907,  285 }, //  5
+        {  7897, -285 }, //  6
+        {  8392, 1143 }, //  7
+        {  7402,    0 }, //  8 black (z=0)
+        {  7402,  571 }, //  9
+        {  7402, -571 }, // 10
+        {  7897,  285 }, // 11
+        {  7897, -857 }, // 12
+        {  6907, -285 }, // 13
+        {  8392, -571 }, // 14
+        {  8392,  571 }, // 15
+    };
     var bodies = new List<CmRigidbody>();
-    const long R = BALL_RADIUS, sp = R * 2 + 5, RAIL = 12699;
-    long cueX = -(RAIL / 2), rackX = RAIL / 2, rowDx = sp * 866 / 1000, s = sp / 2;
-    bodies.Add(MakeBody(0, MakeBall(cueX, BALL_Y, 0, ballMat)));
-    int id = 1;
-    for (int row = 0; row < 5; row++)
-        for (int col = 0; col <= row; col++)
-        {
-            long x = rackX + row * rowDx, z = (col * 2 - row) * s;
-            bodies.Add(MakeBody(id++, MakeBall(x, BALL_Y, z, ballMat)));
-        }
+    for (int id = 0; id < 16; id++)
+        bodies.Add(MakeBody(id, MakeBall(rackXZ[id, 0], BALL_Y, rackXZ[id, 1], ballMat)));
     return bodies;
 }
 

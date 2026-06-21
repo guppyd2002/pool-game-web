@@ -740,99 +740,99 @@
       "ballPositions": [
         {
           "id": 0,
-          "x": -6349,
+          "x": -6413,
           "y": 9440,
           "z": 0
         },
         {
           "id": 1,
-          "x": 6349,
+          "x": 6413,
           "y": 9440,
           "z": 0
         },
         {
           "id": 2,
-          "x": 6846,
+          "x": 7897,
           "y": 9440,
-          "z": -287
+          "z": 857
         },
         {
           "id": 3,
-          "x": 6846,
+          "x": 8392,
           "y": 9440,
-          "z": 287
+          "z": -1143
         },
         {
           "id": 4,
-          "x": 7343,
+          "x": 8392,
           "y": 9440,
-          "z": -574
+          "z": 0
         },
         {
           "id": 5,
-          "x": 7343,
+          "x": 6907,
           "y": 9440,
-          "z": 0
+          "z": 285
         },
         {
           "id": 6,
-          "x": 7343,
+          "x": 7897,
           "y": 9440,
-          "z": 574
+          "z": -285
         },
         {
           "id": 7,
-          "x": 7840,
+          "x": 8392,
           "y": 9440,
-          "z": -861
+          "z": 1143
         },
         {
           "id": 8,
-          "x": 7840,
-          "y": 9440,
-          "z": -287
-        },
-        {
-          "id": 9,
-          "x": 7840,
-          "y": 9440,
-          "z": 287
-        },
-        {
-          "id": 10,
-          "x": 7840,
-          "y": 9440,
-          "z": 861
-        },
-        {
-          "id": 11,
-          "x": 8337,
-          "y": 9440,
-          "z": -1148
-        },
-        {
-          "id": 12,
-          "x": 8337,
-          "y": 9440,
-          "z": -574
-        },
-        {
-          "id": 13,
-          "x": 8337,
+          "x": 7402,
           "y": 9440,
           "z": 0
         },
         {
-          "id": 14,
-          "x": 8337,
+          "id": 9,
+          "x": 7402,
           "y": 9440,
-          "z": 574
+          "z": 571
+        },
+        {
+          "id": 10,
+          "x": 7402,
+          "y": 9440,
+          "z": -571
+        },
+        {
+          "id": 11,
+          "x": 7897,
+          "y": 9440,
+          "z": 285
+        },
+        {
+          "id": 12,
+          "x": 7897,
+          "y": 9440,
+          "z": -857
+        },
+        {
+          "id": 13,
+          "x": 6907,
+          "y": 9440,
+          "z": -285
+        },
+        {
+          "id": 14,
+          "x": 8392,
+          "y": 9440,
+          "z": -571
         },
         {
           "id": 15,
-          "x": 8337,
+          "x": 8392,
           "y": 9440,
-          "z": 1148
+          "z": 571
         }
       ],
       "impulse": {
@@ -846,7 +846,7 @@
         "z": 0
       },
       "hitPoint": {
-        "x": -6349,
+        "x": -6413,
         "y": 9440,
         "z": 0
       }
@@ -854,9 +854,9 @@
     "output": [
       {
         "id": 0,
-        "px": 6964,
+        "px": 504,
         "py": 9439,
-        "pz": -201,
+        "pz": -6735,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -864,13 +864,13 @@
         "ay": 0,
         "az": 0,
         "isActive": false,
-        "isKinematic": false,
+        "isKinematic": true,
         "isOutOfCube": false,
-        "pocketId": -1
+        "pocketId": 5
       },
       {
         "id": 1,
-        "px": 6349,
+        "px": 6413,
         "py": 9439,
         "pz": 0,
         "vx": 0,
@@ -886,9 +886,25 @@
       },
       {
         "id": 2,
-        "px": 1253,
-        "py": 9391,
-        "pz": -10364,
+        "px": 1020,
+        "py": 9439,
+        "pz": 2253,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 3,
+        "px": 4148,
+        "py": 9405,
+        "pz": -10488,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -901,26 +917,10 @@
         "pocketId": -1
       },
       {
-        "id": 3,
-        "px": -12386,
-        "py": 9439,
-        "pz": 6093,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": true,
-        "isOutOfCube": false,
-        "pocketId": 2
-      },
-      {
         "id": 4,
-        "px": -1640,
-        "py": 8830,
-        "pz": -10339,
+        "px": -395,
+        "py": 9223,
+        "pz": -10330,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -934,9 +934,9 @@
       },
       {
         "id": 5,
-        "px": 12305,
-        "py": 9439,
-        "pz": 1598,
+        "px": -15376,
+        "py": 9433,
+        "pz": 7511,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -945,14 +945,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 6,
-        "px": -12050,
-        "py": 9309,
-        "pz": 10407,
+        "px": -11997,
+        "py": 7002,
+        "pz": 10340,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -966,9 +966,9 @@
       },
       {
         "id": 7,
-        "px": 12409,
+        "px": 12130,
         "py": 9439,
-        "pz": -5990,
+        "pz": 2611,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -976,15 +976,15 @@
         "ay": 0,
         "az": 0,
         "isActive": false,
-        "isKinematic": true,
+        "isKinematic": false,
         "isOutOfCube": false,
-        "pocketId": 1
+        "pocketId": -1
       },
       {
         "id": 8,
-        "px": 5724,
-        "py": 9029,
-        "pz": -10383,
+        "px": -9077,
+        "py": 9374,
+        "pz": 10362,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -998,9 +998,9 @@
       },
       {
         "id": 9,
-        "px": -5909,
-        "py": 9439,
-        "pz": -4862,
+        "px": 13060,
+        "py": 9433,
+        "pz": 10442,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1009,45 +1009,13 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 10,
-        "px": -11925,
-        "py": 8753,
-        "pz": 10312,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": true,
-        "pocketId": -1
-      },
-      {
-        "id": 11,
-        "px": 1853,
-        "py": 9391,
-        "pz": -10392,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": true,
-        "pocketId": -1
-      },
-      {
-        "id": 12,
-        "px": 355,
-        "py": 9223,
+        "px": 2376,
+        "py": 711,
         "pz": -10314,
         "vx": 0,
         "vy": 0,
@@ -1061,26 +1029,10 @@
         "pocketId": -1
       },
       {
-        "id": 13,
-        "px": 12513,
+        "id": 11,
+        "px": 10469,
         "py": 9439,
-        "pz": -5921,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": true,
-        "isOutOfCube": false,
-        "pocketId": 1
-      },
-      {
-        "id": 14,
-        "px": -4723,
-        "py": 9439,
-        "pz": 5776,
+        "pz": 357,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1093,10 +1045,10 @@
         "pocketId": -1
       },
       {
-        "id": 15,
-        "px": -9036,
-        "py": 9333,
-        "pz": 10338,
+        "id": 12,
+        "px": 2386,
+        "py": 9189,
+        "pz": -10336,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1107,9 +1059,57 @@
         "isKinematic": false,
         "isOutOfCube": true,
         "pocketId": -1
+      },
+      {
+        "id": 13,
+        "px": 867,
+        "py": 9405,
+        "pz": -10516,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 14,
+        "px": 14096,
+        "py": 9374,
+        "pz": -10414,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 15,
+        "px": 7802,
+        "py": 9439,
+        "pz": 2081,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
       }
     ],
-    "simSteps": 594
+    "simSteps": 496
   },
   {
     "id": "GV-15",
@@ -1118,99 +1118,99 @@
       "ballPositions": [
         {
           "id": 0,
-          "x": -6349,
+          "x": -6413,
           "y": 9440,
           "z": 0
         },
         {
           "id": 1,
-          "x": 6349,
+          "x": 6413,
           "y": 9440,
           "z": 0
         },
         {
           "id": 2,
-          "x": 6846,
+          "x": 7897,
           "y": 9440,
-          "z": -287
+          "z": 857
         },
         {
           "id": 3,
-          "x": 6846,
+          "x": 8392,
           "y": 9440,
-          "z": 287
+          "z": -1143
         },
         {
           "id": 4,
-          "x": 7343,
+          "x": 8392,
           "y": 9440,
-          "z": -574
+          "z": 0
         },
         {
           "id": 5,
-          "x": 7343,
+          "x": 6907,
           "y": 9440,
-          "z": 0
+          "z": 285
         },
         {
           "id": 6,
-          "x": 7343,
+          "x": 7897,
           "y": 9440,
-          "z": 574
+          "z": -285
         },
         {
           "id": 7,
-          "x": 7840,
+          "x": 8392,
           "y": 9440,
-          "z": -861
+          "z": 1143
         },
         {
           "id": 8,
-          "x": 7840,
-          "y": 9440,
-          "z": -287
-        },
-        {
-          "id": 9,
-          "x": 7840,
-          "y": 9440,
-          "z": 287
-        },
-        {
-          "id": 10,
-          "x": 7840,
-          "y": 9440,
-          "z": 861
-        },
-        {
-          "id": 11,
-          "x": 8337,
-          "y": 9440,
-          "z": -1148
-        },
-        {
-          "id": 12,
-          "x": 8337,
-          "y": 9440,
-          "z": -574
-        },
-        {
-          "id": 13,
-          "x": 8337,
+          "x": 7402,
           "y": 9440,
           "z": 0
         },
         {
-          "id": 14,
-          "x": 8337,
+          "id": 9,
+          "x": 7402,
           "y": 9440,
-          "z": 574
+          "z": 571
+        },
+        {
+          "id": 10,
+          "x": 7402,
+          "y": 9440,
+          "z": -571
+        },
+        {
+          "id": 11,
+          "x": 7897,
+          "y": 9440,
+          "z": 285
+        },
+        {
+          "id": 12,
+          "x": 7897,
+          "y": 9440,
+          "z": -857
+        },
+        {
+          "id": 13,
+          "x": 6907,
+          "y": 9440,
+          "z": -285
+        },
+        {
+          "id": 14,
+          "x": 8392,
+          "y": 9440,
+          "z": -571
         },
         {
           "id": 15,
-          "x": 8337,
+          "x": 8392,
           "y": 9440,
-          "z": 1148
+          "z": 571
         }
       ],
       "impulse": {
@@ -1224,7 +1224,7 @@
         "z": 0
       },
       "hitPoint": {
-        "x": -6349,
+        "x": -6413,
         "y": 9440,
         "z": 0
       }
@@ -1232,9 +1232,9 @@
     "output": [
       {
         "id": 0,
-        "px": 15929,
-        "py": 9428,
-        "pz": 3003,
+        "px": 12912,
+        "py": 9439,
+        "pz": 6569,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1242,15 +1242,15 @@
         "ay": 0,
         "az": 0,
         "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": true,
-        "pocketId": -1
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 0
       },
       {
         "id": 1,
-        "px": 6349,
+        "px": -5288,
         "py": 9439,
-        "pz": 0,
+        "pz": 6996,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1264,9 +1264,25 @@
       },
       {
         "id": 2,
-        "px": 887,
-        "py": 9417,
-        "pz": -10715,
+        "px": 6792,
+        "py": 9439,
+        "pz": 2752,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 3,
+        "px": 778,
+        "py": 8716,
+        "pz": -10364,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1279,26 +1295,10 @@
         "pocketId": -1
       },
       {
-        "id": 3,
-        "px": -11068,
-        "py": 9439,
-        "pz": -4526,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": false,
-        "pocketId": -1
-      },
-      {
         "id": 4,
-        "px": 6819,
+        "px": 412,
         "py": 9439,
-        "pz": -1962,
+        "pz": -7713,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1306,15 +1306,15 @@
         "ay": 0,
         "az": 0,
         "isActive": false,
-        "isKinematic": false,
+        "isKinematic": true,
         "isOutOfCube": false,
-        "pocketId": -1
+        "pocketId": 5
       },
       {
         "id": 5,
-        "px": 7337,
-        "py": 9439,
-        "pz": 15,
+        "px": -15370,
+        "py": 6619,
+        "pz": 9769,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1323,14 +1323,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 6,
-        "px": -5750,
+        "px": 9111,
         "py": 9439,
-        "pz": 615,
+        "pz": 3592,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1344,9 +1344,9 @@
       },
       {
         "id": 7,
-        "px": 7832,
-        "py": 9439,
-        "pz": -982,
+        "px": 8320,
+        "py": 9333,
+        "pz": -10384,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1355,14 +1355,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 8,
-        "px": 7840,
+        "px": -9217,
         "py": 9439,
-        "pz": -286,
+        "pz": -5443,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1376,9 +1376,9 @@
       },
       {
         "id": 9,
-        "px": 7839,
+        "px": -9807,
         "py": 9439,
-        "pz": 289,
+        "pz": -2746,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1392,25 +1392,9 @@
       },
       {
         "id": 10,
-        "px": 305,
-        "py": 9439,
-        "pz": 4504,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": false,
-        "pocketId": -1
-      },
-      {
-        "id": 11,
-        "px": 1708,
-        "py": 9153,
-        "pz": -10417,
+        "px": 2401,
+        "py": 5863,
+        "pz": -10332,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1423,10 +1407,26 @@
         "pocketId": -1
       },
       {
+        "id": 11,
+        "px": -9657,
+        "py": 9439,
+        "pz": -5979,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
         "id": 12,
-        "px": -55,
-        "py": 9114,
-        "pz": -10309,
+        "px": 2313,
+        "py": 9405,
+        "pz": -10453,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1440,9 +1440,9 @@
       },
       {
         "id": 13,
-        "px": 1914,
-        "py": -3448,
-        "pz": -10309,
+        "px": 1011,
+        "py": 9283,
+        "pz": -10429,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1456,9 +1456,9 @@
       },
       {
         "id": 14,
-        "px": 5303,
-        "py": 9439,
-        "pz": -7098,
+        "px": 419,
+        "py": 9355,
+        "pz": -10525,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1467,14 +1467,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 15,
-        "px": -6549,
-        "py": 9439,
-        "pz": 1071,
+        "px": 9510,
+        "py": 7639,
+        "pz": -10331,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1483,11 +1483,11 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       }
     ],
-    "simSteps": 383
+    "simSteps": 571
   },
   {
     "id": "GV-16",
@@ -1496,99 +1496,99 @@
       "ballPositions": [
         {
           "id": 0,
-          "x": -6349,
+          "x": -6413,
           "y": 9440,
           "z": 0
         },
         {
           "id": 1,
-          "x": 6349,
+          "x": 6413,
           "y": 9440,
           "z": 0
         },
         {
           "id": 2,
-          "x": 6846,
+          "x": 7897,
           "y": 9440,
-          "z": -287
+          "z": 857
         },
         {
           "id": 3,
-          "x": 6846,
+          "x": 8392,
           "y": 9440,
-          "z": 287
+          "z": -1143
         },
         {
           "id": 4,
-          "x": 7343,
+          "x": 8392,
           "y": 9440,
-          "z": -574
+          "z": 0
         },
         {
           "id": 5,
-          "x": 7343,
+          "x": 6907,
           "y": 9440,
-          "z": 0
+          "z": 285
         },
         {
           "id": 6,
-          "x": 7343,
+          "x": 7897,
           "y": 9440,
-          "z": 574
+          "z": -285
         },
         {
           "id": 7,
-          "x": 7840,
+          "x": 8392,
           "y": 9440,
-          "z": -861
+          "z": 1143
         },
         {
           "id": 8,
-          "x": 7840,
-          "y": 9440,
-          "z": -287
-        },
-        {
-          "id": 9,
-          "x": 7840,
-          "y": 9440,
-          "z": 287
-        },
-        {
-          "id": 10,
-          "x": 7840,
-          "y": 9440,
-          "z": 861
-        },
-        {
-          "id": 11,
-          "x": 8337,
-          "y": 9440,
-          "z": -1148
-        },
-        {
-          "id": 12,
-          "x": 8337,
-          "y": 9440,
-          "z": -574
-        },
-        {
-          "id": 13,
-          "x": 8337,
+          "x": 7402,
           "y": 9440,
           "z": 0
         },
         {
-          "id": 14,
-          "x": 8337,
+          "id": 9,
+          "x": 7402,
           "y": 9440,
-          "z": 574
+          "z": 571
+        },
+        {
+          "id": 10,
+          "x": 7402,
+          "y": 9440,
+          "z": -571
+        },
+        {
+          "id": 11,
+          "x": 7897,
+          "y": 9440,
+          "z": 285
+        },
+        {
+          "id": 12,
+          "x": 7897,
+          "y": 9440,
+          "z": -857
+        },
+        {
+          "id": 13,
+          "x": 6907,
+          "y": 9440,
+          "z": -285
+        },
+        {
+          "id": 14,
+          "x": 8392,
+          "y": 9440,
+          "z": -571
         },
         {
           "id": 15,
-          "x": 8337,
+          "x": 8392,
           "y": 9440,
-          "z": 1148
+          "z": 571
         }
       ],
       "impulse": {
@@ -1602,7 +1602,7 @@
         "z": 0
       },
       "hitPoint": {
-        "x": -6349,
+        "x": -6413,
         "y": 9440,
         "z": 0
       }
@@ -1610,57 +1610,9 @@
     "output": [
       {
         "id": 0,
-        "px": 3626,
-        "py": 9426,
-        "pz": -10708,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": true,
-        "pocketId": -1
-      },
-      {
-        "id": 1,
-        "px": -15342,
-        "py": 5343,
-        "pz": 9469,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": true,
-        "pocketId": -1
-      },
-      {
-        "id": 2,
-        "px": 6395,
+        "px": 12912,
         "py": 9439,
-        "pz": 2304,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": false,
-        "isOutOfCube": false,
-        "pocketId": -1
-      },
-      {
-        "id": 3,
-        "px": -12717,
-        "py": 9439,
-        "pz": 6098,
+        "pz": -6569,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1670,13 +1622,61 @@
         "isActive": false,
         "isKinematic": true,
         "isOutOfCube": false,
-        "pocketId": 2
+        "pocketId": 1
+      },
+      {
+        "id": 1,
+        "px": 9789,
+        "py": 9439,
+        "pz": -1856,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 2,
+        "px": 4172,
+        "py": 6489,
+        "pz": -10334,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 3,
+        "px": 13182,
+        "py": -10370,
+        "pz": -9149,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
       },
       {
         "id": 4,
-        "px": 7344,
+        "px": 7747,
         "py": 9439,
-        "pz": -576,
+        "pz": -104,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1690,9 +1690,9 @@
       },
       {
         "id": 5,
-        "px": -5424,
-        "py": 9439,
-        "pz": 251,
+        "px": 9843,
+        "py": 9417,
+        "pz": -10688,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1701,14 +1701,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 6,
-        "px": -4026,
+        "px": -4881,
         "py": 9439,
-        "pz": 937,
+        "pz": 6729,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1722,9 +1722,9 @@
       },
       {
         "id": 7,
-        "px": 7841,
+        "px": 6342,
         "py": 9439,
-        "pz": -862,
+        "pz": 3448,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1738,9 +1738,9 @@
       },
       {
         "id": 8,
-        "px": 7840,
+        "px": -6916,
         "py": 9439,
-        "pz": -287,
+        "pz": 5030,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1754,9 +1754,9 @@
       },
       {
         "id": 9,
-        "px": 12193,
-        "py": 9439,
-        "pz": 770,
+        "px": 2114,
+        "py": -10499,
+        "pz": -9782,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1765,14 +1765,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 10,
-        "px": -1252,
-        "py": 9439,
-        "pz": 1885,
+        "px": 1845,
+        "py": 9189,
+        "pz": -10363,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1781,14 +1781,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 11,
-        "px": 2033,
-        "py": 9189,
-        "pz": -10303,
+        "px": -7453,
+        "py": 8716,
+        "pz": 10310,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1802,9 +1802,25 @@
       },
       {
         "id": 12,
-        "px": 7861,
-        "py": 7515,
-        "pz": -10329,
+        "px": -5319,
+        "py": 9439,
+        "pz": 3542,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 13,
+        "px": 993,
+        "py": 9189,
+        "pz": -10315,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1817,26 +1833,10 @@
         "pocketId": -1
       },
       {
-        "id": 13,
-        "px": -12545,
-        "py": 9439,
-        "pz": -5953,
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "ax": 0,
-        "ay": 0,
-        "az": 0,
-        "isActive": false,
-        "isKinematic": true,
-        "isOutOfCube": false,
-        "pocketId": 3
-      },
-      {
         "id": 14,
-        "px": 327,
-        "py": 9439,
-        "pz": -3210,
+        "px": 8830,
+        "py": 9374,
+        "pz": -10315,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1845,14 +1845,14 @@
         "az": 0,
         "isActive": false,
         "isKinematic": false,
-        "isOutOfCube": false,
+        "isOutOfCube": true,
         "pocketId": -1
       },
       {
         "id": 15,
-        "px": -7760,
+        "px": 11147,
         "py": 9439,
-        "pz": -5228,
+        "pz": 4667,
         "vx": 0,
         "vy": 0,
         "vz": 0,
@@ -1865,7 +1865,7 @@
         "pocketId": -1
       }
     ],
-    "simSteps": 439
+    "simSteps": 681
   },
   {
     "id": "FUZZ-0001",
