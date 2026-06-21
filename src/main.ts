@@ -36,7 +36,8 @@ import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
 import { createGameOverUI } from './renderer/game-over-ui';
 import { REASON_MESSAGES } from './game/game-play-reason';
-import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
+import { createCameraTween, POSE_OVERVIEW, POSE_TABLE, POSE_TOP } from './renderer/camera-tween';
+import { createTurnPrompt } from './renderer/turn-prompt';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -70,6 +71,9 @@ const adapter = createCueAdapter({
   cueBallMesh: scene.balls[0],
   controller: cue,
   onAimUpdate: () => {
+    // B4: dismiss turn prompt on first player interaction
+    turnPrompt.dismiss();
+
     const now = performance.now() / 1000;
     const dt = _lastAimTime === 0 ? 0.016 : Math.min(now - _lastAimTime, 0.1);
     _lastAimTime = now;
@@ -145,6 +149,10 @@ const uiEdgeFade = createUIEdgeFade(scene.camera, [
   spinDiscUI.element,
 ]);
 
+// ─── B4: turn prompt + cue standby ────────────────────────────────────────────
+
+const turnPrompt = createTurnPrompt(container);
+
 // ─── GAME-015 B-lite: camera tween ────────────────────────────────────────────
 
 const cameraTween = createCameraTween(scene.camera);
@@ -196,6 +204,9 @@ const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
 
 startBtn.addEventListener('click', () => {
   mainMenuEl.style.display = 'none';
+  topViewBtn.style.display = 'block';
+  _inTopView = false;
+  topViewBtn.textContent = '⬆ Top';
   cameraTween.tweenTo(POSE_TABLE, 0.5);
   _runCameraTween(true);
   gameSession.startNewGame();
@@ -212,11 +223,45 @@ gameOverUI.onPlayAgain = () => {
 };
 gameOverUI.onExit = () => {
   gameOverUI.hide();
+  turnPrompt.dismiss();
   gameSession.exitGame();
+  topViewBtn.style.display = 'none';
+  _inTopView = false;
+  topViewBtn.textContent = '⬆ Top';
   cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
   _runCameraTween(true);
   mainMenuEl.style.display = 'flex';
 };
+
+// ─── B3: top-view toggle button + keyboard shortcut ──────────────────────────
+
+const topViewBtn = document.createElement('button');
+topViewBtn.textContent = '⬆ Top';
+topViewBtn.style.cssText = [
+  'position:absolute', 'top:12px', 'right:12px',
+  'background:rgba(0,0,0,0.55)', 'color:#fff',
+  'border:1px solid rgba(255,255,255,0.3)',
+  'padding:6px 14px', 'border-radius:6px',
+  'font-family:sans-serif', 'font-size:13px',
+  'cursor:pointer', 'z-index:100',
+  'display:none',
+].join(';');
+container.appendChild(topViewBtn);
+
+let _inTopView = false;
+
+topViewBtn.addEventListener('click', () => {
+  _inTopView = !_inTopView;
+  cameraTween.tweenTo(_inTopView ? POSE_TOP : POSE_TABLE, 0.5);
+  _runCameraTween(true);
+  topViewBtn.textContent = _inTopView ? '⬇ Table' : '⬆ Top';
+});
+
+window.addEventListener('keydown', (e: KeyboardEvent) => {
+  if ((e.key === 't' || e.key === 'T') && topViewBtn.style.display !== 'none') {
+    topViewBtn.click();
+  }
+});
 
 // ─── Player turn indicator ────────────────────────────────────────────────────
 
@@ -244,13 +289,20 @@ function _updatePlayerIndicator(playerIndex: 0 | 1, ballInHand: boolean): void {
 
 gameSession.onTurnChanged = (playerIndex, ballInHand) => {
   _updatePlayerIndicator(playerIndex, ballInHand);
+  // B4: show clear instruction overlay + cue standby preview
+  turnPrompt.show(playerIndex, ballInHand);
   if (ballInHand) {
     _enterBallInHandMode();
+  } else {
+    // Show cue stick at default angle pointing toward the rack until player drags
+    const cueBall = physics.getBall(0);
+    cueMesh.update(cueBall.position, new CmVector(0.5, 0, 0), 0, 0, 0);
   }
 };
 
 gameSession.onGameEnded = (winner, reason) => {
   playerIndicatorEl.style.display = 'none';
+  turnPrompt.dismiss();
   gameOverUI.show(winner, REASON_MESSAGES[reason] ?? '');
 };
 
@@ -320,6 +372,7 @@ window.addEventListener('beforeunload', () => {
   reasonBanner.dispose();
   gameOverUI.dispose();
   replayDriver.dispose();
+  turnPrompt.dispose();
 });
 
 // ─── Playwright / test hook ──────────────────────────────────────────────────
