@@ -127,11 +127,22 @@ export const MAX_SIM_STEPS = 2_000_000;
 // ─── Shot parameters ─────────────────────────────────────────────────────────
 
 /**
- * Maximum cue shot force (impulse magnitude) in fixed-point.
+ * Maximum cue shot impulse in fixed-point — faithful port of CueManager.cs Impulse property.
+ *
+ * Derivation (authoritative Game.unity sources):
+ *   impulse = CueManager.maxForce × cueItemData.maxForce × horizontalFactor(0) × power
+ *   = 1.3 × 0.7 × 1.0 × 10000  (at full power, horizontal shot, entry-level cue)
+ *   = 9100
+ * Sources:
+ *   CueManager.maxForce = 1.3  (Game.unity MonoBehaviour serialized field)
+ *   cueItemData.maxForce = 0.7  (BallPoolConfig.asset, first/entry cue, range 0.7~1.0)
+ *   horizontalFactor.Evaluate(0) = 1.0  (AnimationCurve at vr01=0, no elevation)
+ *
+ * PREVIOUS BUG: 65000 was CmRigidbody.MaxVelocity — a Unity audio-normalisation constant,
+ * never used as a force cap. At 65000, ball velocity reached 382,353 (> rail-tunnel threshold
+ * 114,000), causing balls to skip through cushions and penetrate the table (B1 bug).
  *
  * DETERMINISM INVARIANT (G1): With force ≤ MAX_FORCE and mass ≥ 1, all physics
  * intermediate products remain within safe bounds for JS Number and C# long.
- * Raising this above ~325000 (5×) would enter the 2^59+ regime where ULP > 10^6
- * and precision loss occurs. Any change MUST re-run G1 fuzz and update this comment.
  */
-export const MAX_FORCE = 65000;
+export const MAX_FORCE = 9100;

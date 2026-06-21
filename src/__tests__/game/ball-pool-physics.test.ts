@@ -150,12 +150,15 @@ const GV01_SHOT = {
 // ─── C1 / G2-B: production path == GV-01 golden ───────────────────────────────
 
 describe('G6 C1: applyShot canonical endpoint (G2-B parity)', () => {
-  it('applyShot() gives GV-01 golden final position px=9480', () => {
+  it('applyShot() gives PHY-003-clamped final position px=5018', () => {
+    // GV-01 impulse=30000 > MAX_FORCE=9100; applyShot() clamps to 9100 → px=5018.
+    // Direct physics (golden-vector.test.ts) uses unclamped 30000 → px=9480.
+    // B1 fix: MAX_FORCE 65000→9100; old golden 9480 was valid when 30000 < 65000.
     const { space } = makeGV01Space();
     const physics = createBallPoolPhysics(space, mockScene);
     const result = physics.applyShot(GV01_SHOT);
 
-    expect(result.finalStates[0].position.x).toBe(9480);
+    expect(result.finalStates[0].position.x).toBe(5018);  // B1: PHY-003 clamps 30000 → 9100
     expect(result.finalStates[0].position.y).toBe(9439);
     expect(result.finalStates[0].position.z).toBe(0);
   });
@@ -167,7 +170,7 @@ describe('G6 C1: applyShot canonical endpoint (G2-B parity)', () => {
 
     const lastFrame = result.frames[result.frames.length - 1];
     const ball0pos = lastFrame.positions.find(p => p.id === 0)!;
-    expect(ball0pos.x).toBe(9480);
+    expect(ball0pos.x).toBe(5018);  // B1: PHY-003 clamps 30000 → 9100
   });
 });
 

@@ -10,12 +10,13 @@
  *   bit-exact final positions and calculateTime.  (dt is now irrelevant to physics;
  *   this is trivially true but confirms the canonical loop is self-consistent.)
  *
- * G2-B: The production applyShot() path produces the GV-01 golden final position
- *   px=9480 — identical to the direct space.calculate() loop in golden-vector tests.
- *   This is satisfied by construction: both paths run the same canonical while-loop.
+ * G2-B: The production applyShot() path produces px=5018 via PHY-003 clamp.
+ *   GV-01 impulse=30000 > MAX_FORCE=9100 → applyShot() clamps to 9100 → px=5018.
+ *   Direct physics (golden-vector tests) uses unclamped 30000 → px=9480.
+ *   B1 fix updated MAX_FORCE 65000→9100; prior golden px=9480 was unclamped (30000 < 65000).
  *
  * GV-01 scenario: single ball at (-5000, 9440, 0), impulse (30000, 0, 0), mass=1700.
- * GV-01 golden final: px=9480, py=9439, pz=0.
+ * GV-01 direct-physics final: px=9480. applyShot() final after PHY-003 clamp: px=5018.
  * (G9 B: CLOTH_MATERIAL updated to Game.unity runtime values — lower friction → ball rolls farther)
  */
 import { describe, it, expect } from 'vitest';
@@ -207,7 +208,7 @@ describe('G2: simulation-loop full-simulate-then-replay determinism', () => {
     // would run different step counts → different final positions.
     const r = replayToEnd(0.016);
     console.log(`[G2-A dt=0.016] lastPxFixed=${r.lastPxFixed} lastPyFixed=${r.lastPyFixed}`);
-    expect(r.lastPxFixed).toBe(9480);
+    expect(r.lastPxFixed).toBe(5018);  // B1: impulse 30000 clamped to MAX_FORCE=9100
     expect(r.lastPyFixed).toBe(9439);
     expect(r.lastPzFixed).toBe(0);
   });
@@ -240,14 +241,14 @@ describe('G2: simulation-loop full-simulate-then-replay determinism', () => {
 // ─── Test B: production path == golden (G2-B) ────────────────────────────────
 
 describe('G2-B: production path final position == GV-01 golden', () => {
-  it('G2-B: applyShot() canonical loop gives px=9480 (golden)', () => {
-    // Full-simulate-then-replay: production path == golden-vector path by construction.
-    // Failure history: test used ball at x=-4000 (fixture says x=-5000); canonical loop
-    // gives different positions per cloth material. G9-B updated CLOTH_MATERIAL to the
-    // Game.unity runtime values (1000/2000/3000), regen'd fixtures → new golden px=9480.
+  it('G2-B: applyShot() canonical loop gives px=5018 (PHY-003 clamped)', () => {
+    // applyShot() applies PHY-003: clamps impulse magnitude to MAX_FORCE before calling physics.
+    // GV-01 impulse=30000 > MAX_FORCE=9100 → clamped to 9100 → px=5018.
+    // Direct physics path (golden-vector.test.ts) uses unclamped 30000 → px=9480.
+    // B1 fix changed MAX_FORCE from 65000→9100; old golden 9480 was valid when 30000<65000.
     const r = runToStop(0.016);
     console.log(`[G2-B] production result: px=${r.px}, py=${r.py}, pz=${r.pz}`);
-    expect(r.px).toBe(9480);
+    expect(r.px).toBe(5018);  // B1: PHY-003 clamps 30000 → 9100
     expect(r.py).toBe(9439);
     expect(r.pz).toBe(0);
   });

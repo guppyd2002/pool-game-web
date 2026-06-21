@@ -32,9 +32,10 @@ export const CUE_MIN_DRAG = 0.01;
 
 /**
  * CUE-005: Maximum spin torque magnitude at full power + full offset (Fixed units).
- * Matches C# default cueItemData.maxSpin = 0.5 × maxForce = 0.5 × 65000 = 32500.
+ * Ratio: cueItemData.maxSpin(0.5) × MAX_FORCE. At MAX_FORCE=9100 → 4550.
+ * Matches C# CueManager Torque: cueItemData.maxSpin × maxForce × cueBackswingZ × ...
  */
-export const CUE_MAX_SPIN = Math.trunc(MAX_FORCE / 2); // 32500
+export const CUE_MAX_SPIN = Math.trunc(MAX_FORCE / 2); // 4550
 
 /** Table plane coordinate (float world coords, y implicit = ball height). */
 export interface TablePoint { x: number; z: number; }

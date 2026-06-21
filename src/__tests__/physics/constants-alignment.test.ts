@@ -67,8 +67,10 @@ describe('G9: physics constants — single source of truth', () => {
     expect(RAIL_MATERIAL.staticFriction).toBe(2000);
   });
 
-  it('authoritative MAX_FORCE == 65000 (G1 ingress bound)', () => {
-    expect(MAX_FORCE).toBe(65000);
+  it('authoritative MAX_FORCE == 9100 (B1: CueManager.maxForce×cueItemData.maxForce×10000 = 1.3×0.7×10000)', () => {
+    // B1 fix: 65000 was CmRigidbody.MaxVelocity (audio constant), never a force cap.
+    // Correct value = CueManager.maxForce(1.3) × cueItemData.maxForce(0.7) × MULTIPLIER(10000) = 9100.
+    expect(MAX_FORCE).toBe(9100);
   });
 
   it('table-setup ball mass == authoritative BALL_MASS (shipped config matches golden)', () => {

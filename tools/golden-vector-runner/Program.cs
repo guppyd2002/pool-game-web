@@ -349,33 +349,35 @@ var results = new List<GoldenVector>();
         21213,0,21213,  0,0,15000));
 }
 
-// GV-14: Full 15-ball rack break — dead-center, 85% force (impulse 55250 along +x)
-//   Dense-collision parity: verifies TS == C# byte-for-byte across a 16-body break,
-//   the regime P1-T01 golden coverage previously topped out at 3 balls.
+// GV-14: Full 15-ball rack break — dead-center, 85% of corrected MAX_FORCE (impulse 7735 along +x)
+//   MAX_FORCE = 9100 = CueManager.maxForce(1.3) × cueItemData.maxForce(0.7) × hFactor(1.0) × 10000.
+//   Previous impulse (55250) used Unity MaxVelocity (65000) as force — wrong; balls escaped table.
+//   Dense-collision parity: verifies TS == C# byte-for-byte across a 16-body break.
 //   Newton's-cradle artifact: apex (id1) transfers momentum straight through and
-//   ends at its EXACT start; near-zero displacement of central/glancing balls is
+//   ends near its start; near-zero displacement of central/glancing balls is
 //   faithful idealized rigid-body behaviour, NOT a solver propagation bug.
 {
     results.Add(RunShot("GV-14",
-        "15-ball rack break: dead-center 85% force (impulse 55250,+x) — dense-collision TS/C# parity",
+        "15-ball rack break: dead-center 85% force (impulse 7735,+x) — dense-collision TS/C# parity",
         MakeRack(BALL_MAT), colls, pockets, space,
-        55250,0,0,  0,0,0));
+        7735,0,0,  0,0,0));
 }
 
-// GV-15: Full 15-ball rack break — slightly off-axis toward +z (impulse 55000,+x / 3000,+z)
+// GV-15: Full 15-ball rack break — slightly off-axis toward +z (impulse 7700,+x / 420,+z)
+//   z/x ratio preserved from original (3000/55000 ≈ 0.055 → 420/7700 ≈ 0.055)
 {
     results.Add(RunShot("GV-15",
-        "15-ball rack break: off-axis +z (impulse 55000,+x 3000,+z) — asymmetric scatter parity",
+        "15-ball rack break: off-axis +z (impulse 7700,+x 420,+z) — asymmetric scatter parity",
         MakeRack(BALL_MAT), colls, pockets, space,
-        55000,0,3000,  0,0,0));
+        7700,0,420,  0,0,0));
 }
 
-// GV-16: Full 15-ball rack break — slightly off-axis toward -z (impulse 55000,+x / -3000,-z)
+// GV-16: Full 15-ball rack break — slightly off-axis toward -z (impulse 7700,+x / -420,-z)
 {
     results.Add(RunShot("GV-16",
-        "15-ball rack break: off-axis -z (impulse 55000,+x -3000,-z) — asymmetric scatter parity",
+        "15-ball rack break: off-axis -z (impulse 7700,+x -420,-z) — asymmetric scatter parity",
         MakeRack(BALL_MAT), colls, pockets, space,
-        55000,0,-3000,  0,0,0));
+        7700,0,-420,  0,0,0));
 }
 
 // ─── Fuzz: 1000 random ShotData cases (seeded, deterministic) ────────────────
@@ -399,7 +401,7 @@ var results = new List<GoldenVector>();
     {
         int   category = fi % 5; // 0=straight,1=spin,2=two-ball,3=three-ball,4=high-force
         int   angleIdx = rng.Next(8);
-        long  force    = category == 4 ? RandRange(55000, 65000) : RandRange(8000, 45000);
+        long  force    = category == 4 ? RandRange(7000, 9100) : RandRange(1000, 6000);
         long  impX     = force * cosTable[angleIdx] / 10000;
         long  impZ     = force * sinTable[angleIdx] / 10000;
         long  torZ     = category == 1 ? (rng.Next(2) == 0 ? 1L : -1L) * RandRange(5000, 20000) : 0L;
