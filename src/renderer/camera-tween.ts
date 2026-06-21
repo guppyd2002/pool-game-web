@@ -23,6 +23,16 @@ export const POSE_TABLE: CameraPose = {
   lookAt: [0, 0, 0],
 };
 
+/**
+ * Near-top-down view for break setup or strategy planning.
+ * Slight z-offset (0.3m) prevents gimbal lock with PerspectiveCamera default up=[0,1,0].
+ * Toggle with 'T' key or the HUD Top button during play.
+ */
+export const POSE_TOP: CameraPose = {
+  position: [0, 5.0, 0.3],
+  lookAt: [0, 0, 0],
+};
+
 export interface CameraTween {
   tweenTo(pose: CameraPose, durationSecs?: number): void;
   update(dtSecs: number): void;
