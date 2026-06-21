@@ -351,6 +351,65 @@ describe('RULE-005 — win/lose on black ball', () => {
     expect(verdict.gameEnded).toBe(true);
     expect(verdict.winner).toBe(1);  // player0 loses
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // RED GATES (P1-T03 QA, 卡卡西): one-pass collapse parity bugs vs BallPool8GameLogic.
+  // These FAIL on commit efdc74d by design — they encode the C# "ought" behaviour and
+  // are the acceptance gate for 鳴人's fix. They must turn GREEN once processShotResult
+  // (a) merges pocketed+outOfTable into one stepIndex-ordered event stream, and
+  // (b) routes game-end through the GameEnded() path (preserving reason) instead of
+  // always running _turnChanged() which resets _lastReason → Non.
+  // Scope of the fix is the pocketed/outOfTable merge only — contacts are NOT reordered.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // FAIL-1 — cue out-of-table must be time-interleaved with the black pocket.
+  // C# BallPool8GameLogic.cs:571 OnBallOutOfTable: cueBallIsOutOfTable |= !GameIsEnded && IsCueBall.
+  // The black drops FIRST (step25) → GameIsEnded=true → the later cue-out (step30) is ignored →
+  // current player (0) WINS. The TS port processes ALL outOfTable before ALL pocketed
+  // (rule-engine.ts:376-384), so cueBallIsOutOfTable is set before the black pocket → wrong LOSE.
+  it('RED FAIL-1: black pocketed (step25) then cue out-of-table (step30) → WIN (cue-out after game-end ignored)', () => {
+    const engine = engineReadyForBlack();
+    engine.beginShot();
+    const verdict = engine.processShotResult(makeShotResult({
+      contacts: [cueHits(8)],
+      pocketed: [pocketed(8, 0, 25)],   // black drops first…
+      outOfTable: [oot(0, 30)],         // …cue leaves the table afterwards
+    }));
+    expect(verdict.gameEnded).toBe(true);
+    expect(verdict.winner).toBe(0);     // C# = WIN for current player
+  });
+
+  // Control (passes today, pins the agreeing direction): cue out-of-table BEFORE the black
+  // pocket → cueBallIsOutOfTable set first → black drop = LOSE in BOTH C# and TS. A correct
+  // fix must keep this LOSE while flipping FAIL-1 to WIN — i.e. the verdict is time-ordered.
+  it('control: cue out-of-table (step20) then black pocketed (step25) → LOSE (both engines agree)', () => {
+    const engine = engineReadyForBlack();
+    engine.beginShot();
+    const verdict = engine.processShotResult(makeShotResult({
+      contacts: [cueHits(8)],
+      pocketed: [pocketed(8, 0, 25)],
+      outOfTable: [oot(0, 20)],         // cue leaves first
+    }));
+    expect(verdict.gameEnded).toBe(true);
+    expect(verdict.winner).toBe(1);     // current player loses
+  });
+
+  // FAIL-2 — a game-ending shot must surface the reason set in OnBallInPocket.
+  // C# BallPoolGame.EndShot: if (GameEnded(out reason)) emit; else if (TurnChanged(...)).
+  // On game-end C# returns changeTurnReason (= YouBlackBallInPocket) and never calls
+  // TurnChanged(). TS always runs _turnChanged(), whose first line resets _lastReason=Non
+  // (rule-engine.ts:244) → the black-ball reason is wiped to Non on every game-ending shot.
+  it('RED FAIL-2: clean black win preserves reason YouBlackBallInPocket (not Non)', () => {
+    const engine = engineReadyForBlack();
+    engine.beginShot();
+    const verdict = engine.processShotResult(makeShotResult({
+      contacts: [cueHits(8), railHit(8)],
+      pocketed: [pocketed(8)],
+    }));
+    expect(verdict.gameEnded).toBe(true);
+    expect(verdict.winner).toBe(0);
+    expect(verdict.reason).toBe(Reason.YouBlackBallInPocket);  // C# GameEnded() reason; TS wipes → Non
+  });
 });
 
 // ─── RULE-008: no-rail foul (after break) ───────────────────────────────────
