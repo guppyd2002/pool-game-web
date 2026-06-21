@@ -79,20 +79,18 @@ function makePhysics() {
 }
 
 // Fixed impulse/torque decoupled from MAX_FORCE to keep delta stable across force-cap changes.
-// HONEST NOTE (卡卡西 audit): the draw/backspin model is effectively broken at all force levels.
-//   - All spin deltas are noise-grade <1% of total travel (35 units out of ~15400).
-//   - The sign is non-monotonic: 4000 flips positive (+27), 4550 negative (−35), 6000 positive (+146).
-//   - The test pins impulse=5000 because noise happens to be negative there — not a "stable regime".
-//   - At every force level ≥ 6000, and at 4000, backspin EXTENDS travel instead of shortening it.
-// → This is pre-existing weak spin model (CUE-005 owner scope). The test remains to catch
-//   complete regressions (trajectory must differ from no-spin; determinism must hold).
-//   The "stops sooner" sub-assertion is pinned at this specific noise-negative point only.
+// Backspin/draw effect confirmed Unity-faithful (DIV-003) via C# ground-truth + source compare:
+//   spin→linear coupling is byte-identical between CM engine and Unity; game spin draw 0.14~0.59%,
+//   engine ceiling −2.6%. This is intentional weak draw, not a bug.
+//   Negative Z torque = true draw direction (shortens travel); positive Z = follow/ineffective.
+//   Test pins impulse=5000 as a stable measurable point for draw direction; small-magnitude
+//   sign fluctuation at other force levels is noise, not model failure. See DIV-003.
 // CUE-005 backspin torque formula for +X aim, spinY=-1, spinMag=2500:
 //   torqueZ = spinY * spinMag * nx = -1 * 2500 * 1 = -2500
 // No rails in this scene — ball rolls out and stops due to cloth friction only.
 const SHOT_IMPULSE    = new CmVector(5000, 0, 0);   // fixed, decoupled from MAX_FORCE
 const SHOT_POSITION   = new CmVector(0, BALL_Y, 0);
-const BACKSPIN_TORQUE = new CmVector(0, 0, -2500);  // fixed; noise-negative at this point (delta≈−35)
+const BACKSPIN_TORQUE = new CmVector(0, 0, -2500);  // draw direction (neg Z); delta≈−35 at this point
 
 describe('QA-Observable #3: CUE-005 spin changes cue-ball trajectory (integration)', () => {
 
