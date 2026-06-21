@@ -734,6 +734,1140 @@
     "simSteps": 52
   },
   {
+    "id": "GV-14",
+    "description": "15-ball rack break: dead-center 85% force (impulse 55250,\u002Bx) \u2014 dense-collision TS/C# parity",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -6349,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 1,
+          "x": 6349,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 2,
+          "x": 6846,
+          "y": 9440,
+          "z": -287
+        },
+        {
+          "id": 3,
+          "x": 6846,
+          "y": 9440,
+          "z": 287
+        },
+        {
+          "id": 4,
+          "x": 7343,
+          "y": 9440,
+          "z": -574
+        },
+        {
+          "id": 5,
+          "x": 7343,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 6,
+          "x": 7343,
+          "y": 9440,
+          "z": 574
+        },
+        {
+          "id": 7,
+          "x": 7840,
+          "y": 9440,
+          "z": -861
+        },
+        {
+          "id": 8,
+          "x": 7840,
+          "y": 9440,
+          "z": -287
+        },
+        {
+          "id": 9,
+          "x": 7840,
+          "y": 9440,
+          "z": 287
+        },
+        {
+          "id": 10,
+          "x": 7840,
+          "y": 9440,
+          "z": 861
+        },
+        {
+          "id": 11,
+          "x": 8337,
+          "y": 9440,
+          "z": -1148
+        },
+        {
+          "id": 12,
+          "x": 8337,
+          "y": 9440,
+          "z": -574
+        },
+        {
+          "id": 13,
+          "x": 8337,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 14,
+          "x": 8337,
+          "y": 9440,
+          "z": 574
+        },
+        {
+          "id": 15,
+          "x": 8337,
+          "y": 9440,
+          "z": 1148
+        }
+      ],
+      "impulse": {
+        "x": 55250,
+        "y": 0,
+        "z": 0
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -6349,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 6964,
+        "py": 9439,
+        "pz": -201,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 1,
+        "px": 6349,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 2,
+        "px": 1253,
+        "py": 9391,
+        "pz": -10364,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 3,
+        "px": -12386,
+        "py": 9439,
+        "pz": 6093,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 2
+      },
+      {
+        "id": 4,
+        "px": -1640,
+        "py": 8830,
+        "pz": -10339,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 5,
+        "px": 12305,
+        "py": 9439,
+        "pz": 1598,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 6,
+        "px": -12050,
+        "py": 9309,
+        "pz": 10407,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 7,
+        "px": 12409,
+        "py": 9439,
+        "pz": -5990,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 1
+      },
+      {
+        "id": 8,
+        "px": 5724,
+        "py": 9029,
+        "pz": -10383,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 9,
+        "px": -5909,
+        "py": 9439,
+        "pz": -4862,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 10,
+        "px": -11925,
+        "py": 8753,
+        "pz": 10312,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 11,
+        "px": 1853,
+        "py": 9391,
+        "pz": -10392,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 12,
+        "px": 355,
+        "py": 9223,
+        "pz": -10314,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 13,
+        "px": 12513,
+        "py": 9439,
+        "pz": -5921,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 1
+      },
+      {
+        "id": 14,
+        "px": -4723,
+        "py": 9439,
+        "pz": 5776,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 15,
+        "px": -9036,
+        "py": 9333,
+        "pz": 10338,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 594
+  },
+  {
+    "id": "GV-15",
+    "description": "15-ball rack break: off-axis \u002Bz (impulse 55000,\u002Bx 3000,\u002Bz) \u2014 asymmetric scatter parity",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -6349,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 1,
+          "x": 6349,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 2,
+          "x": 6846,
+          "y": 9440,
+          "z": -287
+        },
+        {
+          "id": 3,
+          "x": 6846,
+          "y": 9440,
+          "z": 287
+        },
+        {
+          "id": 4,
+          "x": 7343,
+          "y": 9440,
+          "z": -574
+        },
+        {
+          "id": 5,
+          "x": 7343,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 6,
+          "x": 7343,
+          "y": 9440,
+          "z": 574
+        },
+        {
+          "id": 7,
+          "x": 7840,
+          "y": 9440,
+          "z": -861
+        },
+        {
+          "id": 8,
+          "x": 7840,
+          "y": 9440,
+          "z": -287
+        },
+        {
+          "id": 9,
+          "x": 7840,
+          "y": 9440,
+          "z": 287
+        },
+        {
+          "id": 10,
+          "x": 7840,
+          "y": 9440,
+          "z": 861
+        },
+        {
+          "id": 11,
+          "x": 8337,
+          "y": 9440,
+          "z": -1148
+        },
+        {
+          "id": 12,
+          "x": 8337,
+          "y": 9440,
+          "z": -574
+        },
+        {
+          "id": 13,
+          "x": 8337,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 14,
+          "x": 8337,
+          "y": 9440,
+          "z": 574
+        },
+        {
+          "id": 15,
+          "x": 8337,
+          "y": 9440,
+          "z": 1148
+        }
+      ],
+      "impulse": {
+        "x": 55000,
+        "y": 0,
+        "z": 3000
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -6349,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 15929,
+        "py": 9428,
+        "pz": 3003,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 1,
+        "px": 6349,
+        "py": 9439,
+        "pz": 0,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 2,
+        "px": 887,
+        "py": 9417,
+        "pz": -10715,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 3,
+        "px": -11068,
+        "py": 9439,
+        "pz": -4526,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 4,
+        "px": 6819,
+        "py": 9439,
+        "pz": -1962,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 5,
+        "px": 7337,
+        "py": 9439,
+        "pz": 15,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 6,
+        "px": -5750,
+        "py": 9439,
+        "pz": 615,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 7,
+        "px": 7832,
+        "py": 9439,
+        "pz": -982,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 8,
+        "px": 7840,
+        "py": 9439,
+        "pz": -286,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 9,
+        "px": 7839,
+        "py": 9439,
+        "pz": 289,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 10,
+        "px": 305,
+        "py": 9439,
+        "pz": 4504,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 11,
+        "px": 1708,
+        "py": 9153,
+        "pz": -10417,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 12,
+        "px": -55,
+        "py": 9114,
+        "pz": -10309,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 13,
+        "px": 1914,
+        "py": -3448,
+        "pz": -10309,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 14,
+        "px": 5303,
+        "py": 9439,
+        "pz": -7098,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 15,
+        "px": -6549,
+        "py": 9439,
+        "pz": 1071,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 383
+  },
+  {
+    "id": "GV-16",
+    "description": "15-ball rack break: off-axis -z (impulse 55000,\u002Bx -3000,-z) \u2014 asymmetric scatter parity",
+    "input": {
+      "ballPositions": [
+        {
+          "id": 0,
+          "x": -6349,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 1,
+          "x": 6349,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 2,
+          "x": 6846,
+          "y": 9440,
+          "z": -287
+        },
+        {
+          "id": 3,
+          "x": 6846,
+          "y": 9440,
+          "z": 287
+        },
+        {
+          "id": 4,
+          "x": 7343,
+          "y": 9440,
+          "z": -574
+        },
+        {
+          "id": 5,
+          "x": 7343,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 6,
+          "x": 7343,
+          "y": 9440,
+          "z": 574
+        },
+        {
+          "id": 7,
+          "x": 7840,
+          "y": 9440,
+          "z": -861
+        },
+        {
+          "id": 8,
+          "x": 7840,
+          "y": 9440,
+          "z": -287
+        },
+        {
+          "id": 9,
+          "x": 7840,
+          "y": 9440,
+          "z": 287
+        },
+        {
+          "id": 10,
+          "x": 7840,
+          "y": 9440,
+          "z": 861
+        },
+        {
+          "id": 11,
+          "x": 8337,
+          "y": 9440,
+          "z": -1148
+        },
+        {
+          "id": 12,
+          "x": 8337,
+          "y": 9440,
+          "z": -574
+        },
+        {
+          "id": 13,
+          "x": 8337,
+          "y": 9440,
+          "z": 0
+        },
+        {
+          "id": 14,
+          "x": 8337,
+          "y": 9440,
+          "z": 574
+        },
+        {
+          "id": 15,
+          "x": 8337,
+          "y": 9440,
+          "z": 1148
+        }
+      ],
+      "impulse": {
+        "x": 55000,
+        "y": 0,
+        "z": -3000
+      },
+      "torque": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "hitPoint": {
+        "x": -6349,
+        "y": 9440,
+        "z": 0
+      }
+    },
+    "output": [
+      {
+        "id": 0,
+        "px": 3626,
+        "py": 9426,
+        "pz": -10708,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 1,
+        "px": -15342,
+        "py": 5343,
+        "pz": 9469,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 2,
+        "px": 6395,
+        "py": 9439,
+        "pz": 2304,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 3,
+        "px": -12717,
+        "py": 9439,
+        "pz": 6098,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 2
+      },
+      {
+        "id": 4,
+        "px": 7344,
+        "py": 9439,
+        "pz": -576,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 5,
+        "px": -5424,
+        "py": 9439,
+        "pz": 251,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 6,
+        "px": -4026,
+        "py": 9439,
+        "pz": 937,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 7,
+        "px": 7841,
+        "py": 9439,
+        "pz": -862,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 8,
+        "px": 7840,
+        "py": 9439,
+        "pz": -287,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 9,
+        "px": 12193,
+        "py": 9439,
+        "pz": 770,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 10,
+        "px": -1252,
+        "py": 9439,
+        "pz": 1885,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 11,
+        "px": 2033,
+        "py": 9189,
+        "pz": -10303,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 12,
+        "px": 7861,
+        "py": 7515,
+        "pz": -10329,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": true,
+        "pocketId": -1
+      },
+      {
+        "id": 13,
+        "px": -12545,
+        "py": 9439,
+        "pz": -5953,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": true,
+        "isOutOfCube": false,
+        "pocketId": 3
+      },
+      {
+        "id": 14,
+        "px": 327,
+        "py": 9439,
+        "pz": -3210,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      },
+      {
+        "id": 15,
+        "px": -7760,
+        "py": 9439,
+        "pz": -5228,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "ax": 0,
+        "ay": 0,
+        "az": 0,
+        "isActive": false,
+        "isKinematic": false,
+        "isOutOfCube": false,
+        "pocketId": -1
+      }
+    ],
+    "simSteps": 439
+  },
+  {
     "id": "FUZZ-0001",
     "description": "cat=0 angle=5 force=13213 torZ=0 balls=1",
     "input": {

@@ -46,6 +46,26 @@ static CmRigidbody MakeBody(int id, CmSphereCollider col)
     return b;
 }
 
+// --- helper: standard 8-ball triangle rack (cue id0 + 15 object balls id1..15) ---
+// Mirrors src/game/table-setup.ts createPoolTable() EXACTLY (same long-truncation math).
+// Used for the dense-collision break parity fixtures (GV-14/15/16). Apex (id1) is the
+// row nearest the cue; ids increase row-by-row, low-z to high-z within each row.
+static List<CmRigidbody> MakeRack(CmMaterial ballMat)
+{
+    var bodies = new List<CmRigidbody>();
+    const long R = BALL_RADIUS, sp = R * 2 + 5, RAIL = 12699;
+    long cueX = -(RAIL / 2), rackX = RAIL / 2, rowDx = sp * 866 / 1000, s = sp / 2;
+    bodies.Add(MakeBody(0, MakeBall(cueX, BALL_Y, 0, ballMat)));
+    int id = 1;
+    for (int row = 0; row < 5; row++)
+        for (int col = 0; col <= row; col++)
+        {
+            long x = rackX + row * rowDx, z = (col * 2 - row) * s;
+            bodies.Add(MakeBody(id++, MakeBall(x, BALL_Y, z, ballMat)));
+        }
+    return bodies;
+}
+
 // --- helper: line rail collider ---
 static CmLineCollider MakeLine(int id,
     long px, long py, long pz,
@@ -314,6 +334,35 @@ var results = new List<GoldenVector>();
         "Diagonal back-spin: impulse (21213,0,21213) ~30000 at 45deg + back-spin (0,0,+15000) — ball reverses diagonally",
         new List<CmRigidbody>{b0}, colls, pockets, space,
         21213,0,21213,  0,0,15000));
+}
+
+// GV-14: Full 15-ball rack break — dead-center, 85% force (impulse 55250 along +x)
+//   Dense-collision parity: verifies TS == C# byte-for-byte across a 16-body break,
+//   the regime P1-T01 golden coverage previously topped out at 3 balls.
+//   Newton's-cradle artifact: apex (id1) transfers momentum straight through and
+//   ends at its EXACT start; near-zero displacement of central/glancing balls is
+//   faithful idealized rigid-body behaviour, NOT a solver propagation bug.
+{
+    results.Add(RunShot("GV-14",
+        "15-ball rack break: dead-center 85% force (impulse 55250,+x) — dense-collision TS/C# parity",
+        MakeRack(BALL_MAT), colls, pockets, space,
+        55250,0,0,  0,0,0));
+}
+
+// GV-15: Full 15-ball rack break — slightly off-axis toward +z (impulse 55000,+x / 3000,+z)
+{
+    results.Add(RunShot("GV-15",
+        "15-ball rack break: off-axis +z (impulse 55000,+x 3000,+z) — asymmetric scatter parity",
+        MakeRack(BALL_MAT), colls, pockets, space,
+        55000,0,3000,  0,0,0));
+}
+
+// GV-16: Full 15-ball rack break — slightly off-axis toward -z (impulse 55000,+x / -3000,-z)
+{
+    results.Add(RunShot("GV-16",
+        "15-ball rack break: off-axis -z (impulse 55000,+x -3000,-z) — asymmetric scatter parity",
+        MakeRack(BALL_MAT), colls, pockets, space,
+        55000,0,-3000,  0,0,0));
 }
 
 // ─── Fuzz: 1000 random ShotData cases (seeded, deterministic) ────────────────
