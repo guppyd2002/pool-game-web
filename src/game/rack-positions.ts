@@ -1,75 +1,58 @@
 /**
  * GAME-010 — 8-ball triangle rack positions.
- * Faithful port of C# BallPool8Manager.GetBallPosition + delta array.
- * All values in fixed-point (MULTIPLIER = 10000).
  *
- * C# formula: position = firstBall + Vector3(delta.x * sqrt(3) * distance, 0, delta.y * distance)
- * where distance = BallDiameter/2 + ballDistance (ballDistance ≈ gap/2 from table-setup spacing).
+ * Values are hardcoded from C# runner `GetBallPosition(0..15)` float output
+ * × multiplier 10000, trunc-toward-zero (i.e. `(long)` cast).
  *
- * Web equivalent uses the same spacing constants as table-setup.ts.
+ * C# source geometry (BallPool8Manager + BallPoolSettings.asset + Game.unity):
+ *   firstBall.localPosition.x = 0.6413  → apex x = 6413
+ *   ballDiameter = 0.05715, ballDistance = 0
+ *   distance = ballDiameter/2 + ballDistance = 0.028575
+ *   row step ≈ distance × √3 ≈ 0.049494 → 494.94 (per-ball trunc from full float)
+ *   col step = distance = 0.028575 → 285.75 (per-ball trunc from full float)
+ *
+ * ⚠  DO NOT recalculate positions at runtime from constants — per-ball float
+ * precision and trunc interaction means the formula cannot reproduce the C#
+ * integers exactly (e.g. ball2 z=857 ≠ 3×285). The table below is the single
+ * source of truth for both physics initialization and visual reset.
  */
 
-import { BALL_RADIUS, RAIL_LONG_X } from '../physics/constants';
-
-// C# BallPool8Manager delta array indexed by ball id (0–15).
-// delta[id] = [rowOffset, colOffset] from the foot-spot apex.
-// row: steps along the long table axis (x); col: lateral steps (z).
-// Ball id 8 (black ball) is at (2, 0) = center of the 3-ball row ✓
-const DELTA: ReadonlyArray<readonly [number, number]> = [
-  [ 0,  0],  //  0: cue ball — handled separately
-  [ 0,  0],  //  1: apex
-  [ 3,  3],  //  2
-  [ 4, -4],  //  3
-  [ 4,  0],  //  4
-  [ 1,  1],  //  5
-  [ 3, -1],  //  6
-  [ 4,  4],  //  7
-  [ 2,  0],  //  8: BLACK BALL — center of rack
-  [ 2,  2],  //  9
-  [ 2, -2],  // 10
-  [ 3,  1],  // 11
-  [ 3, -3],  // 12
-  [ 1, -1],  // 13
-  [ 4, -2],  // 14
-  [ 4,  2],  // 15
+/** Fixed-point (x, z) positions indexed by ball id 0–15. */
+const POSITIONS: ReadonlyArray<readonly [number, number]> = [
+  [-6413,     0],   //  0: cue ball at break spot (= -firstBall.x)
+  [ 6413,     0],   //  1: apex / foot spot
+  [ 7897,   857],   //  2
+  [ 8392, -1143],   //  3
+  [ 8392,     0],   //  4
+  [ 6907,   285],   //  5
+  [ 7897,  -285],   //  6
+  [ 8392,  1143],   //  7
+  [ 7402,     0],   //  8: BLACK BALL — z=0 (center of rack) ✓
+  [ 7402,   571],   //  9
+  [ 7402,  -571],   // 10
+  [ 7897,   285],   // 11
+  [ 7897,  -857],   // 12
+  [ 6907,  -285],   // 13
+  [ 8392,  -571],   // 14
+  [ 8392,   571],   // 15
 ];
 
-// Spacing between adjacent ball centers (same as table-setup.ts)
-const BALL_SPACING = BALL_RADIUS * 2 + 5;
+/** X position of the rack apex (foot spot). From C# firstBall.localPosition.x=0.6413. */
+export const RACK_APEX_X = 6413;
+
+/** X position of cue ball at break (opposite side). From C# −firstBall.x. */
+export const CUE_BALL_START_X = -6413;
 
 /**
- * Step along the long axis per delta row unit.
- * Matches C# delta.x * sqrt(2*distance^2 - distance^2) = delta.x * sqrt(3) * distance.
- * Approximated as spacing * 866/1000 (consistent with table-setup rowDx).
- */
-export const RACK_ROW_STEP = Math.trunc(BALL_SPACING * 866 / 1000);
-
-/** Lateral step per delta col unit = half-spacing. */
-export const RACK_COL_STEP = Math.trunc(BALL_SPACING / 2);
-
-/** X position of the rack apex (foot spot, positive-x half of table). */
-export const RACK_APEX_X = Math.trunc(RAIL_LONG_X / 2);
-
-/** X position of cue ball at break (opposite side). */
-export const CUE_BALL_START_X = -RACK_APEX_X;
-
-/**
- * Return the fixed-point { x, z } position for a ball id in the rack.
- * Ball 0 (cue): placed at CUE_BALL_START_X.
- * Balls 1–15: triangle positions per C# delta array.
+ * Return the fixed-point { x, z } position for a ball id (0–15).
+ * Sourced from C# GetBallPosition float dump, NOT recomputed from constants.
  */
 export function getRackPosition(id: number): { x: number; z: number } {
-  if (id === 0) {
-    return { x: CUE_BALL_START_X, z: 0 };
-  }
-  const [dr, dc] = DELTA[id] ?? [0, 0];
-  return {
-    x: RACK_APEX_X + dr * RACK_ROW_STEP,
-    z: dc * RACK_COL_STEP,
-  };
+  const [x, z] = POSITIONS[id] ?? POSITIONS[0];
+  return { x, z };
 }
 
-/** All rack positions as an array indexed by ball id (0–15). */
+/** All rack positions as a read-only array indexed by ball id (0–15). */
 export function getAllRackPositions(): ReadonlyArray<{ x: number; z: number }> {
-  return Array.from({ length: 16 }, (_, id) => getRackPosition(id));
+  return POSITIONS.map(([x, z]) => ({ x, z }));
 }
