@@ -527,14 +527,14 @@
       "parityLockBehavior": "Assert currentPort constants (CORNER_B_SCALE_X=569/CORNER_B_RADIUS=284)"
     },
     {
-      "id": "sideJawFrontLeftX",
-      "field": "tableGeometry.colliders[17].position.x",
+      "id": "sideJawBackLeftX",
+      "field": "tableGeometry.colliders[15].position.x",
       "unityTrue": -580,
       "currentPort": -579,
       "delta": 1,
       "status": "deferred",
-      "reason": "1-unit (0.1mm) asymmetry in front-left side jaw only. No functional impact. Awaits 卡卡西 confirmation.",
-      "parityLockBehavior": "Assert portActual=-579 (SIDE_JAW_X) until confirmed"
+      "reason": "1-unit (0.1mm) asymmetry: back-left jaw (-x,+z) Unity |x|=580, other 3 side jaws |x|=579. Port SIDE_JAW_X=579 applied to all 4. Confirmed non-functional by 卡卡西 (2026-06-22). Grouped with jawRoundingDistribution as minor known-discrepancy.",
+      "parityLockBehavior": "Assert portActual=-579 (SIDE_JAW_X)"
     }
   ]
 }
