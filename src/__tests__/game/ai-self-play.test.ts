@@ -287,6 +287,16 @@ describe('AI self-play harness (REC-1)', () => {
       expect(r.totalPots).toBeGreaterThanOrEqual(8);
     }
 
+    // cleanWin-rate floor: guards against regressions where broken group logic (or degenerate
+    // fallback) causes most games to end via premature-8 pocket, bypassing the quality bands.
+    // Without this floor, a regression could pass all per-game bands (foul/legal/pots≥1) while
+    // most completions are premature-8 (the "1-shot early-8 = PASS" blank cheque).
+    // Current rate: 9/11 ≈ 82%. Floor at 60% catches "majority premature-8" regressions while
+    // tolerating rare legitimate early-end games (calibrated with 卡卡西).
+    const cleanWinRate = completed.length > 0
+      ? completed.filter(r => r.cleanWin).length / completed.length : 0;
+    expect(cleanWinRate).toBeGreaterThanOrEqual(0.60);
+
     // Human-readable report (cap-hits are informational, not FAIL)
     const capHitSeeds = capHits.map(r => `seed${r.seed}`).join(', ');
     const completedSummary = completed.map(r =>
@@ -337,8 +347,15 @@ describe('AI self-play harness (REC-1)', () => {
       console.log(`  seed${r.seed}: shots=${r.shots} pots=${r.totalPots} cw=${r.cleanWin} winner=P${r.winner}`),
     );
 
-    // No hard assertions — informational for CEO evaluation.
-    // Asymmetric completion should be materially higher than symmetric; logged for CEO review.
+    // CEO demo config assertions: regression guard for the P0=rank4 vs P1=rank2 demo path.
+    // At least 1 game must complete (demo is viable); all completed games must be clean wins
+    // with a determined winner (guards against broken group/phase logic silently producing
+    // degenerate completions that would look bad in a CEO demo).
+    expect(asymCompleted.length).toBeGreaterThan(0);
+    for (const r of asymCompleted) {
+      expect(r.cleanWin).toBe(true);      // all completed demo games must be full run-outs
+      expect(r.winner).not.toBeNull();    // game must have a determined winner
+    }
   }, 600_000);
 
 });
