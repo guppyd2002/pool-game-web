@@ -287,10 +287,11 @@ export function calculateAIShot(
       }
 
       // ── Cast 2: cue→ghost path — does it hit the target ball? (:179-198) ─
+      // C-6: Cast2 uses BallsOnTable which excludes cue ball (id=0) — pass excludeBallId=0.
       const cast2MaxDist = BALL_R + Math.sqrt((cuePosX - tpX) ** 2 + (cuePosZ - tpZ) ** 2);
       const cast2Dir = new CmVector(Math.round(dir2x * M), 0, Math.round(dir2z * M));
       const cast2From = new CmVector(Math.round(cuePosX * M), space.rigidbodies[0].collider.position.y, Math.round(cuePosZ * M));
-      const hit2 = analyticSphereCast(cast2From, cast2Dir, space, cast2MaxDist);
+      const hit2 = analyticSphereCast(cast2From, cast2Dir, space, cast2MaxDist, 0);
 
       if (hit2.hitType !== 'none') {
         // Cast2 hit something — check if it's our target ball and better score (:183-193)
@@ -343,11 +344,11 @@ export function calculateAIShot(
       const mag = Math.sqrt(dx * dx + dz * dz) || 1;
       const dir2x = dx / mag, dir2z = dz / mag;
 
-      // Cast2 (no exclusion) to verify cue can hit this ball (:232)
+      // Cast2: exclude cue ball (id=0) — C-6 parity with BallsOnTable exclusion (:232)
       const cast2MaxDist = Math.sqrt((cuePosX - ball.x) ** 2 + (cuePosZ - ball.z) ** 2);
       const cast2Dir = new CmVector(Math.round(dir2x * M), 0, Math.round(dir2z * M));
       const cast2From = new CmVector(Math.round(cuePosX * M), space.rigidbodies[0].collider.position.y, Math.round(cuePosZ * M));
-      const hit2 = analyticSphereCast(cast2From, cast2Dir, space, cast2MaxDist);
+      const hit2 = analyticSphereCast(cast2From, cast2Dir, space, cast2MaxDist, 0);
 
       if (hit2.hitType !== 'none') {
         const cDistance = 2 * Math.sqrt((cuePosX - ball.x) ** 2 + (cuePosZ - ball.z) ** 2);  // :234

@@ -22,6 +22,7 @@ import type { IBallPoolPhysics, ShotData } from './ball-pool-physics';
 import type { CueController } from './cue-controller';
 import type { SceneAPI } from '../renderer/scene';
 import { createRuleEngine } from './rule-engine';
+import { BallType } from './player-ball-info';
 import { createGameStore } from './game-store';
 import type { GameStore } from './game-store';
 import type { ReplayDriver } from '../renderer/replay-driver';
@@ -56,6 +57,14 @@ export interface IGameSession {
    * the same verdict pipeline as cue.onShotApplied. Only valid in Aiming phase.
    */
   forceShot(shotData: ShotData): void;
+
+  /**
+   * P1-T05: Returns the allowable-ball predicate for the CURRENT player.
+   * Mirrors Unity BallPoolAIManager.CalculateBestShot allowable semantics —
+   * group not cleared = can't shoot 8; type not assigned = all object balls allowable.
+   * Call right before calculateAIShot() each turn.
+   */
+  getAllowableFn(): (id: number) => boolean;
 
   readonly currentPlayerIndex: 0 | 1;
   readonly isGameEnded: boolean;
@@ -213,6 +222,18 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
         result.outOfTable,
         () => _onReplayComplete(verdict),
       );
+    },
+
+    getAllowableFn(): (id: number) => boolean {
+      // Mirror Unity _isAllowableBall — derived from current player's group state.
+      const player = ruleEngine.players[store.getState().currentPlayerIndex];
+      return (ballId: number) => {
+        if (ballId === 0) return false;                                     // cue ball
+        if (ballId === 8) return player.hasBlackBallToShot;                 // 8-ball only when group cleared
+        if (player.hasBlackBallToShot) return false;                        // can only aim at 8
+        return player.currentBallType === BallType.Non ||                   // pre-assignment: all ok
+               player.isSameBallType(ballId);                               // post-assignment: own group only
+      };
     },
   };
 
