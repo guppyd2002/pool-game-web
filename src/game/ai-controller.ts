@@ -19,6 +19,11 @@
  *   C-7  Ghost-ball geometry uses float arithmetic (matches C# Unity float space).
  *   C-8  :126 `moveCueBall ? 0.25f : 1f` dead branch (always 0.25 inside if(moveCueBall&&...)) — registered as DIV.
  *   C-9  No safety guarantee added (matches Unity: null targetBall → fires residual cueForward at full force).
+ *   C-10 cueBallPosition declared outside loops (:106), mutated on placement success (:132/:142), persists
+ *        across all (pocket×ball) iterations — faithful port of Unity cross-iteration quirk.
+ *   C-11 FIRST_QUAD values verified from Game.unity scene (fileID:649372036): localPos={x:-0.942,y:0,z:0},
+ *        localScale={x:0.655,y:1,z:1.27}, parent chain all scale=1 so lossyScale=localScale.
+ *   C-12 positionIsFree: threshold 1.25*diameter (:116); BallsOnTable excludes cue ball → no cue overlap check.
  */
 
 import { CmVector } from '../physics/cm-vector';
@@ -128,28 +133,28 @@ function getCueBallFloat(space: CmSpace): ActiveBall {
  * Check if a candidate cue ball position is within firstQuad bounds and
  * doesn't overlap any active ball (XZ plane only).
  * Mirrors CueBallMoveManager.PositionIsFree() with firstQuad mode.
+ *
+ * C# `balls` = BallsOnTable which already excludes cue ball (id=0), so no cue-ball check here.
+ * Overlap threshold: 1.25 * diameter (:116), NOT 1.0 * diameter.
+ * FIRST_QUAD values verified from Game.unity scene (fileID:649372036), parent scale=1 → lossyScale=localScale.
  */
 function positionIsFree(
   px: number, pz: number,
-  ballsOnTable: ActiveBall[], cueBall: ActiveBall,
+  ballsOnTable: ActiveBall[],
 ): boolean {
-  // Sphere-in-cube: center must be ≥ BALL_R inside each face
+  // SphereInCube: |pos - center| + BALL_R ≤ halfScale (VectorGeometry.SphereInCube :60-64)
   const xMin = FIRST_QUAD.cx - FIRST_QUAD.sx * 0.5 + BALL_R;
   const xMax = FIRST_QUAD.cx + FIRST_QUAD.sx * 0.5 - BALL_R;
   const zMin = FIRST_QUAD.cz - FIRST_QUAD.sz * 0.5 + BALL_R;
   const zMax = FIRST_QUAD.cz + FIRST_QUAD.sz * 0.5 - BALL_R;
   if (px < xMin || px > xMax || pz < zMin || pz > zMax) return false;
 
-  // No overlap with other active balls
-  const diam2 = BALL_DIAM * BALL_DIAM;
+  // Overlap threshold: 1.25 * diameter (:116) — BallsOnTable excludes cue ball (id=0)
+  const thresh2 = (1.25 * BALL_DIAM) ** 2;
   for (const b of ballsOnTable) {
     const dx = px - b.x, dz = pz - b.z;
-    if (dx * dx + dz * dz < diam2) return false;
+    if (dx * dx + dz * dz < thresh2) return false;
   }
-  // No overlap with cue ball's current position (not the candidate — this is the standard check)
-  const dcx = px - cueBall.x, dcz = pz - cueBall.z;
-  if (dcx * dcx + dcz * dcz < diam2) return false;
-
   return true;
 }
 
@@ -200,6 +205,7 @@ export function calculateAIShot(
   let dot = 0;
   let distance = AI_MAX_DISTANCE;
 
+  // C# :106: declared outside loops, mutated on successful placement — persists across all (pocket×ball) iterations.
   let cueBallPosX = cueBall.x, cueBallPosZ = cueBall.z;
   let cueBallNewX = cueBall.x, cueBallNewZ = cueBall.z;
 
@@ -224,29 +230,29 @@ export function calculateAIShot(
       const tpZ = ball.z - BALL_DIAM * dir1z;
 
       // ── Ball-in-hand placement (:122-145) ───────────────────────────────
-      let cuePosX = cueBallPosX, cuePosZ = cueBallPosZ;  // working cue position for this pair
-
+      // cueBallPosX/Z is the outer persistent working position — mutated on success, NOT a local copy.
+      // Faithful port of Unity cross-iteration cue-pos persistence quirk (:106/:132/:142).
       if (ballInHand) {
         if (moveCueBall && isFirstShot) {
           // Draw A1 + A2 (break random placement, :128-129)
-          // C-8: delta = moveCueBall ? 0.25f : 1f — always 0.25f (dead branch logged as DIV)
-          const delta = 0.25;
+          // C-8: delta = moveCueBall ? 0.25f : 1f — dead branch (always 0.25f inside if(moveCueBall&&isFirstShot))
+          const delta = 0.25;  // dead branch: else arm would be 1f but condition guarantees 0.25f
           const rz = rng(-1, 1);  // A1: forward (Z) offset
           const rx = rng(-1, 1);  // A2: left (-X) offset
           const npX = cueBall.x - delta * 0.7 * FIRST_QUAD.sx * rx;  // left = (-1,0,0)
           const npZ = cueBall.z + delta * 0.3 * FIRST_QUAD.sz * rz;  // forward = (0,0,1)
 
-          if (positionIsFree(npX, npZ, ballsOnTable, cueBall)) {
-            cuePosX = npX; cuePosZ = npZ;
-            cueBallNewX = npX; cueBallNewZ = npZ;
-            targetBallId = ball.id;
+          if (positionIsFree(npX, npZ, ballsOnTable)) {
+            cueBallPosX = npX; cueBallPosZ = npZ;  // persist across iterations (:132)
+            cueBallNewX = npX; cueBallNewZ = npZ;   // update output position (:134)
+            targetBallId = ball.id;                  // (:135)
           }
         } else {
           // Normal ball-in-hand: place behind target ball (:140-141, no draws)
           const npX = ball.x - 2 * BALL_DIAM * dir1x;
           const npZ = ball.z - 2 * BALL_DIAM * dir1z;
-          if (positionIsFree(npX, npZ, ballsOnTable, cueBall)) {
-            cuePosX = npX; cuePosZ = npZ;
+          if (positionIsFree(npX, npZ, ballsOnTable)) {
+            cueBallPosX = npX; cueBallPosZ = npZ;  // persist across iterations (:142); cueBallNewX/Z NOT updated
           }
         }
       }
@@ -257,11 +263,11 @@ export function calculateAIShot(
       // C-3: deltaError uses same scalar for x and z (diagonal vector)
       const deltaError = b1 <= level01 ? 0 : rng(-0.2, 0.2);  // B2 if b1 > level01
 
-      // direction2 = normalize(deltaVector + targetingPoint - cuePosX) on XZ (:156)
+      // direction2 = normalize(deltaVector + targetingPoint - cueBallPosX) on XZ (:156)
       const noiseX = NOISE_R * deltaError;
       const noiseZ = NOISE_R * deltaError;  // C-3: same scalar
-      const rawDX = noiseX + tpX - cuePosX;
-      const rawDZ = noiseZ + tpZ - cuePosZ;
+      const rawDX = noiseX + tpX - cueBallPosX;
+      const rawDZ = noiseZ + tpZ - cueBallPosZ;
       const rawMag = Math.sqrt(rawDX * rawDX + rawDZ * rawDZ) || 1;
       const dir2x = rawDX / rawMag, dir2z = rawDZ / rawMag;
 
@@ -288,14 +294,14 @@ export function calculateAIShot(
 
       // ── Cast 2: cue→ghost path — does it hit the target ball? (:179-198) ─
       // C-6: Cast2 uses BallsOnTable which excludes cue ball (id=0) — pass excludeBallId=0.
-      const cast2MaxDist = BALL_R + Math.sqrt((cuePosX - tpX) ** 2 + (cuePosZ - tpZ) ** 2);
+      const cast2MaxDist = BALL_R + Math.sqrt((cueBallPosX - tpX) ** 2 + (cueBallPosZ - tpZ) ** 2);
       const cast2Dir = new CmVector(Math.round(dir2x * M), 0, Math.round(dir2z * M));
-      const cast2From = new CmVector(Math.round(cuePosX * M), space.rigidbodies[0].collider.position.y, Math.round(cuePosZ * M));
+      const cast2From = new CmVector(Math.round(cueBallPosX * M), space.rigidbodies[0].collider.position.y, Math.round(cueBallPosZ * M));
       const hit2 = analyticSphereCast(cast2From, cast2Dir, space, cast2MaxDist, 0);
 
       if (hit2.hitType !== 'none') {
         // Cast2 hit something — check if it's our target ball and better score (:183-193)
-        const cDistance = cast1MaxDist + Math.sqrt((tpX - cuePosX) ** 2 + (tpZ - cuePosZ) ** 2);
+        const cDistance = cast1MaxDist + Math.sqrt((tpX - cueBallPosX) ** 2 + (tpZ - cueBallPosZ) ** 2);
         if (
           hit2.hitType === 'ball' && hit2.ballId === ball.id &&
           (targetBallId === null || dot / distance < cDot / cDistance)
@@ -305,24 +311,24 @@ export function calculateAIShot(
           targetBallId = ball.id;
           cueForwardX = dir2x; cueForwardZ = dir2z;
           hasTargetBall = true;
-          cueBallNewX = cuePosX; cueBallNewZ = cuePosZ;
+          cueBallNewX = cueBallPosX; cueBallNewZ = cueBallPosZ;  // (:191)
         }
       } else if (!hasTargetBall) {
         // Cast2 missed everything within range — record as fallback direction (:194-198)
-        cueForwardX = dir2x; cueForwardZ = dir2z;      }
+        cueForwardX = dir2x; cueForwardZ = dir2z;
+      }
     }
   }
 
   // ── Fallback: aim at nearest directly-hittable ball (:203-245) ───────────
   if (targetBallId === null) {
     distance = AI_MAX_DISTANCE;
-    cueBallPosX = cueBall.x; cueBallPosZ = cueBall.z;
+    cueBallPosX = cueBall.x; cueBallPosZ = cueBall.z;  // reset to original on fallback (:206)
 
     for (const ball of ballsOnTable) {
       if (!allowable(ball.id)) continue;
 
-      let cuePosX = cueBallPosX, cuePosZ = cueBallPosZ;
-
+      // cueBallPosX/Z persists across fallback iterations too (:222 faithful — no local copy)
       if (ballInHand) {
         // Fallback ball-in-hand: angular search 0-8° (:217-228, step=1, no draws)
         let foundPosition = false;
@@ -332,32 +338,32 @@ export function calculateAIShot(
           // C#: +z=forward, -x=right → npX = ball.x - 2*diam*sin, npZ = ball.z - 2*diam*cos
           const npX = ball.x - 2 * BALL_DIAM * sin;
           const npZ = ball.z - 2 * BALL_DIAM * cos;
-          if (positionIsFree(npX, npZ, ballsOnTable, cueBall)) {
-            cuePosX = npX; cuePosZ = npZ;
+          if (positionIsFree(npX, npZ, ballsOnTable)) {
+            cueBallPosX = npX; cueBallPosZ = npZ;  // persist across iterations (:222 faithful)
             foundPosition = true;
           }
         }
       }
 
       // Aim direction: cue→ball XZ (:230)
-      const dx = ball.x - cuePosX, dz = ball.z - cuePosZ;
+      const dx = ball.x - cueBallPosX, dz = ball.z - cueBallPosZ;
       const mag = Math.sqrt(dx * dx + dz * dz) || 1;
       const dir2x = dx / mag, dir2z = dz / mag;
 
       // Cast2: exclude cue ball (id=0) — C-6 parity with BallsOnTable exclusion (:232)
-      const cast2MaxDist = Math.sqrt((cuePosX - ball.x) ** 2 + (cuePosZ - ball.z) ** 2);
+      const cast2MaxDist = Math.sqrt((cueBallPosX - ball.x) ** 2 + (cueBallPosZ - ball.z) ** 2);
       const cast2Dir = new CmVector(Math.round(dir2x * M), 0, Math.round(dir2z * M));
-      const cast2From = new CmVector(Math.round(cuePosX * M), space.rigidbodies[0].collider.position.y, Math.round(cuePosZ * M));
+      const cast2From = new CmVector(Math.round(cueBallPosX * M), space.rigidbodies[0].collider.position.y, Math.round(cueBallPosZ * M));
       const hit2 = analyticSphereCast(cast2From, cast2Dir, space, cast2MaxDist, 0);
 
       if (hit2.hitType !== 'none') {
-        const cDistance = 2 * Math.sqrt((cuePosX - ball.x) ** 2 + (cuePosZ - ball.z) ** 2);  // :234
+        const cDistance = 2 * Math.sqrt((cueBallPosX - ball.x) ** 2 + (cueBallPosZ - ball.z) ** 2);  // :234
         if (hit2.hitType === 'ball' && hit2.ballId === ball.id &&
             (targetBallId === null || distance > cDistance)) {
           distance = cDistance;
           targetBallId = ball.id;
           cueForwardX = dir2x; cueForwardZ = dir2z;
-          cueBallNewX = cuePosX; cueBallNewZ = cuePosZ;
+          cueBallNewX = cueBallPosX; cueBallNewZ = cueBallPosZ;  // (:243)
         }
       }
     }

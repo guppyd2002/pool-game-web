@@ -275,8 +275,11 @@ describe('AI self-play harness (REC-1)', () => {
       expect(r.totalPots).toBeGreaterThanOrEqual(1);
       // foul<0.35: legit games cluster at ≤23%; cap-hit cluster at ≥78%
       expect(r.foulRate).toBeLessThan(0.35);
-      // legal-contact>0.85: legit games at ≥95%; cap-hit at ≤26%
-      expect(r.legalContactRate).toBeGreaterThan(0.85);
+      // legal-contact>0.75: cap-hit cluster ≤26% (gap ≥49pp — still has teeth).
+      // Lowered from 0.85 after PositionIsFree threshold fix (1.25× diam per C# :116):
+      // stricter placement → occasional failed placements → AI shoots from original position → more misses.
+      // Legit games remain ≥80%; cap-hit still ≤26%; bimodal separation is preserved.
+      expect(r.legalContactRate).toBeGreaterThan(0.75);
     }
     // cleanWin games (≥7 non-8 balls cleared): must have ≥8 total pots.
     // Premature 8-ball pocket (cleanWin=false) is a valid game end with < 8 pots — not asserted.
