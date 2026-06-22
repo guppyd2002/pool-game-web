@@ -50,6 +50,39 @@ function hit1Rail(): ShotResult {
   };
 }
 
+/** Break shot that pockets solid ball 1 with valid cue-ball contact. Player 0 → assigned solids, continues. */
+function breakPocketSolid1(): ShotResult {
+  return {
+    pocketed: [{ ballId: 1, pocketId: 0, stepIndex: 3 }],
+    outOfTable: [],
+    contacts: [{ kind: 'ball', ballId: 0, otherBallId: 1, cushionId: null, stepIndex: 1 }],
+    frames: [],
+    finalStates: [],
+  };
+}
+
+/** Non-break shot pocketing solid ball 2 (cue→ball2) → assigns current player to solids, continues. */
+function pocketSolid2(): ShotResult {
+  return {
+    pocketed: [{ ballId: 2, pocketId: 0, stepIndex: 3 }],
+    outOfTable: [],
+    contacts: [{ kind: 'ball', ballId: 0, otherBallId: 2, cushionId: null, stepIndex: 1 }],
+    frames: [],
+    finalStates: [],
+  };
+}
+
+/** Shot that pockets solids 2-7 (cue→ball2, own group). Clears player 0's group → hasBlackBallToShot=true. */
+function pocketSolids2to7(): ShotResult {
+  return {
+    pocketed: [2, 3, 4, 5, 6, 7].map(id => ({ ballId: id, pocketId: 0, stepIndex: 2 })),
+    outOfTable: [],
+    contacts: [{ kind: 'ball', ballId: 0, otherBallId: 2, cushionId: null, stepIndex: 1 }],
+    frames: [],
+    finalStates: [],
+  };
+}
+
 // ─── Mock builders ────────────────────────────────────────────────────────────
 
 function makeMesh(): THREE.Mesh {
@@ -422,6 +455,54 @@ describe('game-session — IGameSession (GAME-018)', () => {
       replayDriver.triggerComplete();
 
       expect(onTurnChanged).toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllowableFn() — P1-T05 group logic guard', () => {
+    /** Fire one forceShot and advance past replay — mirrors the AI shot pipeline. */
+    function fireShot(s: ReturnType<typeof setup>, result: ShotResult): void {
+      (s.physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(result);
+      s.session.forceShot({ position: CmVector.zero, impulse: new CmVector(0, 0, 1000), torque: CmVector.zero });
+      s.replayDriver.triggerComplete();
+    }
+
+    it('GAAF-001: 8-ball NOT allowable in initial state (pre-assignment, BallType.Non)', () => {
+      const { session } = setup();
+      session.startNewGame();
+      const fn = session.getAllowableFn();
+      // Pre-assignment: all object balls ok, cue always false, 8-ball blocked until group cleared
+      expect(fn(0)).toBe(false);
+      expect(fn(8)).toBe(false);
+      expect(fn(1)).toBe(true);
+      expect(fn(9)).toBe(true);
+    });
+
+    it('GAAF-002: 8-ball NOT allowable after type assigned (solids, group not cleared)', () => {
+      const s = setup();
+      s.session.startNewGame();
+      // Break: pocket solid 1 → valid break, table stays open (type not assigned on break pocket)
+      fireShot(s, breakPocketSolid1());
+      // Shot 2: non-break pocket of solid 2 → player 0 assigned solids, 2/7 cleared, continues
+      fireShot(s, pocketSolid2());
+      const fn = s.session.getAllowableFn();
+      expect(fn(8)).toBe(false);   // own group not cleared → 8 blocked
+      expect(fn(3)).toBe(true);    // solid, same type as player 0
+      expect(fn(9)).toBe(false);   // stripe, different type
+      expect(fn(0)).toBe(false);   // cue ball always false
+    });
+
+    it('GAAF-003: 8-ball IS allowable after all 7 solids cleared (hasBlackBallToShot=true)', () => {
+      const s = setup();
+      s.session.startNewGame();
+      // Break: pocket solid 1 → player 0 assigned solids, continues
+      fireShot(s, breakPocketSolid1());
+      // Shot 2: pocket solids 2-7 → all 7 cleared → hasBlackBallToShot=true
+      fireShot(s, pocketSolids2to7());
+      const fn = s.session.getAllowableFn();
+      expect(fn(8)).toBe(true);    // group cleared → 8 is the only valid target
+      expect(fn(1)).toBe(false);   // solid but hasBlackBallToShot → only 8 allowed
+      expect(fn(9)).toBe(false);   // stripe but hasBlackBallToShot → only 8 allowed
+      expect(fn(0)).toBe(false);   // cue ball always false
     });
   });
 });
