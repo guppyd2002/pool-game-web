@@ -36,7 +36,7 @@ import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
 import { createGameOverUI } from './renderer/game-over-ui';
 import { REASON_MESSAGES } from './game/game-play-reason';
-import { createCameraTween, POSE_OVERVIEW, POSE_TABLE, POSE_TOP } from './renderer/camera-tween';
+import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
 import { createTurnPrompt } from './renderer/turn-prompt';
 import * as THREE from 'three';
 
@@ -67,6 +67,8 @@ let _punchSavedCueBallPos: CmVector | null = null;
 
 const adapter = createCueAdapter({
   camera: scene.camera,
+  // Dynamic camera lookup so ortho top-view raycasting works correctly
+  getCameraFn: () => scene.activeCamera,
   element: scene.renderer.domElement,
   cueBallMesh: scene.balls[0],
   controller: cue,
@@ -228,6 +230,7 @@ gameOverUI.onExit = () => {
   topViewBtn.style.display = 'none';
   _inTopView = false;
   topViewBtn.textContent = '⬆ Top';
+  scene.setOrthoTop(false);  // ensure ortho is cleared on exit
   cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
   _runCameraTween(true);
   mainMenuEl.style.display = 'flex';
@@ -252,8 +255,14 @@ let _inTopView = false;
 
 topViewBtn.addEventListener('click', () => {
   _inTopView = !_inTopView;
-  cameraTween.tweenTo(_inTopView ? POSE_TOP : POSE_TABLE, 0.5);
-  _runCameraTween(true);
+  if (_inTopView) {
+    // Switch to strict ortho top-down; ortho camera is self-contained, no tween needed.
+    scene.setOrthoTop(true);
+  } else {
+    // Return to perspective; snap back to table pose (no tween — instant, avoids disorientation).
+    scene.setOrthoTop(false);
+    cameraTween.tweenTo(POSE_TABLE, 0);
+  }
   topViewBtn.textContent = _inTopView ? '⬇ Table' : '⬆ Top';
 });
 
@@ -318,7 +327,8 @@ function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: numbe
     ((clientX - rect.left) / rect.width) * 2 - 1,
     -((clientY - rect.top) / rect.height) * 2 + 1,
   );
-  _bihRaycaster.setFromCamera(ndc, scene.camera);
+  // Use activeCamera so ball-in-hand placement works in ortho top-view too
+  _bihRaycaster.setFromCamera(ndc, scene.activeCamera);
   return tableIntersection(_bihRaycaster, TABLE_PLANE_Y);
 }
 

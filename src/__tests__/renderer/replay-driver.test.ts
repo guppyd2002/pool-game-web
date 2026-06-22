@@ -26,6 +26,8 @@ function makeScene(count = 16): SceneAPI {
     renderer: null as unknown as THREE.WebGLRenderer,
     scene: null as unknown as THREE.Scene,
     table: null as unknown as THREE.Group,
+    activeCamera: null as unknown as THREE.Camera,
+    setOrthoTop: vi.fn(),
     updateBallPosition: vi.fn(),
     render: vi.fn(),
     dispose: vi.fn(),

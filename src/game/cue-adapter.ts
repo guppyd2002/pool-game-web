@@ -36,6 +36,12 @@ export function tableIntersection(
 
 export interface CueAdapterOptions {
   camera: THREE.Camera;
+  /**
+   * Optional: if provided, called at each raycasting event to resolve the current active camera.
+   * Use this when the camera may switch between perspective and ortho (e.g. top-view toggle).
+   * Overrides the static `camera` field for raycasting only.
+   */
+  getCameraFn?: () => THREE.Camera;
   element: HTMLElement;
   cueBallMesh: THREE.Mesh;
   controller: CueController;
@@ -52,7 +58,9 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   disable(): void;
   dispose(): void;
 } {
-  const { camera, element, cueBallMesh, controller } = opts;
+  const { element, cueBallMesh, controller } = opts;
+  // Resolve the active camera at each raycasting call so ortho/perspective switches work correctly.
+  const getCamera = opts.getCameraFn ?? (() => opts.camera);
   const sm = new PointerStateMachine();
   const raycaster = new THREE.Raycaster();
   let enabled = true;
@@ -70,7 +78,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   }
 
   function ndcToTablePoint(ndc: THREE.Vector2): { x: number; z: number } | null {
-    raycaster.setFromCamera(ndc, camera);
+    raycaster.setFromCamera(ndc, getCamera());
     return tableIntersection(raycaster, TABLE_PLANE_Y);
   }
 
@@ -79,7 +87,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   function onPointerDown(e: PointerEvent): void {
     if (!enabled || _zoomActive) return;  // CUE-023: block drag during pinch
     const ndc = toNDC(e.clientX, e.clientY);
-    raycaster.setFromCamera(ndc, camera);
+    raycaster.setFromCamera(ndc, getCamera());
     // Only begin drag when the pointer hits the cue ball mesh
     if (raycaster.intersectObject(cueBallMesh).length === 0) return;
 

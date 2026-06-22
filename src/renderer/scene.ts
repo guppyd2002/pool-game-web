@@ -37,17 +37,40 @@ const BALL_COLORS: number[] = [
   0x8b4513, // 15: brown stripe
 ];
 
+// Ortho top-view frustum: table half-extents + 15% margin.
+// Camera sits at (0,5,0) looking straight down, up=(0,0,-1) to avoid gimbal lock.
+const ORTHO_HALF_X = (TABLE_W / 2) * 1.15;  // ~1.46 m (long axis)
+const ORTHO_HALF_Z = (TABLE_H / 2) * 1.15;  // ~0.73 m (short axis)
+
+/** Compute OrthographicCamera frustum that fits the whole table for the given viewport aspect. */
+function orthoFrustum(aspect: number): [number, number, number, number] {
+  const tableAspect = ORTHO_HALF_X / ORTHO_HALF_Z;
+  // Fit whichever dimension is the constraint; expand the other to fill screen.
+  const hw = aspect >= tableAspect ? ORTHO_HALF_Z * aspect : ORTHO_HALF_X;
+  const hh = aspect >= tableAspect ? ORTHO_HALF_Z          : ORTHO_HALF_X / aspect;
+  return [-hw, hw, hh, -hh]; // left, right, top, bottom
+}
+
 // ─── Scene API Interface ─────────────────────────────────────────────────────
 
 export interface SceneAPI {
   renderer: THREE.WebGLRenderer;
+  /** Perspective camera (always exists; used by tweens and orbit controls). */
   camera: THREE.PerspectiveCamera;
+  /** Currently active camera — perspective normally, ortho when setOrthoTop(true). */
+  readonly activeCamera: THREE.Camera;
   scene: THREE.Scene;
   balls: THREE.Mesh[];
   table: THREE.Group;
   updateBallPosition(id: number, x: number, y: number, z: number): void;
   /** Hide ball with a sink animation. Replay-driver calls this instead of setting visible=false directly. */
   hideBall?: (id: number) => void;
+  /**
+   * Switch to/from strict orthographic top-down view.
+   * true  → OrthographicCamera at (0,5,0) looking straight down, orbit controls disabled.
+   * false → restore PerspectiveCamera + orbit controls.
+   */
+  setOrthoTop(active: boolean): void;
   render(): void;
   dispose(): void;
 }
@@ -68,11 +91,21 @@ export function createScene(container: HTMLElement): SceneAPI {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);
 
-  // Camera — 45° overhead view
+  // Perspective camera — 45° overhead view (default / play mode)
   const aspect = (container.clientWidth || window.innerWidth) / (container.clientHeight || window.innerHeight);
   const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 50);
   camera.position.set(0, 2.5, 1.8);
   camera.lookAt(0, 0, 0);
+
+  // Orthographic camera — strict top-down view for 'T' mode
+  // up=(0,0,-1): -Z is screen-up, avoids degenerate lookAt along -Y with default up=(0,1,0).
+  const [ol, or_, ot, ob] = orthoFrustum(aspect);
+  const orthoCam = new THREE.OrthographicCamera(ol, or_, ot, ob, 0.1, 50);
+  orthoCam.position.set(0, 5, 0);
+  orthoCam.up.set(0, 0, -1);
+  orthoCam.lookAt(0, 0, 0);
+
+  let _useOrtho = false;
 
   // OrbitControls — right-click rotate, middle-click pan (left-click reserved for shooting)
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -212,8 +245,15 @@ export function createScene(container: HTMLElement): SceneAPI {
   const onResize = () => {
     const w = container.clientWidth || window.innerWidth;
     const h = container.clientHeight || window.innerHeight;
-    camera.aspect = w / h;
+    const asp = w / h;
+    // Update perspective camera aspect
+    camera.aspect = asp;
     camera.updateProjectionMatrix();
+    // Update ortho frustum so table still fills view after resize
+    const [l, r, t, b] = orthoFrustum(asp);
+    orthoCam.left = l; orthoCam.right = r;
+    orthoCam.top = t; orthoCam.bottom = b;
+    orthoCam.updateProjectionMatrix();
     renderer.setSize(w, h);
   };
   window.addEventListener('resize', onResize);
@@ -222,6 +262,7 @@ export function createScene(container: HTMLElement): SceneAPI {
   return {
     renderer,
     camera,
+    get activeCamera(): THREE.Camera { return _useOrtho ? orthoCam : camera; },
     scene,
     balls,
     table: tableGroup,
@@ -234,9 +275,14 @@ export function createScene(container: HTMLElement): SceneAPI {
       animateBallSink(mesh, scene);  // visual clone sinks before disappearing
       mesh.visible = false;
     },
+    setOrthoTop(active: boolean): void {
+      _useOrtho = active;
+      // Orbit controls orbit the perspective camera only; disable in ortho to avoid confusion.
+      controls.enabled = !active;
+    },
     render() {
       controls.update();
-      renderer.render(scene, camera);
+      renderer.render(scene, _useOrtho ? orthoCam : camera);
     },
     dispose() {
       window.removeEventListener('resize', onResize);

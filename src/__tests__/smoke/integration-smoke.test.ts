@@ -25,6 +25,8 @@ const sceneStub: SceneAPI = {
   scene: null as unknown as import('three').Scene,
   balls: [] as unknown as import('three').Mesh[],
   table: null as unknown as import('three').Group,
+  activeCamera: null as unknown as import('three').Camera,
+  setOrthoTop: () => {},
 };
 
 // ─── Smoke tests ─────────────────────────────────────────────────────────────

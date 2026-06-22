@@ -1,32 +1,34 @@
 /**
- * B3 — camera-tween tests: POSE_TOP structural checks + tween behavior.
+ * B3 — camera-tween tests: POSE_OVERVIEW/POSE_TABLE structural checks + tween behavior.
+ * Note: POSE_TOP removed — 'T' key now triggers scene.setOrthoTop() (OrthographicCamera).
+ * See scene.ts orthoFrustum + SceneAPI.setOrthoTop for the new top-down implementation.
  */
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { createCameraTween, POSE_OVERVIEW, POSE_TABLE, POSE_TOP } from '../../renderer/camera-tween';
+import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from '../../renderer/camera-tween';
 
 describe('camera-tween — B3', () => {
 
-  describe('POSE_TOP structural invariants', () => {
-    it('is exported with a 3-element position tuple', () => {
-      expect(POSE_TOP.position).toHaveLength(3);
+  describe('POSE_OVERVIEW / POSE_TABLE structural invariants', () => {
+    it('POSE_OVERVIEW has a 3-element position tuple', () => {
+      expect(POSE_OVERVIEW.position).toHaveLength(3);
     });
 
-    it('y is higher than POSE_TABLE (top view must be above playing view)', () => {
-      expect(POSE_TOP.position[1]).toBeGreaterThan(POSE_TABLE.position[1]);
+    it('POSE_TABLE y is below POSE_OVERVIEW y (table view is closer to table)', () => {
+      expect(POSE_TABLE.position[1]).toBeLessThan(POSE_OVERVIEW.position[1]);
     });
 
-    it('y >= POSE_OVERVIEW.y (at least as high as overview pose)', () => {
-      expect(POSE_TOP.position[1]).toBeGreaterThanOrEqual(POSE_OVERVIEW.position[1]);
+    it('POSE_TABLE is centered over table (x ≈ 0)', () => {
+      expect(Math.abs(POSE_TABLE.position[0])).toBeLessThan(0.5);
     });
 
-    it('x is near 0 (top view is centered over table)', () => {
-      expect(Math.abs(POSE_TOP.position[0])).toBeLessThan(0.5);
+    it('POSE_OVERVIEW lookAt is [0,0,0]', () => {
+      expect(POSE_OVERVIEW.lookAt).toEqual([0, 0, 0]);
     });
 
-    it('lookAt is [0,0,0]', () => {
-      expect(POSE_TOP.lookAt).toEqual([0, 0, 0]);
+    it('POSE_TABLE lookAt is [0,0,0]', () => {
+      expect(POSE_TABLE.lookAt).toEqual([0, 0, 0]);
     });
   });
 
@@ -40,11 +42,11 @@ describe('camera-tween — B3', () => {
       expect(camera.position.z).toBeCloseTo(POSE_TABLE.position[2], 5);
     });
 
-    it('tweenTo POSE_TOP with duration=0 sets camera to top position', () => {
+    it('tweenTo POSE_OVERVIEW with duration=0 sets camera to overview position', () => {
       const camera = new THREE.PerspectiveCamera();
       const tween = createCameraTween(camera);
-      tween.tweenTo(POSE_TOP, 0);
-      expect(camera.position.y).toBeCloseTo(POSE_TOP.position[1], 5);
+      tween.tweenTo(POSE_OVERVIEW, 0);
+      expect(camera.position.y).toBeCloseTo(POSE_OVERVIEW.position[1], 5);
     });
 
     it('update() advances position toward target (not yet at target)', () => {
@@ -69,7 +71,7 @@ describe('camera-tween — B3', () => {
     it('isActive is false immediately after duration=0 tweenTo', () => {
       const camera = new THREE.PerspectiveCamera();
       const tween = createCameraTween(camera);
-      tween.tweenTo(POSE_TOP, 0);
+      tween.tweenTo(POSE_OVERVIEW, 0);
       expect(tween.isActive).toBe(false);
     });
   });
