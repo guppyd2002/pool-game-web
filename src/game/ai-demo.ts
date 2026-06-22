@@ -19,9 +19,9 @@ export interface AIDemoConfig {
   turnDelayMs: number; // ms between replay completion and next AI shot
 }
 
-// seed 7 verified cleanWin=true in P1-T05 asymmetric demo (rank0=4 vs rank1=2)
+// seed 4: P0(rank4) legally pots 8-ball → "Player 1 wins! You pocketed the black ball" (clean legal win)
 export const AI_DEMO_DEFAULTS: AIDemoConfig = {
-  seed: 7,
+  seed: 4,
   rank0: 4,
   rank1: 2,
   turnDelayMs: 800,

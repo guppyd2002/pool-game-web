@@ -5,8 +5,8 @@
  * SV2 — First AI shot fires within 3 s of page load.
  * SV3 — Game plays to completion: game-over UI appears with a winner (player 1 or 2).
  *
- * URL: ?demo=ai-selfplay&seed=7&r0=4&r1=2&delay=0
- *   seed=7 verified cleanWin=true in P1-T05 asymmetric test (37 shots).
+ * URL: ?demo=ai-selfplay&seed=4&r0=4&r1=2&delay=0
+ *   seed=4: P0(rank4) legally pots 8-ball → "Player 1 wins! You pocketed the black ball" (clean legal win).
  *   delay=0 removes inter-shot pause so the test completes in replay-time only.
  *
  * Timeout: 120 s to accommodate ~37 shots × replay time in headless Chromium.
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url';
 const BASE_URL = 'http://localhost:5173';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SS = (n: string) => path.join(__dirname, 'screenshots', n);
-const DEMO_URL = `${BASE_URL}?demo=ai-selfplay&seed=7&r0=4&r1=2&delay=0`;
+const DEMO_URL = `${BASE_URL}?demo=ai-selfplay&seed=4&r0=4&r1=2&delay=0`;
 
 async function gotoDemo(page: Page) {
   if (!fs.existsSync(path.join(__dirname, 'screenshots'))) {
