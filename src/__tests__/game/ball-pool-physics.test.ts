@@ -21,7 +21,7 @@ import type { CmMaterial } from '../../physics/colliders';
 import { CmRigidbody, CmKinematicTrigger } from '../../physics/cm-rigidbody';
 import { CmSpace } from '../../physics/cm-space';
 import type { CmSpaceCube } from '../../physics/cm-collision';
-import { createBallPoolPhysics } from '../../game/ball-pool-physics';
+import { createBallPoolPhysics, analyticSphereCast } from '../../game/ball-pool-physics';
 import {
   BALL_MASS, BALL_RADIUS, TABLE_Y, BALL_Y,
   BALL_MATERIAL as BALL_MAT,
@@ -767,5 +767,96 @@ describe('G6 §2.2 — pocketed/outOfTable explicit sort (stepIndex asc, ballId 
       expect(p.stepIndex < c.stepIndex || (p.stepIndex === c.stepIndex && p.ballId <= c.ballId))
         .toBe(true);
     }
+  });
+});
+
+// ─── PHY-009-ext: analyticSphereCast maxDistM + excludeBallId (AI Cast1/Cast2) ──
+//
+// C# SphereCastManager.SphereCast optional args mirrored here:
+//   AI Cast1 (ball→pocket):  maxDist=dist(pocket,ball),  excludeBallId=targetBallId
+//   AI Cast2 (cue→ghost):    maxDist=r+dist(cue,ghost),  no excludeId
+
+describe('PHY-009-ext analyticSphereCast: maxDistM cap', () => {
+  it('ball in path but beyond maxDistM: returns none (AI Cast1 distance cap)', () => {
+    // b1 contact ≈ 0.67 m from b0; maxDistM=0.5 → not reached
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+
+    const hit = analyticSphereCast(
+      new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0), space, 0.5,
+    );
+    expect(hit.hitType).toBe('none');
+  });
+
+  it('ball in path within maxDistM: returns ball hit normally', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+
+    const hit = analyticSphereCast(
+      new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0), space, 1.0,
+    );
+    expect(hit.hitType).toBe('ball');
+    expect(hit.ballId).toBe(1);
+  });
+
+  it('cushion in path beyond maxDistM: returns none', () => {
+    // Right rail ~1.27 m from cue; maxDistM=0.5 → not reached
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0], makeTable(), makePockets());
+
+    const hit = analyticSphereCast(
+      new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0), space, 0.5,
+    );
+    expect(hit.hitType).toBe('none');
+  });
+});
+
+describe('PHY-009-ext analyticSphereCast: excludeBallId (AI Cast1)', () => {
+  it('excluded ball in direct path is skipped — returns cushion instead', () => {
+    // b0=cue, b1=target in +X path; exclude b1 (Cast1 excludes target ball)
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+
+    const hit = analyticSphereCast(
+      new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0), space,
+      undefined, 1,
+    );
+    expect(hit.hitType).toBe('cushion');
+  });
+
+  it('non-excluded blocking ball still detected when target excluded', () => {
+    // b1=target(excluded), b2=blocker in same path; b2 should still block Cast1
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  3000, BALL_Y, 0);
+    const b2 = makeBall(2,  1000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1, b2], makeTable(), makePockets());
+
+    const hit = analyticSphereCast(
+      new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0), space,
+      undefined, 1,
+    );
+    expect(hit.hitType).toBe('ball');
+    expect(hit.ballId).toBe(2);
+  });
+
+  it('undefined excludeBallId: all active balls detected (default no-exclusion)', () => {
+    const b0 = makeBall(0, -5000, BALL_Y, 0);
+    const b1 = makeBall(1,  2000, BALL_Y, 0);
+    const space = new CmSpace();
+    space.init(SPACE_CUBE, [b0, b1], makeTable(), makePockets());
+
+    const hit = analyticSphereCast(
+      new CmVector(-5000, BALL_Y, 0), new CmVector(10000, 0, 0), space,
+    );
+    expect(hit.hitType).toBe('ball');
+    expect(hit.ballId).toBe(1);
   });
 });

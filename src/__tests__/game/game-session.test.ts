@@ -365,4 +365,63 @@ describe('game-session — IGameSession (GAME-018)', () => {
       expect(session.currentPlayerIndex).toBe(1);
     });
   });
+
+  describe('forceShot() — P1-T05 AI path', () => {
+    it('GSFS-001: no-op when phase is not Aiming', () => {
+      const { physics, session } = setup();
+      // phase=MainMenu
+      const shotData: ShotData = { position: CmVector.zero, impulse: new CmVector(0, 0, 1000), torque: CmVector.zero };
+      session.forceShot(shotData);
+      expect(physics.applyShot).not.toHaveBeenCalled();
+    });
+
+    it('GSFS-002: calls physics.applyShot with the provided ShotData', () => {
+      const { physics, session } = setup();
+      session.startNewGame();
+      expect(session.store.getState().phase).toBe('Aiming');
+
+      const shotData: ShotData = { position: CmVector.zero, impulse: new CmVector(0, 0, 1000), torque: CmVector.zero };
+      (physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(noShot());
+      session.forceShot(shotData);
+
+      expect(physics.applyShot).toHaveBeenCalledWith(shotData);
+    });
+
+    it('GSFS-003: transitions to Replaying phase and runs verdict pipeline', () => {
+      const { physics, replayDriver, session } = setup();
+      session.startNewGame();
+
+      const shotData: ShotData = { position: CmVector.zero, impulse: new CmVector(0, 0, 1000), torque: CmVector.zero };
+      (physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(noShot());
+      session.forceShot(shotData);
+
+      expect(session.store.getState().phase).toBe('InShot');
+      expect(replayDriver.watch).toHaveBeenCalledTimes(1);
+    });
+
+    it('GSFS-004: does not call cue.disable() (AI bypasses cue controller)', () => {
+      const { physics, cue, session } = setup();
+      session.startNewGame();
+
+      const shotData: ShotData = { position: CmVector.zero, impulse: new CmVector(0, 0, 1000), torque: CmVector.zero };
+      (physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(noShot());
+      session.forceShot(shotData);
+
+      expect(cue.disable).not.toHaveBeenCalled();
+    });
+
+    it('GSFS-005: onTurnChanged fires after replay completes (break-foul → ballInHand)', () => {
+      const { physics, replayDriver, session } = setup();
+      session.startNewGame();
+
+      const onTurnChanged = vi.fn();
+      session.onTurnChanged = onTurnChanged;
+      const shotData: ShotData = { position: CmVector.zero, impulse: new CmVector(0, 0, 1000), torque: CmVector.zero };
+      (physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(noShot());
+      session.forceShot(shotData);
+      replayDriver.triggerComplete();
+
+      expect(onTurnChanged).toHaveBeenCalled();
+    });
+  });
 });

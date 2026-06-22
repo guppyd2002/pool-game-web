@@ -118,16 +118,24 @@ function bodyToBallState(body: CmRigidbody): BallState {
 }
 
 // ─── PHY-009: Analytic SphereCast (matches C# SphereCastManager.SphereCast) ──
-// UX-only, non-deterministic (float arithmetic). Not used in physics simulation.
+// Float arithmetic, UX-only precision. Used by aim-line preview + AI cast.
+//
+// Optional params mirror C# SphereCastManager.SphereCast optional args:
+//   maxDistM    — cap search distance (Unity meters). Default: full table width.
+//   excludeBallId — skip this ball ID in ball detection (C# excludeBallId param).
 
-function analyticSphereCast(from: CmVector, dir: CmVector, space: CmSpace): AimHit {
+export function analyticSphereCast(
+  from: CmVector, dir: CmVector, space: CmSpace,
+  maxDistM?: number, excludeBallId?: number,
+): AimHit {
   const M = MULTIPLIER;
   const noneHit: AimHit = { hitType: 'none', ballId: null, cushionId: null, point: from, normal: CmVector.zero, distance: 0 };
 
   if (dir.x === 0 && dir.y === 0 && dir.z === 0) return noneHit;
 
   const r = BALL_RADIUS / M;          // ball radius in float meters
-  const maxD = (SPACE_SCALE_X * 2) / M;  // max search in float meters
+  const maxD = (SPACE_SCALE_X * 2) / M;  // default max search in float meters
+  const searchMaxD = maxDistM !== undefined ? maxDistM : maxD;  // AI supplies cap
 
   // From/dir in float
   const fx = from.x / M, fy = from.y / M, fz = from.z / M;
@@ -136,12 +144,14 @@ function analyticSphereCast(from: CmVector, dir: CmVector, space: CmSpace): AimH
   const dx = dir.x / M / rawMag, dy = dir.y / M / rawMag, dz = dir.z / M / rawMag;
 
   // ── Ball detection (C# SphereCastManager ball loop) ──────────────────────
-  let bestBallD = maxD;
+  let bestBallD = searchMaxD;
   let bestBallHit: AimHit | null = null;
   const diam2 = 4 * r * r;  // diameter squared
 
   for (const body of space.rigidbodies) {
     if (body.isKinematic || body.isOutOfCube) continue;
+    // C# excludeBallId: AI Cast1 excludes target ball from path-to-pocket check
+    if (excludeBallId !== undefined && body.id === excludeBallId) continue;
     const bx = body.collider.position.x / M;
     const by = body.collider.position.y / M;
     const bz = body.collider.position.z / M;
@@ -171,7 +181,7 @@ function analyticSphereCast(from: CmVector, dir: CmVector, space: CmSpace): AimH
   }
 
   // ── Board/Rail detection (C# SphereCastManager board loop) ───────────────
-  let bestBoardD = maxD;
+  let bestBoardD = searchMaxD;
   let bestBoardHit: AimHit | null = null;
 
   for (const collider of space.colliders) {
@@ -231,10 +241,10 @@ function analyticSphereCast(from: CmVector, dir: CmVector, space: CmSpace): AimH
   if (bestBallD < bestBoardD && bestBallHit) return bestBallHit;
   if (bestBoardD < bestBallD && bestBoardHit) return bestBoardHit;
 
-  const endX = Math.round((fx + dx * maxD) * M);
-  const endY = Math.round((fy + dy * maxD) * M);
-  const endZ = Math.round((fz + dz * maxD) * M);
-  return { ...noneHit, point: new CmVector(endX, endY, endZ), distance: Math.round(maxD * M) };
+  const endX = Math.round((fx + dx * searchMaxD) * M);
+  const endY = Math.round((fy + dy * searchMaxD) * M);
+  const endZ = Math.round((fz + dz * searchMaxD) * M);
+  return { ...noneHit, point: new CmVector(endX, endY, endZ), distance: Math.round(searchMaxD * M) };
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────────

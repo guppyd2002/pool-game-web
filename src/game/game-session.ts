@@ -18,7 +18,7 @@
  *   - This avoids double physics.placeBall calls.
  */
 
-import type { IBallPoolPhysics } from './ball-pool-physics';
+import type { IBallPoolPhysics, ShotData } from './ball-pool-physics';
 import type { CueController } from './cue-controller';
 import type { SceneAPI } from '../renderer/scene';
 import { createRuleEngine } from './rule-engine';
@@ -49,6 +49,13 @@ export interface IGameSession {
    * physics.placeBall() is called by BallInHandController, not here.
    */
   notifyBallPlaced(): void;
+
+  /**
+   * P1-T05 headless AI shot — mirrors Unity ForceShot path.
+   * Calls physics.applyShot(shotData) directly (bypasses cue controller) then runs
+   * the same verdict pipeline as cue.onShotApplied. Only valid in Aiming phase.
+   */
+  forceShot(shotData: ShotData): void;
 
   readonly currentPlayerIndex: 0 | 1;
   readonly isGameEnded: boolean;
@@ -189,6 +196,23 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       store.dispatch({ type: 'BALL_PLACED' });
       cue.resetForNewTurn();  // CUE-020
       session.onTurnChanged?.(store.getState().currentPlayerIndex, false);
+    },
+
+    forceShot(shotData: ShotData): void {
+      // P1-T05: AI bypasses cue controller — apply shot directly then run same verdict pipeline.
+      if (store.getState().phase !== 'Aiming') return;
+      const result = physics.applyShot(shotData);
+      ruleEngine.beginShot();
+      const verdict = ruleEngine.processShotResult(result);
+      store.dispatch({ type: 'SHOT_FIRED' });
+      // No cue.disable() — AI never enables cue, so no input to suppress.
+      replayDriver.watch(
+        physics,
+        scene,
+        result.pocketed,
+        result.outOfTable,
+        () => _onReplayComplete(verdict),
+      );
     },
   };
 
