@@ -31,6 +31,7 @@ import { createSpinDiscUI } from './renderer/spin-disc-ui';
 import { createPowerSliderUI } from './renderer/power-slider-ui';
 import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import { createBallPool8Session } from './game/game-session';
+import { attachAIDemo, parseDemoConfig } from './game/ai-demo';
 import { createReplayDriver } from './renderer/replay-driver';
 import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
@@ -298,19 +299,7 @@ function _updatePlayerIndicator(playerIndex: 0 | 1, ballInHand: boolean): void {
 
 // ─── Session callbacks ─────────────────────────────────────────────────────────
 
-gameSession.onTurnChanged = (playerIndex, ballInHand) => {
-  _updatePlayerIndicator(playerIndex, ballInHand);
-  // B4: show clear instruction overlay + cue standby preview
-  turnPrompt.show(playerIndex, ballInHand);
-  if (ballInHand) {
-    _enterBallInHandMode();
-  } else {
-    // Show cue stick at default angle pointing toward the rack until player drags
-    const cueBall = physics.getBall(0);
-    cueMesh.update(cueBall.position, new CmVector(0.5, 0, 0), 0, 0, 0);
-  }
-};
-
+// onGameEnded and onReasonMessage are shared by both HotSeat and demo modes
 gameSession.onGameEnded = (winner, reason) => {
   playerIndicatorEl.style.display = 'none';
   turnPrompt.dismiss();
@@ -320,6 +309,43 @@ gameSession.onGameEnded = (winner, reason) => {
 gameSession.onReasonMessage = (msg) => {
   if (msg) reasonBanner.show(msg);
 };
+
+// ─── Demo mode: ?demo=ai-selfplay [&seed=N] [&r0=N] [&r1=N] [&delay=N] ───────
+
+const _demoConfig = parseDemoConfig(new URLSearchParams(window.location.search));
+
+if (_demoConfig) {
+  // AI self-play: attach AI turn loop (sets onTurnChanged internally)
+  attachAIDemo(gameSession, physics, space, _demoConfig);
+  // Wrap to also update player indicator (shows which AI is playing)
+  const _demoTurnFn = gameSession.onTurnChanged;
+  gameSession.onTurnChanged = (playerIndex, ballInHand) => {
+    _updatePlayerIndicator(playerIndex, ballInHand);
+    _demoTurnFn?.(playerIndex, ballInHand);
+  };
+  // Auto-start: skip main menu, tween camera to table, begin game
+  mainMenuEl.style.display = 'none';
+  topViewBtn.style.display = 'block';
+  _inTopView = false;
+  topViewBtn.textContent = '⬆ Top';
+  cameraTween.tweenTo(POSE_TABLE, 0.5);
+  _runCameraTween(true);
+  gameSession.startNewGame();
+} else {
+  // Normal HotSeat mode: human-controlled turn changes
+  gameSession.onTurnChanged = (playerIndex, ballInHand) => {
+    _updatePlayerIndicator(playerIndex, ballInHand);
+    // B4: show clear instruction overlay + cue standby preview
+    turnPrompt.show(playerIndex, ballInHand);
+    if (ballInHand) {
+      _enterBallInHandMode();
+    } else {
+      // Show cue stick at default angle pointing toward the rack until player drags
+      const cueBall = physics.getBall(0);
+      cueMesh.update(cueBall.position, new CmVector(0.5, 0, 0), 0, 0, 0);
+    }
+  };
+}
 
 // ─── Ball-in-hand pointer handling (GAME-014 BallMoveManager) ────────────────
 
