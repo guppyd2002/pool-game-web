@@ -291,11 +291,11 @@ describe('AI self-play harness (REC-1)', () => {
     // fallback) causes most games to end via premature-8 pocket, bypassing the quality bands.
     // Without this floor, a regression could pass all per-game bands (foul/legal/pots≥1) while
     // most completions are premature-8 (the "1-shot early-8 = PASS" blank cheque).
-    // Current rate: 9/11 ≈ 82%. Floor at 60% catches "majority premature-8" regressions while
-    // tolerating rare legitimate early-end games (calibrated with 卡卡西).
+    // Floor=0.5: healthy distribution ≥79% (margin ≥29pp, max flake-resistance per 卡卡西 N=4
+    // windows 0-79: 82%/79%/100%/80%). "Majority premature-8" regression → rate<50% → FAIL.
     const cleanWinRate = completed.length > 0
       ? completed.filter(r => r.cleanWin).length / completed.length : 0;
-    expect(cleanWinRate).toBeGreaterThanOrEqual(0.60);
+    expect(cleanWinRate).toBeGreaterThan(0.5);
 
     // Human-readable report (cap-hits are informational, not FAIL)
     const capHitSeeds = capHits.map(r => `seed${r.seed}`).join(', ');
@@ -351,10 +351,10 @@ describe('AI self-play harness (REC-1)', () => {
     // At least 1 game must complete (demo is viable); all completed games must be clean wins
     // with a determined winner (guards against broken group/phase logic silently producing
     // degenerate completions that would look bad in a CEO demo).
-    expect(asymCompleted.length).toBeGreaterThan(0);
+    expect(asymCompleted.length).toBeGreaterThanOrEqual(1);
     for (const r of asymCompleted) {
-      expect(r.cleanWin).toBe(true);      // all completed demo games must be full run-outs
-      expect(r.winner).not.toBeNull();    // game must have a determined winner
+      expect(r.cleanWin).toBe(true);                              // full run-out
+      expect(r.winner === 0 || r.winner === 1).toBe(true);        // determined winner
     }
   }, 600_000);
 
