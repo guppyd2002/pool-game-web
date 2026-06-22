@@ -48,21 +48,9 @@ test('B2 — 6 pocket discs render at sim positions', async ({ page }) => {
   expect(xs.filter(x => x < 0.002).length).toBe(2);                    // 2 side pockets x=0
 });
 
-test('B3 — top-view toggle moves camera to POSE_TOP and back', async ({ page }) => {
-  await goto(page); await clickPlay(page);
-  const table = await cam(page);                          // POSE_TABLE ~ [0,2.5,1.8]
-  await page.keyboard.press('t');                          // → POSE_TOP
-  await page.waitForTimeout(900);
-  const top = await cam(page);
-  await page.keyboard.press('t');                          // → back to POSE_TABLE
-  await page.waitForTimeout(900);
-  const back = await cam(page);
-  console.log(`B3 camera table=${JSON.stringify(table)} top=${JSON.stringify(top)} back=${JSON.stringify(back)}`);
-  expect(top!.y).toBeGreaterThan(table!.y + 1);            // moved up toward 5.0
-  expect(Math.abs(top!.z)).toBeLessThan(0.6);             // near-overhead (POSE_TOP z=0.3)
-  expect(Math.abs(back!.y - table!.y)).toBeLessThan(0.3); // restored to table view
-  expect(Math.abs(back!.z - table!.z)).toBeLessThan(0.3);
-});
+// B3 superseded: the top-view is now a strict OrthographicCamera (commit 151b316), not a
+// perspective POSE_TOP move — the perspective camera stays at POSE_TABLE while ortho is active.
+// Full B3 ortho ratify lives in b3-ortho-qa.spec.ts (4-state screenshot + restore check).
 
 test('B4 — turn-prompt overlay present + correct player text', async ({ page }) => {
   await goto(page); await clickPlay(page);
