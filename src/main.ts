@@ -254,6 +254,8 @@ container.appendChild(topViewBtn);
 let _inTopView = false;
 
 topViewBtn.addEventListener('click', () => {
+  // Cancel any in-progress aim drag so the aim-line overlay doesn't persist across camera switch.
+  cue.cancel();
   _inTopView = !_inTopView;
   if (_inTopView) {
     // Switch to strict ortho top-down; ortho camera is self-contained, no tween needed.
