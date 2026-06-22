@@ -99,10 +99,11 @@ describe('G9: physics constants — single source of truth', () => {
     }
   });
 
-  it('table-setup space scale matches authoritative (30000 × 20000 × 20000)', () => {
-    expect(SPACE_SCALE_X).toBe(30000);
-    expect(SPACE_SCALE_Y).toBe(20000);
-    expect(SPACE_SCALE_Z).toBe(20000);
+  it('table-setup space scale matches authoritative unityTrue (40000 × 30000 × 30000)', () => {
+    // unityTrue: Game.unity:25395, UnityCmSpace.cs:114; previous (30000,20000,20000)/pos0 was fabricated.
+    expect(SPACE_SCALE_X).toBe(40000);
+    expect(SPACE_SCALE_Y).toBe(30000);
+    expect(SPACE_SCALE_Z).toBe(30000);
   });
 });
 
@@ -185,25 +186,26 @@ describe('G9: pocket geometry — POCKET_RADIUS and all 6 POCKET_POSITIONS', () 
     expect(POCKET_POSITIONS).toHaveLength(6);
   });
 
-  // Corner pockets (4): at ±RAIL_LONG_X ± z-offset
-  it('POCKET_POSITIONS[0] == [12875,  6510] (corner +x +z)', () => {
-    expect(POCKET_POSITIONS[0]).toEqual([12875,  6510]);
+  // Corner pockets (4): unityTrue from KinematicTrigger in _Game/Scenes/Game.unity
+  // Previous (±12875,±6510) was fabricated (zero Unity source); corrected to unityTrue.
+  it('POCKET_POSITIONS[0] == [12949,  6549] (corner +x +z — unityTrue)', () => {
+    expect(POCKET_POSITIONS[0]).toEqual([12949,  6549]);
   });
-  it('POCKET_POSITIONS[1] == [12875, -6510] (corner +x -z)', () => {
-    expect(POCKET_POSITIONS[1]).toEqual([12875, -6510]);
+  it('POCKET_POSITIONS[1] == [12949, -6549] (corner +x -z — unityTrue)', () => {
+    expect(POCKET_POSITIONS[1]).toEqual([12949, -6549]);
   });
-  it('POCKET_POSITIONS[2] == [-12875,  6510] (corner -x +z)', () => {
-    expect(POCKET_POSITIONS[2]).toEqual([-12875,  6510]);
+  it('POCKET_POSITIONS[2] == [-12949,  6549] (corner -x +z — unityTrue)', () => {
+    expect(POCKET_POSITIONS[2]).toEqual([-12949,  6549]);
   });
-  it('POCKET_POSITIONS[3] == [-12875, -6510] (corner -x -z)', () => {
-    expect(POCKET_POSITIONS[3]).toEqual([-12875, -6510]);
+  it('POCKET_POSITIONS[3] == [-12949, -6549] (corner -x -z — unityTrue)', () => {
+    expect(POCKET_POSITIONS[3]).toEqual([-12949, -6549]);
   });
-  // Side pockets (2): at x=0, ±z
-  it('POCKET_POSITIONS[4] == [0, 7100] (side +z)', () => {
-    expect(POCKET_POSITIONS[4]).toEqual([0, 7100]);
+  // Side pockets (2): unityTrue from KinematicTrigger; previous (0,±7100) was fabricated.
+  it('POCKET_POSITIONS[4] == [0, 7129] (side +z — unityTrue)', () => {
+    expect(POCKET_POSITIONS[4]).toEqual([0, 7129]);
   });
-  it('POCKET_POSITIONS[5] == [0, -7100] (side -z)', () => {
-    expect(POCKET_POSITIONS[5]).toEqual([0, -7100]);
+  it('POCKET_POSITIONS[5] == [0, -7129] (side -z — unityTrue)', () => {
+    expect(POCKET_POSITIONS[5]).toEqual([0, -7129]);
   });
 });
 

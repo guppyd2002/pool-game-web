@@ -22,7 +22,7 @@ import type { CmSpaceCube } from '../physics/cm-collision';
 import {
   BALL_MASS, BALL_RADIUS,
   TABLE_Y, BALL_Y,
-  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
+  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z, SPACE_POS_Y,
   RAIL_LONG_X, RAIL_BACK_X, RAIL_BACK_Z,
   RAIL_LONG_SCALE_X, RAIL_LONG_RADIUS,
   RAIL_SHORT_SCALE_X, RAIL_SHORT_RADIUS,
@@ -77,8 +77,9 @@ function makeLine(
 
 /** Create the full pool table physics scene (16 balls in standard 8-ball rack) */
 export function createPoolTable(): CmSpace {
+  // spaceCube: Unity true scale=(40000,30000,30000), pos=(0,5000,0) @ Game.unity:25395
   const spaceCube: CmSpaceCube = {
-    position: CmVector.zero,
+    position: new CmVector(0, SPACE_POS_Y, 0),
     scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
   };
 

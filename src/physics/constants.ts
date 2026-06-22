@@ -29,10 +29,17 @@ export const TABLE_Y = 9154;
 /** Y position of ball center at rest on cloth (TABLE_Y + BALL_RADIUS, rounded) */
 export const BALL_Y = 9440;
 
-/** Space cube half-dimensions: (30000, 20000, 20000) */
-export const SPACE_SCALE_X = 30000;
-export const SPACE_SCALE_Y = 20000;
-export const SPACE_SCALE_Z = 20000;
+/**
+ * Space cube half-dimensions and position.
+ * Source: UnityCmSpace.cs:114 reads Game.unity serialized field; active object at Game.unity:25395.
+ * unityTrue: scale=(40000,30000,30000), pos=(0,5000,0).
+ * Previous port had (30000,20000,20000)/pos0 — zero Unity source (fabricated), now corrected.
+ */
+export const SPACE_SCALE_X = 40000;
+export const SPACE_SCALE_Y = 30000;
+export const SPACE_SCALE_Z = 30000;
+/** Y offset of space cube centre (Unity true: 5000 = 0.5 m above table origin) */
+export const SPACE_POS_Y   = 5000;
 
 // ─── Rail geometry ────────────────────────────────────────────────────────────
 
@@ -75,14 +82,19 @@ export const PLANE_RADIUS  = 12699;
 /** Pocket trigger radius (larger than ball for acceptance zone) */
 export const POCKET_RADIUS = 450;
 
-/** 6 pocket positions: [x, z] pairs */
+/**
+ * 6 pocket trigger positions: [x, z] pairs.
+ * Source: KinematicTrigger transforms in _Game/Scenes/Game.unity.
+ * unityTrue: corner=(±12949,±6549), side=(0,±7129), radius=450.
+ * Previous port had (±12875,±6510)/(0,±7100) — zero Unity source (fabricated), now corrected.
+ */
 export const POCKET_POSITIONS: [number, number][] = [
-  [ 12875,  6510],
-  [ 12875, -6510],
-  [-12875,  6510],
-  [-12875, -6510],
-  [     0,  7100],
-  [     0, -7100],
+  [ 12949,  6549],
+  [ 12949, -6549],
+  [-12949,  6549],
+  [-12949, -6549],
+  [     0,  7129],
+  [     0, -7129],
 ];
 
 // ─── Materials (from Game.unity scene, fixed-point: bounciness, rolling, twisting, dynamic, static) ───

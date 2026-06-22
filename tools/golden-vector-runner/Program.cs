@@ -157,12 +157,13 @@ static List<ICmCollider> MakeTable(CmMaterial cloth, CmMaterial rail)
 }
 
 // --- pocket triggers (6 pockets) ---
+// unityTrue: corner=(±12949,±6549) side=(0,±7129), radius=450 — from KinematicTrigger in Game.unity
 static List<CmKinematicTrigger> MakePockets()
 {
     long[,] pos = {
-        {  12875, BALL_Y,  6510 }, {  12875, BALL_Y, -6510 },
-        { -12875, BALL_Y,  6510 }, { -12875, BALL_Y, -6510 },
-        {      0, BALL_Y,  7100 }, {      0, BALL_Y, -7100 }
+        {  12949, BALL_Y,  6549 }, {  12949, BALL_Y, -6549 },
+        { -12949, BALL_Y,  6549 }, { -12949, BALL_Y, -6549 },
+        {      0, BALL_Y,  7129 }, {      0, BALL_Y, -7129 }
     };
     var list = new List<CmKinematicTrigger>();
     for (int i = 0; i < 6; i++)
@@ -170,8 +171,9 @@ static List<CmKinematicTrigger> MakePockets()
     return list;
 }
 
+// spaceCube: Unity true scale=(40000,30000,30000) pos=(0,5000,0) @ Game.unity:25395 via UnityCmSpace.cs:114
 static CmSpaceCube MakeSpace() =>
-    new CmSpaceCube { position = CmVector.zero, scale = new CmVector(30000, 20000, 20000) };
+    new CmSpaceCube { position = new CmVector(0, 5000, 0), scale = new CmVector(40000, 30000, 30000) };
 
 // --- run one shot scenario ---
 static GoldenVector RunShot(
@@ -328,7 +330,7 @@ var results = new List<GoldenVector>();
 {
     var b0 = MakeBody(0, MakeBall(0, BALL_Y, 0, BALL_MAT));
     results.Add(RunShot("GV-10",
-        "Cue ball scratch: ball aimed directly into side pocket (pocket 4, z=+7100)",
+        "Cue ball scratch: ball aimed directly into side pocket (pocket 4, z=+7129)",
         new List<CmRigidbody>{b0}, colls, pockets, space,
         0,0,30000,  0,0,0));
 }
@@ -341,7 +343,7 @@ var results = new List<GoldenVector>();
     var b0 = MakeBody(0, MakeBall(10775, BALL_Y, 3710, BALL_MAT));
     var b1 = MakeBody(1, MakeBall(11975, BALL_Y, 5310, BALL_MAT));
     results.Add(RunShot("GV-11",
-        "Target ball into corner pocket 0 (+x,+z): b0 hits b1 at 53deg (3:4 slope), b1 pockets",
+        "Target ball into corner pocket 0 (+x,+z) at (12949,6549): b0 hits b1 at 53deg (3:4 slope), b1 pockets",
         new List<CmRigidbody>{b0, b1}, colls, pockets, space,
         18000,0,24000,  0,0,0));
 }

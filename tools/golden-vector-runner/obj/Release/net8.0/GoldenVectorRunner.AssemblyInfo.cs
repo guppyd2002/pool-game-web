@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GoldenVectorRunner")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e75c0581d2781df344d2481fd6d94c677267577f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f752986f45035e4e747c8fec90dc1d0f480ef0f6")]
 [assembly: System.Reflection.AssemblyProductAttribute("GoldenVectorRunner")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GoldenVectorRunner")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

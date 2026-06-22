@@ -23,7 +23,7 @@ import {
   BALL_MASS, BALL_RADIUS, TABLE_Y, BALL_Y,
   BALL_MATERIAL as BALL_MAT,
   CLOTH_MATERIAL as CLOTH_MAT,
-  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z,
+  SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z, SPACE_POS_Y,
   PLANE_SCALE_X, PLANE_RADIUS,
 } from '../../physics/constants';
 
@@ -33,7 +33,7 @@ const NULL_RENDERER = {
 } as unknown as SceneAPI;
 
 const SPACE_CUBE: CmSpaceCube = {
-  position: CmVector.zero,
+  position: new CmVector(0, SPACE_POS_Y, 0),
   scale: new CmVector(SPACE_SCALE_X, SPACE_SCALE_Y, SPACE_SCALE_Z),
 };
 

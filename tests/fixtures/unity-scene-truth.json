@@ -1,0 +1,540 @@
+{
+  "_meta": {
+    "description": "Unity scene truth artifact — single authoritative source of all parity-critical values. All parity-locks must align to this file. Each value traced to a real Unity asset; fabricated/unverifiable values are flagged noUnitySource:true.",
+    "extractedAt": "2026-06-22",
+    "multiplier": 10000,
+    "floatToFixed": "Math.trunc(rawFloat * 10000) — trunc-toward-zero identical to C# (long) cast. E.g. 0.028575 * 10000 = 285.75 → 285; 0.005 * 10000 = 49.999 → 49.",
+    "coordinateFrame": {
+      "note": "All fixed-point values in the BallPool8 authoring-scene frame (TABLE_Y=9154 y-origin). Active build scene uses y≈0 frame (cloth=0, rail=320, ball=285). XZ geometry is identical between frames; only Y differs. Port adds TABLE_Y=9154 offset.",
+      "clothY_buildFrame": 0,
+      "clothY_BallPool8Frame": 9154,
+      "railY_buildFrame": 320,
+      "railY_unityTrue_BallPool8Frame": 9474,
+      "railY_portActual": 9440,
+      "ballAtRest_buildFrame": 285,
+      "ballAtRest_BallPool8Frame": 9440
+    },
+    "sources": [
+      "Assets/_Game/Scenes/Game.unity (active build scene)",
+      "Assets/_Game/BallPool/BallPool8/Scenes/Game.unity (BallPool8 authoring scene)",
+      "Assets/_Game/UnityCM/CmMaterials/BallCmMateria.asset",
+      "Assets/_Game/UnityCM/CmMaterials/PlaneCmMateria.asset",
+      "Assets/_Game/UnityCM/CmMaterials/RailCmMateria.asset",
+      "Assets/_Game/BallPool/Config/BallPoolConfig.asset",
+      "Assets/_Game/BallPool/BallPool8/Scripts/Game/BallPool8Manager.cs",
+      "Assets/_Game/CalculableMechanics/CmSpace.cs",
+      "Assets/_Game/CalculableMechanics/CmRigidbody.cs"
+    ]
+  },
+
+  "materials": {
+    "_note": "Cloth material: BallPool8 authoring scene has DIFFERENT values (bounciness=500, dynamic=8000, static=8999). Build scene serialized values (line 14171) are authoritative for runtime — used here.",
+    "ball": {
+      "_src": "Assets/_Game/UnityCM/CmMaterials/BallCmMateria.asset",
+      "bounciness":       { "raw": 0.9499, "fixed": 9499,   "line": 14 },
+      "rollingFriction":  { "raw": 0.005,  "fixed": 49,     "line": 15, "note": "trunc(0.005*10000)=49, not 50" },
+      "twistingFriction": { "raw": 20,     "fixed": 200000, "line": 16, "note": "raw is dimensionless scale; *10000=200000" },
+      "dynamicFriction":  { "raw": 0.05,   "fixed": 500,    "line": 17 },
+      "staticFriction":   { "raw": 0.06,   "fixed": 599,    "line": 18, "note": "trunc(0.06*10000)=599, not 600" }
+    },
+    "cloth": {
+      "_src": "Assets/_Game/UnityCM/CmMaterials/PlaneCmMateria.asset (raw); serialized fixed-point in build scene planeCollider.material (line 14172)",
+      "bounciness":       { "raw": 0.1,  "fixed": 1000,   "line": 14, "_buildSceneLine": 14172 },
+      "rollingFriction":  { "raw": 0.01, "fixed": 99,     "line": 15, "note": "trunc(0.01*10000)=99" },
+      "twistingFriction": { "raw": 20,   "fixed": 200000, "line": 16 },
+      "dynamicFriction":  { "raw": 0.2,  "fixed": 2000,   "line": 17 },
+      "staticFriction":   { "raw": 0.3,  "fixed": 3000,   "line": 18 }
+    },
+    "rail": {
+      "_src": "Assets/_Game/UnityCM/CmMaterials/RailCmMateria.asset (raw); serialized in each cmLineCollider.material in build scene",
+      "bounciness":       { "raw": 0.6, "fixed": 6000, "line": 14 },
+      "rollingFriction":  { "raw": 0,   "fixed": 0,    "line": 15 },
+      "twistingFriction": { "raw": 0,   "fixed": 0,    "line": 16 },
+      "dynamicFriction":  { "raw": 0,   "fixed": 0,    "line": 17 },
+      "staticFriction":   { "raw": 0.2, "fixed": 2000, "line": 18 }
+    }
+  },
+
+  "ballGeometry": {
+    "_src": "Assets/_Game/Scenes/Game.unity (build scene) — cmSphereCollider serialized block",
+    "radius": {
+      "raw": 0.028575,
+      "fixed": 285,
+      "line": 855,
+      "note": "raw ~0.028574944 from ball LocalPosition.y (line 447); trunc(0.028575*10000)=285"
+    },
+    "mass": {
+      "raw": 0.17,
+      "fixed": 1700,
+      "rawLine": 875,
+      "fixedLine": 879,
+      "note": "CmRigidbody serialized twice: raw float and fixed-point"
+    }
+  },
+
+  "cueSettings": {
+    "cueManagerMaxForce": {
+      "raw": 1.3,
+      "_src": "Assets/_Game/Scenes/Game.unity:22497 — CueManager.maxForce [SerializeField]",
+      "note": "Overrides .cs code default 1.0f (CueManager.cs:66). This is the player-facing CueManager instance in the active build scene."
+    },
+    "cueItems": {
+      "_src": "Assets/_Game/BallPool/Config/BallPoolConfig.asset",
+      "items": [
+        { "tier": "standard-1", "maxForce": 0.7,  "maxSpin": 0.5,  "lines": [967,  968]  },
+        { "tier": "standard-2", "maxForce": 0.7,  "maxSpin": 0.5,  "lines": [980,  981]  },
+        { "tier": "standard-3", "maxForce": 0.75, "maxSpin": 0.75, "lines": [993,  994]  },
+        { "tier": "standard-4", "maxForce": 0.8,  "maxSpin": 0.8,  "lines": [1006, 1007] },
+        { "tier": "standard-5", "maxForce": 0.85, "maxSpin": 0.85, "lines": [1019, 1020] },
+        { "tier": "premium-1",  "maxForce": 1.0,  "maxSpin": 1.0,  "lines": [1042, 1043] },
+        { "tier": "premium-2",  "maxForce": 1.0,  "maxSpin": 1.0,  "lines": [1055, 1056] },
+        { "tier": "premium-3",  "maxForce": 1.0,  "maxSpin": 1.0,  "lines": [1068, 1069] },
+        { "tier": "premium-4",  "maxForce": 1.0,  "maxSpin": 1.0,  "lines": [1081, 1082] },
+        { "tier": "premium-5",  "maxForce": 1.0,  "maxSpin": 1.0,  "lines": [1110, 1111] }
+      ]
+    },
+    "derived": {
+      "MAX_FORCE": {
+        "formula": "trunc(cueManagerMaxForce * cueItemMaxForce(premium) * MULTIPLIER)",
+        "value": 13000,
+        "calculation": "trunc(1.3 * 1.0 * 10000) = 13000",
+        "note": "Not serialized — derived. constants.ts MAX_FORCE=13000 ✓"
+      },
+      "horizontalFactor_levelShot": {
+        "value": 1.0,
+        "note": "AnimationCurve horizontalFactor.Evaluate(0)=1.0 for horizontal shot (vr01=0)"
+      }
+    }
+  },
+
+  "tableConstants": {
+    "_src": "BallPool8 authoring scene for tableY/ballY; build scene for railY derivation",
+    "tableY": {
+      "fixed": 9154,
+      "_src": "Assets/_Game/BallPool/BallPool8/Scenes/Game.unity:1059 — planeCollider.position.y serialized directly",
+      "note": "Build scene cloth is at y=0; BallPool8 frame adds 9154. Port TABLE_Y=9154 ✓"
+    },
+    "ballY": {
+      "fixed": 9440,
+      "_src": "Assets/_Game/BallPool/BallPool8/Scenes/Game.unity:354 — cmSphereCollider.position.y for ball at rest",
+      "note": "= tableY(9154) + radius(285) + restGap(1) = 9440 ✓"
+    },
+    "railY": {
+      "unityTrue": 9474,
+      "portActual": 9440,
+      "buildFrameValue": 320,
+      "_src": "Assets/_Game/Scenes/Game.unity — all cmLineCollider.position.y=320 (build frame); BallPool8 frame = tableY(9154)+320=9474",
+      "note": "Port uses BALL_Y=9440 (ball center) for all line colliders instead of tableY+320=9474. Delta=34. See knownDiscrepancies[railY]."
+    },
+    "restGapRule": {
+      "ballY_minus_tableY": 286,
+      "formula": "radius(285) + margin(1) = 286",
+      "note": "PARITY-CRITICAL: margin=1 prevents ball from continuously contacting cloth. If 0, perpetual cloth friction → different deceleration regime."
+    }
+  },
+
+  "spaceCube": {
+    "unityTrue": {
+      "scale":    { "x": 40000, "y": 30000, "z": 30000 },
+      "position": { "x": 0,     "y": 5000,  "z": 0 },
+      "_src": "Assets/_Game/Scenes/Game.unity:25395 — fileID 1180347666, active+enabled, runtime-read by UnityCmSpace.cs:114"
+    },
+    "portActual": {
+      "scale":    { "x": 40000, "y": 30000, "z": 30000 },
+      "position": { "x": 0,     "y": 5000,  "z": 0 },
+      "_src": "src/physics/constants.ts SPACE_SCALE_X/Y/Z + SPACE_POS_Y; table-setup.ts spaceCube",
+      "note": "Corrected to unityTrue in geometry truth-up (2026-06-22). Previous (30000,20000,20000)/pos0 was fabricated; now removed."
+    },
+    "note": "OOC boundary = pos.y ± scale.y/2 = 5000 ± 15000 = [-10000, 20000]. Port now == unityTrue."
+  },
+
+  "tableGeometry": {
+    "_note": "19 colliders: 1 cloth plane + 2 long rails + 4 end cushion half-segments + 8 corner jaw cushions + 4 side pocket jaw cushions. Positions in BallPool8 frame. All line collider unityTrue y=9474; port uses 9440 (knownDiscrepancy[railY]).",
+    "_indexOrder": "Matches createPoolTable() cid++ order in table-setup.ts",
+    "colliders": [
+      {
+        "index": 0, "type": "plane", "name": "cloth",
+        "position": { "x": 0,      "y": 9154, "z": 0 },
+        "right":    { "x": 10000,  "y": 0,    "z": 0 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 0,      "y": 0,    "z": 10000 },
+        "scale":    { "x": 25399,  "y": 5000, "z": 12699 },
+        "radius": 12699,
+        "material": "cloth",
+        "_src": "Assets/_Game/Scenes/Game.unity:14148 (planeCollider block); y=9154 from BallPool8 scene:1059",
+        "_portY": 9154
+      },
+      {
+        "index": 1, "type": "line", "name": "longRailPosX",
+        "position": { "x": 12699,  "y": 9474, "z": 0 },
+        "right":    { "x": 0,      "y": 0,    "z": 10000 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -10000, "y": 0,    "z": 0 },
+        "scale":    { "x": 11045,  "y": 5000, "z": 5000 },
+        "radius": 5522,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:26876 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 2, "type": "line", "name": "longRailNegX",
+        "position": { "x": -12699, "y": 9474, "z": 0 },
+        "right":    { "x": 0,      "y": 0,    "z": -10000 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 10000,  "y": 0,    "z": 0 },
+        "scale":    { "x": 11045,  "y": 5000, "z": 5000 },
+        "radius": 5522,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:34171 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 3, "type": "line", "name": "endHeadRight",
+        "position": { "x": 6244,   "y": 9474, "z": 6349 },
+        "right":    { "x": -10000, "y": 0,    "z": 0 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 0,      "y": 0,    "z": -10000 },
+        "scale":    { "x": 11260,  "y": 5000, "z": 5000 },
+        "radius": 5630,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:21793 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 4, "type": "line", "name": "endHeadLeft",
+        "position": { "x": -6244,  "y": 9474, "z": 6349 },
+        "right":    { "x": -10000, "y": 0,    "z": 0 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 0,      "y": 0,    "z": -10000 },
+        "scale":    { "x": 11260,  "y": 5000, "z": 5000 },
+        "radius": 5630,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:24881 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 5, "type": "line", "name": "endFootRight",
+        "position": { "x": 6244,   "y": 9474, "z": -6349 },
+        "right":    { "x": 10000,  "y": 0,    "z": 0 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 0,      "y": 0,    "z": 10000 },
+        "scale":    { "x": 11260,  "y": 5000, "z": 5000 },
+        "radius": 5630,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:32802 (cmLineCollider block); buildFrame y=320; B1 regressor",
+        "_portY": 9440
+      },
+      {
+        "index": 6, "type": "line", "name": "endFootLeft",
+        "position": { "x": -6244,  "y": 9474, "z": -6349 },
+        "right":    { "x": 10000,  "y": 0,    "z": 0 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 0,      "y": 0,    "z": 10000 },
+        "scale":    { "x": 11260,  "y": 5000, "z": 5000 },
+        "radius": 5630,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:35444 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 7, "type": "line", "name": "cornerHeadRightJawA",
+        "position": { "x": 12075,  "y": 9474, "z": 6551 },
+        "right":    { "x": -7071,  "y": 0,    "z": -7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 7071,   "y": 0,    "z": -7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:14581 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 8, "type": "line", "name": "cornerHeadRightJawB",
+        "position": { "x": 12901,  "y": 9474, "z": 5723 },
+        "right":    { "x": 7071,   "y": 0,    "z": 7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -7071,  "y": 0,    "z": 7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:13920 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440,
+        "_note": "Unity scale=570/radius=285; port CORNER_B_SCALE_X=569/CORNER_B_RADIUS=284 (1-unit off). See knownDiscrepancies[cornerBScale]."
+      },
+      {
+        "index": 9, "type": "line", "name": "cornerFootLeftJawA",
+        "position": { "x": -12075, "y": 9474, "z": -6551 },
+        "right":    { "x": 7071,   "y": 0,    "z": 7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -7071,  "y": 0,    "z": 7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:32425 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 10, "type": "line", "name": "cornerFootLeftJawB",
+        "position": { "x": -12901, "y": 9474, "z": -5723 },
+        "right":    { "x": -7071,  "y": 0,    "z": -7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 7071,   "y": 0,    "z": -7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:10338 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440,
+        "_note": "See knownDiscrepancies[cornerBScale]."
+      },
+      {
+        "index": 11, "type": "line", "name": "cornerFootRightJawA",
+        "position": { "x": 12075,  "y": 9474, "z": -6551 },
+        "right":    { "x": 7071,   "y": 0,    "z": -7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 7071,   "y": 0,    "z": 7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:516 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 12, "type": "line", "name": "cornerFootRightJawB",
+        "position": { "x": 12901,  "y": 9474, "z": -5723 },
+        "right":    { "x": -7071,  "y": 0,    "z": 7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -7071,  "y": 0,    "z": -7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:36509 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440,
+        "_note": "See knownDiscrepancies[cornerBScale]."
+      },
+      {
+        "index": 13, "type": "line", "name": "cornerHeadLeftJawA",
+        "position": { "x": -12075, "y": 9474, "z": 6551 },
+        "right":    { "x": -7071,  "y": 0,    "z": 7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -7071,  "y": 0,    "z": -7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:38838 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 14, "type": "line", "name": "cornerHeadLeftJawB",
+        "position": { "x": -12901, "y": 9474, "z": 5723 },
+        "right":    { "x": 7071,   "y": 0,    "z": -7071 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 7071,   "y": 0,    "z": 7071 },
+        "scale":    { "x": 570,    "y": 5000, "z": 1000 },
+        "radius": 285,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:12757 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440,
+        "_note": "See knownDiscrepancies[cornerBScale]."
+      },
+      {
+        "index": 15, "type": "line", "name": "sideJawBackLeft",
+        "position": { "x": -579,   "y": 9474, "z": 6546 },
+        "right":    { "x": -1736,  "y": 0,    "z": -9848 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 9848,   "y": 0,    "z": -1736 },
+        "scale":    { "x": 400,    "y": 5000, "z": 1000 },
+        "radius": 200,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:28782 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 16, "type": "line", "name": "sideJawBackRight",
+        "position": { "x": 579,    "y": 9474, "z": 6546 },
+        "right":    { "x": -1736,  "y": 0,    "z": 9848 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -9848,  "y": 0,    "z": -1736 },
+        "scale":    { "x": 400,    "y": 5000, "z": 1000 },
+        "radius": 200,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:37090 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      },
+      {
+        "index": 17, "type": "line", "name": "sideJawFrontLeft",
+        "position": { "x": -580,   "y": 9474, "z": -6546 },
+        "right":    { "x": 1736,   "y": 0,    "z": -9848 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": 9848,   "y": 0,    "z": 1736 },
+        "scale":    { "x": 400,    "y": 5000, "z": 1000 },
+        "radius": 200,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:16419 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440,
+        "_note": "Unity x=-580; port SIDE_JAW_X=579 (1 unit off). See knownDiscrepancies[sideJawFrontLeftX]."
+      },
+      {
+        "index": 18, "type": "line", "name": "sideJawFrontRight",
+        "position": { "x": 579,    "y": 9474, "z": -6546 },
+        "right":    { "x": 1736,   "y": 0,    "z": 9848 },
+        "up":       { "x": 0,      "y": 10000, "z": 0 },
+        "forward":  { "x": -9848,  "y": 0,    "z": 1736 },
+        "scale":    { "x": 400,    "y": 5000, "z": 1000 },
+        "radius": 200,
+        "material": "rail",
+        "_src": "Assets/_Game/Scenes/Game.unity:37664 (cmLineCollider block); buildFrame y=320",
+        "_portY": 9440
+      }
+    ]
+  },
+
+  "pockets": {
+    "_src": "Assets/_Game/Scenes/Game.unity — KinematicTrigger MonoBehaviour serialized trigger.position+radius",
+    "_note": "Port positions corrected to unityTrue in geometry truth-up (2026-06-22). Previous (±12875,±6510)/(0,±7100) had zero Unity source; now removed.",
+    "radius": { "fixed": 450, "_src": "Assets/_Game/Scenes/Game.unity:35597 — trigger.radius" },
+    "unityTruePositions": [
+      { "id": 0, "label": "footRightCorner", "x":  12949, "y": 285, "z": -6549, "_src": "build scene:35593" },
+      { "id": 1, "label": "headRightCorner", "x":  12949, "y": 285, "z":  6549, "_src": "build scene:8256"  },
+      { "id": 2, "label": "footLeftCorner",  "x": -12949, "y": 285, "z": -6549, "_src": "build scene:16360" },
+      { "id": 3, "label": "headLeftCorner",  "x": -12949, "y": 285, "z":  6549, "_src": "build scene:35902" },
+      { "id": 4, "label": "headSide",        "x":      0, "y": 285, "z":  7129, "_src": "build scene:40463" },
+      { "id": 5, "label": "footSide",        "x":      0, "y": 285, "z": -7129, "_src": "build scene:21209" }
+    ],
+    "portActualPositions": {
+      "note": "constants.ts POCKET_POSITIONS — now matches unityTrue (corrected 2026-06-22).",
+      "values": [
+        { "id": 0, "x":  12949, "z":  6549 },
+        { "id": 1, "x":  12949, "z": -6549 },
+        { "id": 2, "x": -12949, "z":  6549 },
+        { "id": 3, "x": -12949, "z": -6549 },
+        { "id": 4, "x":      0, "z":  7129 },
+        { "id": 5, "x":      0, "z": -7129 }
+      ]
+    }
+  },
+
+  "rack": {
+    "_src": "Seeds from Assets/_Game/BallPool/BallPool8/Scenes/Game.unity + BallPool8Manager.cs math",
+    "seeds": {
+      "firstBallLocalPosition": {
+        "raw": { "x": 0.6413, "y": 0, "z": 0 },
+        "fixed": { "x": 6413, "y": 0, "z": 0 },
+        "_src": "Assets/_Game/BallPool/BallPool8/Scenes/Game.unity:82065 — firstBall Transform.localPosition",
+        "note": "Cue ball = -firstBall.x = -6413. Rack apex = +6413."
+      },
+      "ballDistance": {
+        "raw": 0,
+        "fixed": 0,
+        "_src": "Assets/_Game/BallPool/BallPool8/Scenes/Game.unity:28037 — BallPool8Manager.ballDistance [SerializeField]"
+      },
+      "ballDiameter": {
+        "raw": 0.05715,
+        "fixed": 571,
+        "_src": "Derived: 2 × ballRadius(0.028575) = 0.05715; BallPoolManager.BallDiameter property",
+        "note": "trunc(0.05715*10000)=571. In GetBallPosition: distance=BallDiameter/2+ballDistance=0.028575"
+      },
+      "deltaArray": {
+        "_src": "Assets/_Game/BallPool/BallPool8/Scripts/Game/BallPool8Manager.cs:10-28",
+        "entries": [
+          { "id":  0, "dx": 0.0, "dz":  0.0 },
+          { "id":  1, "dx": 0.0, "dz":  0.0 },
+          { "id":  2, "dx": 3.0, "dz":  3.0 },
+          { "id":  3, "dx": 4.0, "dz": -4.0 },
+          { "id":  4, "dx": 4.0, "dz":  0.0 },
+          { "id":  5, "dx": 1.0, "dz":  1.0 },
+          { "id":  6, "dx": 3.0, "dz": -1.0 },
+          { "id":  7, "dx": 4.0, "dz":  4.0 },
+          { "id":  8, "dx": 2.0, "dz":  0.0 },
+          { "id":  9, "dx": 2.0, "dz":  2.0 },
+          { "id": 10, "dx": 2.0, "dz": -2.0 },
+          { "id": 11, "dx": 3.0, "dz":  1.0 },
+          { "id": 12, "dx": 3.0, "dz": -3.0 },
+          { "id": 13, "dx": 1.0, "dz": -1.0 },
+          { "id": 14, "dx": 4.0, "dz": -2.0 },
+          { "id": 15, "dx": 4.0, "dz":  2.0 }
+        ]
+      },
+      "formula": "BallPool8Manager.cs:30-41. id=0: return -firstBall.localPosition. id>0: firstBall.localPosition + (dx*sqrt((2d)^2-d^2), 0, dz*d) where d=ballDiameter/2+ballDistance"
+    },
+    "balls": {
+      "_note": "C# GetBallPosition() dump — fixed-point (x,z) pairs, trunc(float*10000). y=BALL_Y=9440 at runtime. DO NOT recalculate from seeds (float-precision interaction prevents exact reproduction).",
+      "_src": "src/game/rack-positions.ts — verified against C# runner GetBallPosition output",
+      "positions": [
+        { "id":  0, "x": -6413, "z":     0, "note": "cue ball at break spot" },
+        { "id":  1, "x":  6413, "z":     0, "note": "rack apex / foot spot" },
+        { "id":  2, "x":  7897, "z":   857 },
+        { "id":  3, "x":  8392, "z": -1143 },
+        { "id":  4, "x":  8392, "z":     0 },
+        { "id":  5, "x":  6907, "z":   285 },
+        { "id":  6, "x":  7897, "z":  -285 },
+        { "id":  7, "x":  8392, "z":  1143 },
+        { "id":  8, "x":  7402, "z":     0, "note": "8-ball (black) — center of rack" },
+        { "id":  9, "x":  7402, "z":   571 },
+        { "id": 10, "x":  7402, "z":  -571 },
+        { "id": 11, "x":  7897, "z":   285 },
+        { "id": 12, "x":  7897, "z":  -857 },
+        { "id": 13, "x":  6907, "z":  -285 },
+        { "id": 14, "x":  8392, "z":  -571 },
+        { "id": 15, "x":  8392, "z":   571 }
+      ]
+    }
+  },
+
+  "engineConstants": {
+    "_note": "Source-code constants — not scene-serialized. Changing without re-running golden-vector-runner breaks 1000/1000 FUZZ parity.",
+    "precision": {
+      "value": 2,
+      "_src": "Assets/_Game/CalculableMechanics/CmSpace.cs:15 — private const int precision = 2"
+    },
+    "minTS": {
+      "value": 50,
+      "_src": "Assets/_Game/CalculableMechanics/CmSpace.cs:16 — private const int minTS = 50",
+      "note": "PARITY-CRITICAL: MIN_TS=50 is the B1 tunneling-prevention threshold. Lowering this re-enables cushion skip."
+    },
+    "maxTS": {
+      "value": 200,
+      "_src": "Assets/_Game/CalculableMechanics/CmSpace.cs:17 — private const int maxTS = 200"
+    },
+    "minSqrVelocity": {
+      "value": 100,
+      "_src": "Assets/_Game/CalculableMechanics/CmRigidbody.cs:41 — internal const long minSqrVelocity = 100"
+    },
+    "cCount": {
+      "value": 2,
+      "_src": "Assets/_Game/CalculableMechanics/CmRigidbody.cs — CheckIsActive(2); consecutive below-threshold ticks before deactivation"
+    }
+  },
+
+  "knownDiscrepancies": [
+    {
+      "id": "railY",
+      "field": "tableGeometry.colliders[1-18].position.y",
+      "unityTrue": 9474,
+      "currentPort": 9440,
+      "delta": 34,
+      "status": "deferred-decided",
+      "reason": "3.4mm non-functional; would churn 92% of golden vectors (all rail-contact cases). Deferred to separate twin-fidelity case by CEO ruling (2026-06-22). TS==C# runner consistent at 9440.",
+      "parityLockBehavior": "Assert portActual=9440 (BALL_Y); RAIL_Y=9474 not yet applied to colliders"
+    },
+    {
+      "id": "jawRoundingDistribution",
+      "field": "tableGeometry.colliders[7-14].scale.x and radius (corner jaws)",
+      "unityTrue": "7 corner jaws scale=570/radius=285; 1 corner jaw (build scene:13914) scale=569/radius=284",
+      "currentPort": "4 A-type (indices 7,9,11,13) scale=570/radius=285; 4 B-type (indices 8,10,12,14) scale=569/radius=284 (CORNER_B_SCALE_X=569/CORNER_B_RADIUS=284)",
+      "delta": "Port has 4 jaws at 569/284 vs Unity's 1; A-type correct, B-type 3/4 wrong by 1 unit (0.1mm)",
+      "status": "deferred",
+      "reason": "0.1mm sub-unit rounding; non-functional. Would churn jaw-contact golden vectors. Deferred per CEO ruling (2026-06-22).",
+      "parityLockBehavior": "Assert currentPort constants (CORNER_B_SCALE_X=569/CORNER_B_RADIUS=284)"
+    },
+    {
+      "id": "sideJawFrontLeftX",
+      "field": "tableGeometry.colliders[17].position.x",
+      "unityTrue": -580,
+      "currentPort": -579,
+      "delta": 1,
+      "status": "deferred",
+      "reason": "1-unit (0.1mm) asymmetry in front-left side jaw only. No functional impact. Awaits 卡卡西 confirmation.",
+      "parityLockBehavior": "Assert portActual=-579 (SIDE_JAW_X) until confirmed"
+    }
+  ]
+}
