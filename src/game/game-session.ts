@@ -167,7 +167,10 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
   cue.onShotData = (data) => { _pendingHumanShotData = data; };
 
   cue.onShotApplied = (result) => {
-    if (store.getState().phase !== 'Aiming') return;
+    if (store.getState().phase !== 'Aiming') {
+      _pendingHumanShotData = null;  // discard stale — no shot was legally processed
+      return;
+    }
 
     ruleEngine.beginShot();
     const verdict = ruleEngine.processShotResult(result);

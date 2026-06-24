@@ -14,7 +14,7 @@
 
 import type { IGameSession, RecordedShot } from './game-session';
 import { createPoolTable } from './table-setup';
-import { createBallPoolPhysics } from './ball-pool-physics';
+import { createBallPoolPhysics, type IBallPoolPhysics } from './ball-pool-physics';
 import { createBallPool8Session } from './game-session';
 import { calculateAIShot } from './ai-controller';
 import type { SceneAPI } from '../renderer/scene';
@@ -45,10 +45,11 @@ function _stubCue(): CueController {
 export interface PlaybackController {
   /**
    * Attach to a live session. Feeds shots from the record on each onTurnChanged.
+   * physics is required to restore the recorded cue-ball position on ball-in-hand shots.
    * Call session.startNewGame() after attaching to begin replay.
    * Stops automatically when all shots are fed or game ends.
    */
-  attach(session: IGameSession): void;
+  attach(session: IGameSession, physics: IBallPoolPhysics): void;
 }
 
 /**
@@ -58,23 +59,25 @@ export interface PlaybackController {
  */
 export function createPlaybackController(shots: RecordedShot[]): PlaybackController {
   return {
-    attach(session: IGameSession): void {
+    attach(session: IGameSession, physics: IBallPoolPhysics): void {
       let idx = 0;
 
       session.onTurnChanged = (_playerIdx, ballInHand) => {
         if (session.isGameEnded || idx >= shots.length) return;
         const shot = shots[idx++];
 
-        // Ball-in-hand: place cue ball from record, then fire
-        if (ballInHand && shot.cueBallPlaced) {
-          // Caller must provide the physics reference; use session's internal physics
-          // through notifyBallPlaced pathway (placement is recorded as cueBallPlaced).
-          // NOTE: in Mode A, ball placement is the recorded position — no AI re-computation.
-          // The session caller is responsible for calling physics.placeBall(0, shot.cueBallPlaced)
-          // and then notifyBallPlaced() before this onTurnChanged fires.
-          // For a fully self-contained playback, use Mode B (re-run from seed).
-          session.forceShot(shot.shotData);
-        } else {
+        if (ballInHand) {
+          // Restore recorded cue-ball position before notifyBallPlaced transitions phase
+          if (shot.cueBallPlaced) physics.placeBall(0, shot.cueBallPlaced);
+          else physics.respotCueBall();
+          // Suppress re-entry: notifyBallPlaced() fires onTurnChanged(_, false) internally
+          const savedCb = session.onTurnChanged;
+          session.onTurnChanged = null;
+          session.notifyBallPlaced();
+          session.onTurnChanged = savedCb;
+        }
+
+        if (!session.isGameEnded) {
           session.forceShot(shot.shotData);
         }
       };
@@ -106,9 +109,10 @@ export interface DeterminismCheckResult {
  */
 export function runDeterminismCheck(
   record: { shots: RecordedShot[]; config?: { gameSeed?: number; players?: Array<{ type: string; rank?: number }> } },
-  options: { r0?: number; r1?: number } = {},
+  options: { r0?: number; r1?: number; gameSeed?: number } = {},
 ): DeterminismCheckResult {
-  const gameSeed = record.config?.gameSeed ?? 0;
+  // options.gameSeed takes priority: RecordHandle doesn't expose config; callers must pass gameSeed explicitly.
+  const gameSeed = options.gameSeed ?? record.config?.gameSeed ?? 0;
   const r0 = options.r0 ?? record.config?.players?.[0]?.rank ?? 4;
   const r1 = options.r1 ?? record.config?.players?.[1]?.rank ?? 2;
 
