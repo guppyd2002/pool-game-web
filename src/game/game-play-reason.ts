@@ -70,12 +70,12 @@ export const REASON_MESSAGES: Readonly<Record<number, string>> = {
   [Reason.OpponentNeedToHitBlack]:   'The cue ball should hit the black ball',
   [Reason.YouNo4BoardHit]:           'Very weak shot',         // C# dead-branch faithful port
   [Reason.OpponentNo4BoardHit]:      'Very weak shot',
-  [Reason.YouNeedToPocketSolids]:    'You have to pocket solids ball',
-  [Reason.YouNeedToPocketStripes]:   'You have to pocket stripes ball',
-  [Reason.OpponentNeedToPocketSolids]:  'Your opponent have to pocket a solid ball',
-  [Reason.OpponentNeedToPocketStripes]: 'Your opponent have to pocket a stripe ball',
+  [Reason.YouNeedToPocketSolids]:    'You have to pocket solids ball',   // LOC-003: Unity original ("solids ball" kept for parity)
+  [Reason.YouNeedToPocketStripes]:   'You have to pocket stripes ball',  // LOC-003: Unity original
+  [Reason.OpponentNeedToPocketSolids]:  'Your opponent have to pocket a solid ball',   // LOC-003: Unity original ("have to" not "has to" — BallPool8LibraryManager.cs:67)
+  [Reason.OpponentNeedToPocketStripes]: 'Your opponent have to pocket a stripe ball',  // LOC-003: Unity original
   [Reason.YouNeedToPocketBlack]:     'You have to pocket the black ball',
-  [Reason.OpponentNeedToPocketBlack]:   'Your opponent have to pocket the black ball',
+  [Reason.OpponentNeedToPocketBlack]:   'Your opponent have to pocket the black ball', // LOC-003: Unity original ("have to")
   [Reason.YouDoNotHitAnyBall]:       "The cue ball didn't hit any ball",
   [Reason.OpponentDoNotHitAnyBall]:  "The cue ball didn't hit any ball",
   [Reason.YouDoNotPocketAnyBall]:    'You have to pocket any ball',

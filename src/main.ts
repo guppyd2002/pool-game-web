@@ -328,6 +328,9 @@ if (_demoConfig) {
   topViewBtn.style.display = 'block';
   _inTopView = false;
   topViewBtn.textContent = '⬆ Top';
+  // Spectator view: hide Power/Shot and Spin/Top controls (AI drives all input)
+  powerSliderUI.element.style.display = 'none';
+  spinDiscUI.element.style.display = 'none';
   cameraTween.tweenTo(POSE_TABLE, 0.5);
   _runCameraTween(true);
   gameSession.startNewGame();
