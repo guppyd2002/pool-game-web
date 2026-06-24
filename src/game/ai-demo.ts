@@ -14,6 +14,7 @@ import { calculateAIShot } from './ai-controller';
 
 export interface AIDemoConfig {
   seed: number;
+  seedFromUrl: boolean; // true = explicit ?seed=N in URL; false = pick via pickValidSeed at startup
   rank0: number;      // P0 AI rank (1–5)
   rank1: number;      // P1 AI rank (1–5); asymmetric (rank0≠rank1) breaks symmetric deadlock
   turnDelayMs: number; // ms between replay completion and next AI shot
@@ -22,6 +23,7 @@ export interface AIDemoConfig {
 // seed 4: P0(rank4) legally pots 8-ball → "Player 1 wins! You pocketed the black ball" (clean legal win)
 export const AI_DEMO_DEFAULTS: AIDemoConfig = {
   seed: 4,
+  seedFromUrl: false,  // default = pick via pickValidSeed
   rank0: 4,
   rank1: 2,
   turnDelayMs: 800,
@@ -33,8 +35,10 @@ export const AI_DEMO_DEFAULTS: AIDemoConfig = {
  */
 export function parseDemoConfig(params: URLSearchParams): AIDemoConfig | null {
   if (params.get('demo') !== 'ai-selfplay') return null;
+  const hasSeed = params.has('seed');
   return {
-    seed:        parseInt(params.get('seed')  ?? String(AI_DEMO_DEFAULTS.seed),        10),
+    seed:        hasSeed ? parseInt(params.get('seed')!, 10) : AI_DEMO_DEFAULTS.seed,
+    seedFromUrl: hasSeed,  // false → main.ts replaces seed via pickValidSeed before startNewGame
     rank0:       parseInt(params.get('r0')    ?? String(AI_DEMO_DEFAULTS.rank0),       10),
     rank1:       parseInt(params.get('r1')    ?? String(AI_DEMO_DEFAULTS.rank1),       10),
     turnDelayMs: parseInt(params.get('delay') ?? String(AI_DEMO_DEFAULTS.turnDelayMs), 10),

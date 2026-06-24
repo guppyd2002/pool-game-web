@@ -32,6 +32,7 @@ import { createPowerSliderUI } from './renderer/power-slider-ui';
 import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import { createBallPool8Session } from './game/game-session';
 import { attachAIDemo, parseDemoConfig } from './game/ai-demo';
+import { pickValidSeed } from './game/headless-game';
 import { createReplayDriver } from './renderer/replay-driver';
 import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
@@ -315,6 +316,12 @@ gameSession.onReasonMessage = (msg) => {
 const _demoConfig = parseDemoConfig(new URLSearchParams(window.location.search));
 
 if (_demoConfig) {
+  // If no explicit ?seed= in URL, headless-simulate to find a valid random seed
+  // (avoids ~37% deadlock/cap-hit seeds; pickValidSeed tries up to 15 candidates, <2s).
+  if (!_demoConfig.seedFromUrl) {
+    _demoConfig.seed = pickValidSeed(_demoConfig.rank0, _demoConfig.rank1, Math.floor(Math.random() * 10000));
+  }
+
   // AI self-play: attach AI turn loop (sets onTurnChanged internally)
   attachAIDemo(gameSession, physics, space, _demoConfig);
   // Wrap to also update player indicator (shows which AI is playing)
