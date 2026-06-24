@@ -148,6 +148,8 @@ export interface CueController {
    * Optional — existing tests work without setting it.
    */
   onShotApplied: ((result: import('./ball-pool-physics').ShotResult) => void) | null;
+  /** Fires with the ShotData just before physics.applyShot() — used by record driver. Optional for back-compat. */
+  onShotData?: ((data: import('./ball-pool-physics').ShotData) => void) | null;
 }
 
 export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): CueController {
@@ -253,7 +255,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           );
 
       const cueBall = physics.getBall(cueBallId);
-      const _dragResult = physics.applyShot({
+      const _dragShotData = {
         position: cueBall.position,
         impulse: new CmVector(
           Math.trunc(nx * force),
@@ -261,7 +263,9 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           Math.trunc(nz * force),
         ),
         torque,
-      });
+      };
+      this.onShotData?.(_dragShotData);
+      const _dragResult = physics.applyShot(_dragShotData);
       this.onShotApplied?.(_dragResult);
       return true;
     },
@@ -292,7 +296,7 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           );
 
       const cueBall = physics.getBall(cueBallId);
-      const _fireResult = physics.applyShot({
+      const _fireShotData = {
         position: cueBall.position,
         impulse: new CmVector(
           Math.trunc(nx * force),
@@ -300,7 +304,9 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
           Math.trunc(nz * force),
         ),
         torque,
-      });
+      };
+      this.onShotData?.(_fireShotData);
+      const _fireResult = physics.applyShot(_fireShotData);
       this.onShotApplied?.(_fireResult);
       return true;
     },
@@ -395,5 +401,6 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
     },
 
     onShotApplied: null,
+    onShotData: null,
   };
 }

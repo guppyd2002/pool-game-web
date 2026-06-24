@@ -22,6 +22,7 @@ import type { IBallPoolPhysics, ShotData } from './ball-pool-physics';
 import type { CueController } from './cue-controller';
 import type { SceneAPI } from '../renderer/scene';
 import { createRuleEngine } from './rule-engine';
+import type { GameLogicStateV1 } from './rule-engine';
 import { BallType } from './player-ball-info';
 import { createGameStore } from './game-store';
 import type { GameStore } from './game-store';
@@ -32,8 +33,24 @@ import type { ReasonValue } from './game-play-reason';
 import type { ShotVerdict } from './rule-engine';
 import { BALL_Y, TABLE_Y } from '../physics/constants';
 import { getAllRackPositions } from './rack-positions';
+import { CmVector } from '../physics/cm-vector';
 
 // ─── GAME-018 interface ───────────────────────────────────────────────────────
+
+/**
+ * Per-shot record emitted by onShotFired (post-settle, physics + rule-engine committed).
+ * Core of the deterministic replay record; checksum covers physics + rule state.
+ * shotStartedAt is excluded from checksum (wall-clock only — see GameLogicStateV1:43).
+ */
+export interface RecordedShot {
+  n: number;                        // shot index (0-based, monotonic per game)
+  player: 0 | 1;                    // who shot
+  shotData: ShotData;               // input impulse/position/torque — what was executed
+  cueBallPlaced: CmVector | null;   // ball-in-hand placement (post-settle position), else null
+  physicsState: string;             // space.getStateAsString() post-settle
+  ruleState: GameLogicStateV1;      // ruleEngine.serialize() post-settle
+  checksum: string;                 // computeShotChecksum(physicsState, ruleState)
+}
 
 /**
  * Thin abstraction matching C# BallPoolGameManager abstract contract.
@@ -74,6 +91,30 @@ export interface IGameSession {
   onTurnChanged: ((playerIndex: 0 | 1, ballInHand: boolean) => void) | null;
   onGameEnded: ((winner: 0 | 1 | null, reason: ReasonValue) => void) | null;
   onReasonMessage: ((message: string) => void) | null;
+  /** Record hook: fires post-settle (physics + rule engine committed) for each shot. */
+  onShotFired: ((shot: RecordedShot) => void) | null;
+}
+
+// ─── Checksum ────────────────────────────────────────────────────────────────
+
+/**
+ * Compute per-shot state checksum covering BOTH physics and rule-engine state.
+ * C-1 requirement: checksum catches rule-state divergence (type-assignment, ballInHand,
+ * tableIsOpened, etc.) that physics-only hashing would miss.
+ *
+ * shotStartedAt is excluded — it is wall-clock only and not part of deterministic state
+ * (see GameLogicStateV1 field comment at rule-engine.ts line 43).
+ */
+export function computeShotChecksum(physicsState: string, ruleState: GameLogicStateV1): string {
+  // Omit shotStartedAt from the hash input
+  const { shotStartedAt: _, ...deterministicRule } = ruleState;
+  const input = physicsState + '\x00' + JSON.stringify(deterministicRule);
+  // FNV-1a 32-bit hash — fast, no external dependency, sufficient for determinism check
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h = Math.imul(h ^ input.charCodeAt(i), 16777619) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
@@ -97,12 +138,45 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
   // ── Ball-in-hand state ────────────────────────────────────────────────────
   let _ballInHandActive = false;
 
+  // ── Record-driver state ───────────────────────────────────────────────────
+  let _shotCounter = 0;
+  // Cue-ball placement for ball-in-hand shots; set in notifyBallPlaced(), cleared post-record.
+  let _lastCueBallPlaced: CmVector | null = null;
+  // shotData for human shots; set via cue.onShotData, read in cue.onShotApplied.
+  let _pendingHumanShotData: ShotData | null = null;
+
+  /** Compute and emit onShotFired after physics + rule-engine are post-settle. */
+  function _emitShotFired(shotData: ShotData): void {
+    if (!session.onShotFired) return;
+    const physicsState = physics.getStateAsString();
+    const ruleState = ruleEngine.serialize();
+    const checksum = computeShotChecksum(physicsState, ruleState);
+    session.onShotFired({
+      n: _shotCounter++,
+      player: store.getState().currentPlayerIndex,
+      shotData,
+      cueBallPlaced: _lastCueBallPlaced,
+      physicsState,
+      ruleState,
+      checksum,
+    });
+    _lastCueBallPlaced = null;  // consumed
+  }
+
   // ── Hook into cue-controller shot events ─────────────────────────────────
+  cue.onShotData = (data) => { _pendingHumanShotData = data; };
+
   cue.onShotApplied = (result) => {
     if (store.getState().phase !== 'Aiming') return;
 
     ruleEngine.beginShot();
     const verdict = ruleEngine.processShotResult(result);
+
+    // Post-settle record (physics.applyShot already settled before this callback)
+    if (_pendingHumanShotData) {
+      _emitShotFired(_pendingHumanShotData);
+      _pendingHumanShotData = null;
+    }
 
     store.dispatch({ type: 'SHOT_FIRED' });
     cue.disable();  // no input during replay
@@ -162,6 +236,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     onTurnChanged: null,
     onGameEnded: null,
     onReasonMessage: null,
+    onShotFired: null,
 
     get currentPlayerIndex() { return store.getState().currentPlayerIndex; },
     get isGameEnded() { return store.getState().phase === 'GameOver'; },
@@ -174,6 +249,8 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
       _ballInHandActive = false;
+      _shotCounter = 0;
+      _lastCueBallPlaced = null;
       store.dispatch({ type: 'START_GAME' });
       // GAME-014: cue bind id=0 + resetForNewTurn initial state
       cue.resetForNewTurn();
@@ -200,6 +277,8 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
 
     notifyBallPlaced(): void {
       if (!_ballInHandActive) return;
+      // Save cue-ball position for onShotFired (ball-in-hand record)
+      _lastCueBallPlaced = physics.getBall(0).position;
       _ballInHandActive = false;
       trail?.enable();  // GAME-013: re-enable trail after placement
       store.dispatch({ type: 'BALL_PLACED' });
@@ -213,6 +292,9 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       const result = physics.applyShot(shotData);
       ruleEngine.beginShot();
       const verdict = ruleEngine.processShotResult(result);
+      // Post-settle record (applyShot is synchronous; physics settled before we reach here).
+      // forceShot(game-session:288) passes shotData straight to applyShot — recorded==executed.
+      _emitShotFired(shotData);
       store.dispatch({ type: 'SHOT_FIRED' });
       // No cue.disable() — AI never enables cue, so no input to suppress.
       replayDriver.watch(
