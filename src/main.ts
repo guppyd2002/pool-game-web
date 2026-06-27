@@ -220,6 +220,7 @@ loadReplayInput.addEventListener('change', () => {
     if (!shots || shots.length === 0) { alert('Invalid or empty .poolrecord file.'); return; }
     mainMenuEl.style.display = 'none';
     topViewBtn.style.display = 'block';
+    fineAimBtn.style.display = 'none';  // replay: no fine-aim (human controls disabled)
     _inTopView = true;
     topViewBtn.textContent = '⬇ Table';
     scene.setOrthoTop(true);
@@ -239,6 +240,7 @@ loadReplayInput.addEventListener('change', () => {
 startBtn.addEventListener('click', () => {
   mainMenuEl.style.display = 'none';
   topViewBtn.style.display = 'block';
+  fineAimBtn.style.display = 'block';
   _inTopView = true;
   topViewBtn.textContent = '⬇ Table';
   scene.setOrthoTop(true);
@@ -260,6 +262,8 @@ gameOverUI.onExit = () => {
   turnPrompt.dismiss();
   gameSession.exitGame();
   topViewBtn.style.display = 'none';
+  fineAimBtn.style.display = 'none';
+  adapter.setFineAim(false);
   _inTopView = false;
   topViewBtn.textContent = '⬆ Top';
   scene.setOrthoTop(false);  // ensure ortho is cleared on exit
@@ -283,6 +287,32 @@ topViewBtn.style.cssText = [
 ].join(';');
 container.appendChild(topViewBtn);
 
+// CUE-024: fine-aim toggle button (touch accessible; Shift key is the keyboard shortcut)
+const fineAimBtn = document.createElement('button');
+fineAimBtn.textContent = '⌖ Fine';
+fineAimBtn.title = 'Fine aim (hold Shift)';
+fineAimBtn.style.cssText = [
+  'position:absolute', 'top:12px', 'right:88px',
+  'background:rgba(0,0,0,0.55)', 'color:#fff',
+  'border:1px solid rgba(255,255,255,0.3)',
+  'padding:6px 14px', 'border-radius:6px',
+  'font-family:sans-serif', 'font-size:13px',
+  'cursor:pointer', 'z-index:100',
+  'display:none',
+].join(';');
+container.appendChild(fineAimBtn);
+
+function _updateFineAimBtn(): void {
+  fineAimBtn.style.background = adapter.isFineAim
+    ? 'rgba(76,175,80,0.7)'
+    : 'rgba(0,0,0,0.55)';
+}
+
+fineAimBtn.addEventListener('click', () => {
+  adapter.setFineAim(!adapter.isFineAim);
+  _updateFineAimBtn();
+});
+
 let _inTopView = false;
 
 topViewBtn.addEventListener('click', () => {
@@ -304,6 +334,11 @@ window.addEventListener('keydown', (e: KeyboardEvent) => {
   if ((e.key === 't' || e.key === 'T') && topViewBtn.style.display !== 'none') {
     topViewBtn.click();
   }
+  // Sync fine-aim button highlight when Shift is pressed
+  if (e.key === 'Shift') _updateFineAimBtn();
+});
+window.addEventListener('keyup', (e: KeyboardEvent) => {
+  if (e.key === 'Shift') _updateFineAimBtn();
 });
 
 // ─── Player turn indicator ────────────────────────────────────────────────────
@@ -384,6 +419,7 @@ if (_demoConfig) {
   // Auto-start: skip main menu, enter ortho top-view, begin game
   mainMenuEl.style.display = 'none';
   topViewBtn.style.display = 'block';
+  fineAimBtn.style.display = 'none';  // demo/spectator: no fine-aim (AI drives input)
   _inTopView = true;
   topViewBtn.textContent = '⬇ Table';
   scene.setOrthoTop(true);

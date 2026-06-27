@@ -20,6 +20,14 @@ import type { CueController } from './cue-controller';
 export const TABLE_PLANE_Y = 0.028;
 
 /**
+ * CUE-024: Fine-aim sensitivity multiplier.
+ * Scales the displacement from drag-start to 15% — same angular change per
+ * pointer pixel as pulling back ~6.7× farther in normal mode.
+ * Sensitivity is a pure function of cursor displacement (no time/velocity).
+ */
+export const FINE_AIM_SENSITIVITY = 0.15;
+
+/**
  * Intersect a pre-aimed raycaster with a horizontal plane at world Y = planeY.
  * Returns null if the ray is parallel to the plane or pointing away from it.
  * Pure function — call raycaster.setFromCamera(ndc, camera) before invoking.
@@ -32,6 +40,22 @@ export function tableIntersection(
   const target = new THREE.Vector3();
   const hit = raycaster.ray.intersectPlane(plane, target);
   return hit ? { x: target.x, z: target.z } : null;
+}
+
+/**
+ * CUE-024: Scale the current-point displacement from startPt by sensitivity.
+ * Returns a point that is `sensitivity` of the way from startPt toward rawPt.
+ * Pure function of (rawPt, startPt, sensitivity) — no time/velocity dependency.
+ */
+export function applyAimSensitivity(
+  rawPt: { x: number; z: number },
+  startPt: { x: number; z: number },
+  sensitivity: number,
+): { x: number; z: number } {
+  return {
+    x: startPt.x + (rawPt.x - startPt.x) * sensitivity,
+    z: startPt.z + (rawPt.z - startPt.z) * sensitivity,
+  };
 }
 
 export interface CueAdapterOptions {
@@ -57,6 +81,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   enable(): void;
   disable(): void;
   dispose(): void;
+  /** CUE-024: Toggle fine-aim mode (for touch UI). Shift key also controls this. */
+  setFineAim(active: boolean): void;
+  /** CUE-024: Whether fine-aim mode is currently active. */
+  readonly isFineAim: boolean;
 } {
   const { element, cueBallMesh, controller } = opts;
   // Resolve the active camera at each raycasting call so ortho/perspective switches work correctly.
@@ -68,6 +96,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   // CUE-023: zoom-suspend flag — set during 2-finger pinch, cleared when fingers lift.
   // Independent of `enabled` (CUE-019 mutex). Cue input blocked when either is false.
   let _zoomActive = false;
+  // CUE-024: fine-aim mode — scales displacement from drag-start by FINE_AIM_SENSITIVITY.
+  let _aimFine = false;
+  // World-space drag start position, set in onPointerDown, used by applyAimSensitivity.
+  let _dragStartWorld: { x: number; z: number } | null = null;
 
   function toNDC(clientX: number, clientY: number): THREE.Vector2 {
     const rect = element.getBoundingClientRect();
@@ -84,6 +116,14 @@ export function createCueAdapter(opts: CueAdapterOptions): {
 
   // ─── Pointer events (mouse + single-touch via PointerEvents API) ─────────────
 
+  // CUE-024: apply fine-aim scaling — scales displacement from drag-start so that
+  // the same pointer movement produces a smaller aim/power change in fine mode.
+  function _applyFine(pt: { x: number; z: number }): { x: number; z: number } {
+    return _aimFine && _dragStartWorld
+      ? applyAimSensitivity(pt, _dragStartWorld, FINE_AIM_SENSITIVITY)
+      : pt;
+  }
+
   function onPointerDown(e: PointerEvent): void {
     if (!enabled || _zoomActive) return;  // CUE-023: block drag during pinch
     const ndc = toNDC(e.clientX, e.clientY);
@@ -94,6 +134,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     sm.feedPointerDown(e.clientX, e.clientY);
     const pt = tableIntersection(raycaster, TABLE_PLANE_Y);
     if (!pt) return;
+    _dragStartWorld = pt;  // CUE-024: anchor for fine-aim displacement scaling
     dragging = true;
     controller.onDragStart(pt);
     e.preventDefault();
@@ -104,7 +145,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     sm.feedPointerMove(e.clientX, e.clientY);
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) {
-      controller.onDragMove(pt);
+      controller.onDragMove(_applyFine(pt));
       opts.onAimUpdate?.();
     }
     e.preventDefault();
@@ -119,7 +160,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (pt) {
       // CUE-011: capture power before onDragEnd clears drag state
       const powerAtRelease = controller.getPowerFraction();
-      const shotFired = controller.onDragEnd(pt);
+      const shotFired = controller.onDragEnd(_applyFine(pt));
       if (shotFired) opts.onShotFired?.(powerAtRelease);
     } else {
       controller.cancel();  // pointer went off-table: cancel drag, clears aim line
@@ -179,6 +220,15 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     e.preventDefault();
   }
 
+  // ─── CUE-024: Shift key — hold for fine-aim mode ─────────────────────────────
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Shift') _aimFine = true;
+  }
+  function onKeyUp(e: KeyboardEvent): void {
+    if (e.key === 'Shift') _aimFine = false;
+  }
+
   // ─── Register listeners ───────────────────────────────────────────────────────
 
   element.addEventListener('pointerdown', onPointerDown as EventListener);
@@ -188,10 +238,14 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   element.addEventListener('touchmove', onTouchMove as EventListener, { passive: false });
   element.addEventListener('touchend', onTouchEnd as EventListener);
   element.addEventListener('wheel', onWheel as EventListener, { passive: false });
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
 
   return {
     enable(): void { enabled = true; },
     disable(): void { enabled = false; dragging = false; controller.cancel(); sm.reset(); },
+    setFineAim(active: boolean): void { _aimFine = active; },
+    get isFineAim(): boolean { return _aimFine; },
     dispose(): void {
       element.removeEventListener('pointerdown', onPointerDown as EventListener);
       element.removeEventListener('pointermove', onPointerMove as EventListener);
@@ -200,6 +254,8 @@ export function createCueAdapter(opts: CueAdapterOptions): {
       element.removeEventListener('touchmove', onTouchMove as EventListener);
       element.removeEventListener('touchend', onTouchEnd as EventListener);
       element.removeEventListener('wheel', onWheel as EventListener);
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
     },
   };
 }
