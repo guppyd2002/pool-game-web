@@ -154,30 +154,49 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
   }
 
   // Jump to a specific position (0 = initial state, n = after shot n-1).
+  // Always replays from startNewGame + shots[0..target-1] headlessly so that
+  // BOTH physics and rule-engine state are correctly rewound.  The .poolrecord
+  // format excludes ruleState to keep file size down, so setStateFromString-only
+  // seek would leave the rule engine in a stale/wrong phase.
   function _seekTo(position: number): void {
     _clearTimer();
     _pendingBih = false;
     if (!_session || !_physics || !_scene) return;
     const target = Math.max(0, Math.min(position, _shots.length));
 
-    const savedCb = _session.onTurnChanged;
-    _session.onTurnChanged = null;
+    // Suppress all session callbacks during headless replay-from-start so that
+    // game-over UI, reason banners, and turn-change scheduling don't fire.
+    const savedOnTurnChanged   = _session.onTurnChanged;
+    const savedOnGameEnded     = _session.onGameEnded;
+    const savedOnReasonMessage = _session.onReasonMessage;
+    const savedOnShotFired     = _session.onShotFired;
+    _session.onTurnChanged   = null;
+    _session.onGameEnded     = null;
+    _session.onReasonMessage = null;
+    _session.onShotFired     = null;
 
-    if (target === 0) {
-      // Reset to canonical rack (handles physics + scene ball placement)
-      _session.startNewGame();
-    } else {
-      const refShot = _shots[target - 1];
-      if (refShot.physicsState) {
-        _physics.setStateFromString(refShot.physicsState);
-        _syncSceneFromPhysics();
+    _session.startNewGame();
+
+    for (let i = 0; i < target; i++) {
+      if (_session.isGameEnded) break;
+      const s = _shots[i];
+      if (s.cueBallPlaced !== null) {
+        _physics.placeBall(0, s.cueBallPlaced);
+        _session.notifyBallPlaced();  // transitions rule-engine BallInHand → Aiming
       }
-      // Infer bih for the upcoming shot from its cueBallPlaced record
-      _pendingBih = target < _shots.length && _shots[target].cueBallPlaced !== null;
+      _session.forceShot(s.shotData);
     }
 
+    _syncSceneFromPhysics();
     _nextIdx = target;
-    _session.onTurnChanged = savedCb;
+    // Infer BIH for the NEXT shot from the record (cueBallPlaced non-null ↔ BIH shot)
+    _pendingBih = target < _shots.length && _shots[target].cueBallPlaced !== null;
+
+    _session.onShotFired     = savedOnShotFired;
+    _session.onReasonMessage = savedOnReasonMessage;
+    _session.onGameEnded     = savedOnGameEnded;
+    _session.onTurnChanged   = savedOnTurnChanged;
+
     _updateUI();
 
     if (_playing && _nextIdx < _shots.length) _scheduleNext();
@@ -232,20 +251,17 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
       $seek.max = String(shots.length);
       el.style.display = 'flex';
 
-      // Wire onTurnChanged: record pending bih and schedule next shot if playing
+      // Wire onTurnChanged: record pending bih and (if playing) schedule next shot.
+      // Must be set BEFORE _seekTo(0) restores it.
       session.onTurnChanged = (_pi, bih) => {
         _pendingBih = bih;
         _updateUI();
         if (_playing && _nextIdx < _shots.length) _scheduleNext();
       };
 
-      // Reset to initial rack state in paused mode
-      const savedCb = session.onTurnChanged;
-      session.onTurnChanged = null;
-      session.startNewGame();
-      session.onTurnChanged = savedCb;
-
-      _updateUI();
+      // Reset to initial rack in paused mode.  _seekTo suppresses callbacks during
+      // startNewGame so the turn-change handler doesn't fire prematurely.
+      _seekTo(0);
     },
 
     dispose(): void {
