@@ -131,14 +131,21 @@ const adapter = createCueAdapter({
   },
 });
 
+// Feature flag: power slider visible and active only when ?slider=1 is in the URL.
+// Default OFF: drag-power is the sole force path; fireNow() is dead code in normal play.
+// Set ON to restore slider as a touch-accessible power alternative (feature-flag降級, reversible).
+const _sliderEnabled = new URLSearchParams(window.location.search).has('slider');
+
 // CUE-002: power slider
 const shotSlider = createShotSlider({
   onStartControl: () => { adapter.disable(); },
   onEndControl:   () => { adapter.enable(); },
   onMove:  (f) => { powerBar.update(f); },
-  onShot:  (f) => { cue.fireNow(f); },
+  onShot:  (f) => { if (_sliderEnabled) cue.fireNow(f); },
 });
 const powerSliderUI = createPowerSliderUI(container, shotSlider);
+// Hide slider UI unless the feature flag is on.
+if (!_sliderEnabled) powerSliderUI.element.style.display = 'none';
 
 // CUE-006/CUE-008: spin disc
 const spinDisc = createSpinDisc({
