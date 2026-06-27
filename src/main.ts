@@ -287,22 +287,23 @@ topViewBtn.style.cssText = [
   'position:absolute', 'top:12px', 'right:12px',
   'background:rgba(0,0,0,0.55)', 'color:#fff',
   'border:1px solid rgba(255,255,255,0.3)',
-  'padding:6px 14px', 'border-radius:6px',
+  'padding:8px 14px', 'border-radius:6px', 'min-height:44px',
   'font-family:sans-serif', 'font-size:13px',
   'cursor:pointer', 'z-index:100',
   'display:none',
 ].join(';');
 container.appendChild(topViewBtn);
 
-// CUE-024: fine-aim toggle button (touch accessible; Shift key is the keyboard shortcut)
+// CUE-024: fine-aim toggle button — stacked below topViewBtn so it never
+// overlaps the centered player indicator on small screens.
 const fineAimBtn = document.createElement('button');
 fineAimBtn.textContent = '⌖ Fine';
 fineAimBtn.title = 'Fine aim (hold Shift)';
 fineAimBtn.style.cssText = [
-  'position:absolute', 'top:12px', 'right:88px',
+  'position:absolute', 'top:60px', 'right:12px',
   'background:rgba(0,0,0,0.55)', 'color:#fff',
   'border:1px solid rgba(255,255,255,0.3)',
-  'padding:6px 14px', 'border-radius:6px',
+  'padding:8px 14px', 'border-radius:6px', 'min-height:44px',
   'font-family:sans-serif', 'font-size:13px',
   'cursor:pointer', 'z-index:100',
   'display:none',
@@ -359,6 +360,8 @@ playerIndicatorEl.style.cssText = [
   'padding:6px 20px', 'border-radius:20px',
   'font-family:sans-serif', 'font-size:14px',
   'pointer-events:none', 'display:none', 'z-index:100',
+  'max-width:calc(100% - 110px)',
+  'overflow:hidden', 'text-overflow:ellipsis', 'white-space:nowrap',
 ].join(';');
 container.appendChild(playerIndicatorEl);
 

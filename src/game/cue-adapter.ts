@@ -231,6 +231,11 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   function onKeyUp(e: KeyboardEvent): void {
     if (e.key === 'Shift') _fineShift = false;
   }
+  // Reset _fineShift on focus-loss so a Shift+tab or alt-tab doesn't leave fine
+  // mode stuck on (keyup never fires after the window loses focus).
+  function onWindowBlur(): void {
+    _fineShift = false;
+  }
 
   // ─── Register listeners ───────────────────────────────────────────────────────
 
@@ -243,6 +248,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   element.addEventListener('wheel', onWheel as EventListener, { passive: false });
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', onWindowBlur);
 
   return {
     enable(): void { enabled = true; },
@@ -259,6 +265,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
       element.removeEventListener('wheel', onWheel as EventListener);
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onWindowBlur);
     },
   };
 }

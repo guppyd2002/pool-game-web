@@ -49,7 +49,7 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
   btn.style.cssText = [
     'padding:8px 16px', 'background:rgba(0,0,0,0.6)', 'color:white',
     'border:1px solid rgba(255,255,255,0.7)', 'border-radius:4px',
-    'cursor:pointer', 'font-size:14px', 'touch-action:none',
+    'cursor:pointer', 'font-size:14px', 'touch-action:none', 'min-height:44px',
   ].join(';');
 
   // Targeting disc panel
