@@ -88,8 +88,6 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
   let _nextIdx = 0;      // index of next shot to play (0-based)
   let _playing = false;
   let _timer: ReturnType<typeof setTimeout> | null = null;
-  // Ball-in-hand flag for the NEXT shot (set by onTurnChanged)
-  let _pendingBih = false;
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -134,16 +132,17 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
     }
     const shot = _shots[_nextIdx++];
 
-    if (_pendingBih) {
-      // Restore recorded cue-ball placement before transitioning phase
+    // Use live session.isBallInHand (rule-engine state) rather than cueBallPlaced
+    // inference — cueBallPlaced=null cannot distinguish "no BIH" from "BIH but AI
+    // did not move the cue ball" (cueBallNewPos=null).
+    if (_session.isBallInHand) {
       if (shot.cueBallPlaced) _physics.placeBall(0, shot.cueBallPlaced);
-      else _physics.respotCueBall();
+      // no placeBall if cueBallPlaced=null (AI kept cue ball where it was)
       const saved = _session.onTurnChanged;
       _session.onTurnChanged = null;
       _session.notifyBallPlaced();
       _session.onTurnChanged = saved;
     }
-    _pendingBih = false;
     _session.forceShot(shot.shotData);
     _updateUI();
   }
@@ -160,7 +159,6 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
   // seek would leave the rule engine in a stale/wrong phase.
   function _seekTo(position: number): void {
     _clearTimer();
-    _pendingBih = false;
     if (!_session || !_physics || !_scene) return;
     const target = Math.max(0, Math.min(position, _shots.length));
 
@@ -180,17 +178,19 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
     for (let i = 0; i < target; i++) {
       if (_session.isGameEnded) break;
       const s = _shots[i];
-      if (s.cueBallPlaced !== null) {
-        _physics.placeBall(0, s.cueBallPlaced);
-        _session.notifyBallPlaced();  // transitions rule-engine BallInHand → Aiming
+      // Use live isBallInHand (not cueBallPlaced inference) — cueBallPlaced=null
+      // cannot distinguish "no BIH" from "BIH but AI kept cue ball in place".
+      if (_session.isBallInHand) {
+        if (s.cueBallPlaced) _physics.placeBall(0, s.cueBallPlaced);
+        _session.notifyBallPlaced();  // transitions BallInHand → Aiming
       }
       _session.forceShot(s.shotData);
     }
 
     _syncSceneFromPhysics();
     _nextIdx = target;
-    // Infer BIH for the NEXT shot from the record (cueBallPlaced non-null ↔ BIH shot)
-    _pendingBih = target < _shots.length && _shots[target].cueBallPlaced !== null;
+    // session.isBallInHand now reflects correct live rule-engine state for the next
+    // shot; _doFireShot reads it directly — no cached flag needed here.
 
     _session.onShotFired     = savedOnShotFired;
     _session.onReasonMessage = savedOnReasonMessage;
@@ -246,15 +246,13 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
       _shots = shots;
       _nextIdx = 0;
       _playing = false;
-      _pendingBih = false;
 
       $seek.max = String(shots.length);
       el.style.display = 'flex';
 
-      // Wire onTurnChanged: record pending bih and (if playing) schedule next shot.
+      // Wire onTurnChanged: update UI and schedule next shot if playing.
       // Must be set BEFORE _seekTo(0) restores it.
-      session.onTurnChanged = (_pi, bih) => {
-        _pendingBih = bih;
+      session.onTurnChanged = (_pi, _bih) => {
         _updateUI();
         if (_playing && _nextIdx < _shots.length) _scheduleNext();
       };
