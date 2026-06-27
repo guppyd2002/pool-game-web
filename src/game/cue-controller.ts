@@ -330,10 +330,18 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       if (nd < 0.001) return null;
       const nx = dx / nd;
       const nz = dz / nd;
+      // F-1: use actual execution quantization (trunc(nx*force)) so the preview
+      // matches exactly what applyShot will receive — not the MULTIPLIER-scale
+      // direction which diverges at low force.
+      const force = dragDistToForce(nd);
+      const qx = Math.trunc(nx * force);
+      const qz = Math.trunc(nz * force);
+      // At near-zero force the quantized direction collapses to zero — show no line.
+      if (qx === 0 && qz === 0) return null;
       const cueBall = physics.getBall(cueBallId);
       return physics.predictAimLine(
         cueBall.position,
-        new CmVector(Math.trunc(nx * MULTIPLIER), 0, Math.trunc(nz * MULTIPLIER)),
+        new CmVector(qx, 0, qz),
       );
     },
 
