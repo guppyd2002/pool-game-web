@@ -97,7 +97,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   // Independent of `enabled` (CUE-019 mutex). Cue input blocked when either is false.
   let _zoomActive = false;
   // CUE-024: fine-aim mode — scales displacement from drag-start by FINE_AIM_SENSITIVITY.
-  let _aimFine = false;
+  // _fineBtn = persistent toggle (⌖ Fine button); _fineShift = held Shift key.
+  // Active when either is true so releasing Shift doesn't clear a button-set fine mode.
+  let _fineBtn = false;
+  let _fineShift = false;
   // World-space drag start position, set in onPointerDown, used by applyAimSensitivity.
   let _dragStartWorld: { x: number; z: number } | null = null;
 
@@ -119,7 +122,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   // CUE-024: apply fine-aim scaling — scales displacement from drag-start so that
   // the same pointer movement produces a smaller aim/power change in fine mode.
   function _applyFine(pt: { x: number; z: number }): { x: number; z: number } {
-    return _aimFine && _dragStartWorld
+    return (_fineBtn || _fineShift) && _dragStartWorld
       ? applyAimSensitivity(pt, _dragStartWorld, FINE_AIM_SENSITIVITY)
       : pt;
   }
@@ -223,10 +226,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   // ─── CUE-024: Shift key — hold for fine-aim mode ─────────────────────────────
 
   function onKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Shift') _aimFine = true;
+    if (e.key === 'Shift') _fineShift = true;
   }
   function onKeyUp(e: KeyboardEvent): void {
-    if (e.key === 'Shift') _aimFine = false;
+    if (e.key === 'Shift') _fineShift = false;
   }
 
   // ─── Register listeners ───────────────────────────────────────────────────────
@@ -244,8 +247,8 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   return {
     enable(): void { enabled = true; },
     disable(): void { enabled = false; dragging = false; controller.cancel(); sm.reset(); },
-    setFineAim(active: boolean): void { _aimFine = active; },
-    get isFineAim(): boolean { return _aimFine; },
+    setFineAim(active: boolean): void { _fineBtn = active; },
+    get isFineAim(): boolean { return _fineBtn || _fineShift; },
     dispose(): void {
       element.removeEventListener('pointerdown', onPointerDown as EventListener);
       element.removeEventListener('pointermove', onPointerMove as EventListener);
