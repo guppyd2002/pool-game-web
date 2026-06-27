@@ -220,8 +220,9 @@ loadReplayInput.addEventListener('change', () => {
     if (!shots || shots.length === 0) { alert('Invalid or empty .poolrecord file.'); return; }
     mainMenuEl.style.display = 'none';
     topViewBtn.style.display = 'block';
-    cameraTween.tweenTo(POSE_TABLE, 0.5);
-    _runCameraTween(true);
+    _inTopView = true;
+    topViewBtn.textContent = '⬇ Table';
+    scene.setOrthoTop(true);
     // Disable human controls — replay drives the session
     adapter.disable();
     powerSliderUI.element.style.display = 'none';
@@ -238,10 +239,9 @@ loadReplayInput.addEventListener('change', () => {
 startBtn.addEventListener('click', () => {
   mainMenuEl.style.display = 'none';
   topViewBtn.style.display = 'block';
-  _inTopView = false;
-  topViewBtn.textContent = '⬆ Top';
-  cameraTween.tweenTo(POSE_TABLE, 0.5);
-  _runCameraTween(true);
+  _inTopView = true;
+  topViewBtn.textContent = '⬇ Table';
+  scene.setOrthoTop(true);
   gameSession.startNewGame();
 });
 
@@ -381,16 +381,15 @@ if (_demoConfig) {
     _prevDemoGameEnded?.(winner, reason);
   };
 
-  // Auto-start: skip main menu, tween camera to table, begin game
+  // Auto-start: skip main menu, enter ortho top-view, begin game
   mainMenuEl.style.display = 'none';
   topViewBtn.style.display = 'block';
-  _inTopView = false;
-  topViewBtn.textContent = '⬆ Top';
+  _inTopView = true;
+  topViewBtn.textContent = '⬇ Table';
+  scene.setOrthoTop(true);
   // Spectator view: hide Power/Shot and Spin/Top controls (AI drives all input)
   powerSliderUI.element.style.display = 'none';
   spinDiscUI.element.style.display = 'none';
-  cameraTween.tweenTo(POSE_TABLE, 0.5);
-  _runCameraTween(true);
   gameSession.startNewGame();
 } else {
   // Normal HotSeat mode: human-controlled turn changes
