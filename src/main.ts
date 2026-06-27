@@ -33,6 +33,8 @@ import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import { createBallPool8Session } from './game/game-session';
 import { attachAIDemo, parseDemoConfig } from './game/ai-demo';
 import { pickValidSeed } from './game/headless-game';
+import { createRecordDriver, downloadRecord, parseRecord } from './game/record-driver';
+import { createReplayHUD } from './renderer/replay-hud';
 import { createReplayDriver } from './renderer/replay-driver';
 import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
@@ -199,10 +201,37 @@ mainMenuEl.innerHTML = [
   '<h1 style="font-size:36px;margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
   '<p style="font-size:14px;opacity:0.6;margin-bottom:32px;">HotSeat — 2 players, same screen</p>',
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
+  '<label id="btn-load-replay" style="margin-top:16px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
+  '<input id="inp-record" type="file" accept=".poolrecord,.json" style="display:none;">',
 ].join('');
 container.appendChild(mainMenuEl);
 
 const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
+const loadReplayLabel = mainMenuEl.querySelector('#btn-load-replay') as HTMLLabelElement;
+const loadReplayInput = mainMenuEl.querySelector('#inp-record') as HTMLInputElement;
+loadReplayLabel.htmlFor = 'inp-record';
+
+loadReplayInput.addEventListener('change', () => {
+  const file = loadReplayInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const shots = parseRecord(reader.result as string);
+    if (!shots || shots.length === 0) { alert('Invalid or empty .poolrecord file.'); return; }
+    mainMenuEl.style.display = 'none';
+    topViewBtn.style.display = 'block';
+    cameraTween.tweenTo(POSE_TABLE, 0.5);
+    _runCameraTween(true);
+    // Disable human controls — replay drives the session
+    adapter.disable();
+    powerSliderUI.element.style.display = 'none';
+    spinDiscUI.element.style.display = 'none';
+    replayHUD.start(gameSession, physics, scene, shots);
+  };
+  reader.readAsText(file);
+  // Reset so the same file can be re-loaded
+  loadReplayInput.value = '';
+});
 
 // ─── GAME-003: start → Aiming, cue enabled ───────────────────────────────────
 
@@ -221,6 +250,7 @@ startBtn.addEventListener('click', () => {
 const reasonBanner = createReasonBanner(container);
 
 const gameOverUI = createGameOverUI(container);
+const replayHUD = createReplayHUD(container);
 gameOverUI.onPlayAgain = () => {
   gameOverUI.hide();
   gameSession.playAgain();
@@ -330,6 +360,27 @@ if (_demoConfig) {
     _updatePlayerIndicator(playerIndex, ballInHand);
     _demoTurnFn?.(playerIndex, ballInHand);
   };
+
+  // Recording: wire onShotFired to accumulate per-shot records for download
+  const _recConfig = {
+    engineVersion: 'dev',
+    players: [
+      { type: 'AI' as const, rank: _demoConfig.rank0 },
+      { type: 'AI' as const, rank: _demoConfig.rank1 },
+    ] as [{ type: 'AI'; rank: number }, { type: 'AI'; rank: number }],
+    gameSeed: _demoConfig.seed,
+  };
+  const { driver: _recDriver, record: _recRecord } = createRecordDriver(_recConfig);
+  gameSession.onShotFired = (s) => _recDriver.onShotFired(s);
+
+  // Override onGameEnded to finalize recording and expose download button
+  const _prevDemoGameEnded = gameSession.onGameEnded;
+  gameSession.onGameEnded = (winner, reason) => {
+    _recDriver.finalize({ winner, reason, totalShots: _recRecord.shots.length });
+    gameOverUI.onDownloadRecord = () => downloadRecord(_recRecord, _recConfig);
+    _prevDemoGameEnded?.(winner, reason);
+  };
+
   // Auto-start: skip main menu, tween camera to table, begin game
   mainMenuEl.style.display = 'none';
   topViewBtn.style.display = 'block';
@@ -419,6 +470,7 @@ window.addEventListener('beforeunload', () => {
   placementMarker.dispose();
   reasonBanner.dispose();
   gameOverUI.dispose();
+  replayHUD.dispose();
   replayDriver.dispose();
   turnPrompt.dispose();
 });
