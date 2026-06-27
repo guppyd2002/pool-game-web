@@ -2,9 +2,10 @@
  * Replay HUD — Mode A playback controls.
  * play / pause / step-fwd / step-bk / reset / speed / shot-seek
  *
- * Seek uses RecordedShot.physicsState (now included in .poolrecord) to jump
- * backward without re-running the AI. Visual positions are always exact.
- * Ball-in-hand state after a backward seek is inferred from cueBallPlaced.
+ * Seek replays startNewGame + shots[0..n-1] headlessly to correctly rewind
+ * both physics and rule-engine state.  Ball-in-hand transitions use
+ * session.isBallInHand (live state) — not cueBallPlaced, which is null when
+ * BIH occurs but the AI keeps the cue ball in place.
  */
 
 import type { IGameSession, RecordedShot } from '../game/game-session';
