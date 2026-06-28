@@ -197,10 +197,10 @@ const spinDisc = createSpinDisc({
 });
 const spinDiscUI = createSpinDiscUI(container, spinDisc);
 
-// CUE-021: UI edge fade
+// CUE-021: UI edge fade — passive indicators only; powerSliderUI excluded
+// because it is the primary interactive control and must remain at full opacity.
 const uiEdgeFade = createUIEdgeFade(scene.camera, [
   powerBar.element,
-  powerSliderUI.element,
   spinDiscUI.element,
 ]);
 
@@ -494,9 +494,13 @@ if (_demoConfig) {
     if (isBallInHand) {
       _enterBallInHandMode();
     } else {
-      // Show cue stick at default angle pointing toward the rack until player drags
-      const cueBall = physics.getBall(0);
-      cueMesh.update(cueBall.position, new CmVector(0.5, 0, 0), 0, 0, 0);
+      // G-2: set default aim so _updateAimVisuals shows cue + line before first drag.
+      // direction = start − current = (0.2, 0) → normalized +X (toward rack).
+      // resetForNewTurn() already cleared stale aim; this sets a fresh default each turn.
+      cue.onDragStart({ x: 0.1, z: 0 });
+      cue.onDragMove({ x: -0.1, z: 0 });
+      cue.cancel();
+      _updateAimVisuals();
     }
   };
 }

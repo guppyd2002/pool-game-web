@@ -55,7 +55,9 @@ export function createPowerSliderUI(
   const track = document.createElement('div');
   track.style.cssText = [
     `width:${TRACK_W}px`, `height:${TRACK_H}px`, 'border-radius:18px',
-    'background:rgba(0,0,0,0.55)', 'border:1px solid rgba(255,255,255,0.3)',
+    // G-1: raised opacity + stronger border so track is visible on dark table bg (#1a1a2e)
+    'background:rgba(0,0,0,0.88)', 'border:2px solid rgba(255,255,255,0.65)',
+    'box-shadow:0 0 0 1px rgba(255,255,255,0.15),0 4px 20px rgba(0,0,0,0.9)',
     'position:relative', 'overflow:hidden',
     'touch-action:none', 'cursor:ns-resize',
   ].join(';');
