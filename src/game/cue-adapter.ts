@@ -73,8 +73,7 @@ export interface CueAdapterOptions {
   onAimUpdate?: () => void;
   /** Called on pinch or wheel zoom (delta > 0 = zoom in). */
   onZoom?: (delta: number) => void;
-  /** CUE-011: Called when a shot fires, with the power fraction [0,1] at release. */
-  onShotFired?: (powerFraction: number) => void;
+  // onShotFired removed: 8BP mode fires via power bar (main.ts), not the adapter.
 }
 
 export function createCueAdapter(opts: CueAdapterOptions): {
@@ -86,7 +85,9 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   /** CUE-024: Whether fine-aim mode is currently active. */
   readonly isFineAim: boolean;
 } {
-  const { element, cueBallMesh, controller } = opts;
+  const { element, controller } = opts;
+  // cueBallMesh kept in options for API compat but no longer used for hit-testing
+  // (8BP: aim drag works anywhere on the canvas, not just on the cue ball).
   // Resolve the active camera at each raycasting call so ortho/perspective switches work correctly.
   const getCamera = opts.getCameraFn ?? (() => opts.camera);
   const sm = new PointerStateMachine();
@@ -131,9 +132,8 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (!enabled || _zoomActive) return;  // CUE-023: block drag during pinch
     const ndc = toNDC(e.clientX, e.clientY);
     raycaster.setFromCamera(ndc, getCamera());
-    // Only begin drag when the pointer hits the cue ball mesh
-    if (raycaster.intersectObject(cueBallMesh).length === 0) return;
-
+    // 8BP aim: drag anywhere on canvas rotates the aim line.
+    // No cue ball mesh intersection required.
     sm.feedPointerDown(e.clientX, e.clientY);
     const pt = tableIntersection(raycaster, TABLE_PLANE_Y);
     if (!pt) return;
@@ -161,14 +161,16 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) {
-      // CUE-011: capture power before onDragEnd clears drag state
-      const powerAtRelease = controller.getPowerFraction();
-      const shotFired = controller.onDragEnd(_applyFine(pt));
-      if (shotFired) opts.onShotFired?.(powerAtRelease);
+      // 8BP: pointer-up commits aim direction only — no shot fires from the adapter.
+      // Apply final fine-aim scaling then cancel the drag phase.
+      // _lastAimStart/_lastAimCurrent in CueController persist after cancel()
+      // so the power bar can later call fireNow() with the saved aim.
+      controller.onDragMove(_applyFine(pt));  // update aim to final pointer position
+      controller.cancel();                    // go idle, keep _lastAimStart/_lastAimCurrent
     } else {
-      controller.cancel();  // pointer went off-table: cancel drag, clears aim line
+      controller.cancel();  // pointer went off-table: cancel drag
     }
-    opts.onAimUpdate?.();  // clear aim+power visuals when shot fires or drag drops
+    opts.onAimUpdate?.();  // refresh aim-line visuals after drag ends
   }
 
   // ─── Touch events for multi-finger pinch (P1-T12 PointerStateMachine) ────────
