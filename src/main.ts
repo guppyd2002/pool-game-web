@@ -89,8 +89,13 @@ function _updateAimVisuals(): void {
   _lastAimTime = now;
 
   const cueBall = physics.getBall(0);
-  // M-2: pass _currentPowerFraction so getAimHit uses the same quantization as fireNow
-  const hit = cue.getAimHit(_currentPowerFraction);
+  // F-A fix: use a nominal 50% preview force when power bar is not being held
+  // (_currentPowerFraction === 0), so the aim line always shows during aim drag.
+  // When the power bar IS held (_currentPowerFraction > 0), use the real fraction
+  // → bit-exact preview (M-2) for the "about to fire" moment.
+  // The nominal preview never fires, so it need not be bit-exact.
+  const _previewForce = _currentPowerFraction > 0 ? _currentPowerFraction : 0.5;
+  const hit = cue.getAimHit(_previewForce);
   const power = _currentPowerFraction;
   aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
   ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);

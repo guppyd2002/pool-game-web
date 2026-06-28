@@ -422,6 +422,10 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       _phase = 'idle';
       _startPoint = null;
       _currentPoint = null;
+      // Clear CUE-002 saved aim state so the next player starts with no aim direction.
+      // Prevents cross-turn stale aim line (F-A / boundary-#2).
+      _lastAimStart = null;
+      _lastAimCurrent = null;
       _isEnabled = true;
       // _aimLineVisible intentionally NOT reset — user preference persists across turns
     },

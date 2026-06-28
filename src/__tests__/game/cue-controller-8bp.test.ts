@@ -163,8 +163,8 @@ describe('M-2: getAimHit(forceFraction) — 8BP 模式預覽線', () => {
     expect(ctrl.getAimHit()).toBeNull();  // no arg → old behavior → null
   });
 
-  it('getAimHit(forceFraction) works after onDragEnd (aim state persists)', () => {
-    // 8BP: after drag end (aim committed), power bar can still show preview
+  it('getAimHit(forceFraction) works after onDragEnd (aim state persists within turn)', () => {
+    // 8BP: after drag end (aim committed), power bar can still show preview within same turn
     const phys = makeMockPhysics();
     const ctrl = createCueController(phys);
     ctrl.onDragStart({ x: 0, z: 0 });
@@ -173,5 +173,19 @@ describe('M-2: getAimHit(forceFraction) — 8BP 模式預覽線', () => {
     phys.shotLog.length = 0;
     const result = ctrl.getAimHit(0.5);
     expect(result).not.toBeNull();
+  });
+
+  it('resetForNewTurn() clears CUE-002 aim state — no cross-turn stale aim line', () => {
+    // F-A/boundary-#2: after resetForNewTurn, the new player has no saved aim.
+    // getAimHit(forceFraction) must return null until the new player drags.
+    const ctrl = createCueController(makeMockPhysics());
+    ctrl.onDragStart({ x: 0, z: 0 });
+    ctrl.onDragMove({ x: -0.5, z: 0 });
+    ctrl.cancel();  // commit aim for Player 1
+    ctrl.resetForNewTurn();  // turn change: Player 2 starts
+    // Player 2 has not aimed yet — no stale aim line from Player 1
+    expect(ctrl.getAimHit(0.5)).toBeNull();
+    // Also fireNow must fail (no saved aim for this turn)
+    expect(ctrl.fireNow(0.5)).toBe(false);
   });
 });
