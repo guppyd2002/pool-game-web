@@ -89,13 +89,12 @@ function _updateAimVisuals(): void {
   _lastAimTime = now;
 
   const cueBall = physics.getBall(0);
-  // F-A fix: use a nominal 50% preview force when power bar is not being held
-  // (_currentPowerFraction === 0), so the aim line always shows during aim drag.
-  // When the power bar IS held (_currentPowerFraction > 0), use the real fraction
-  // → bit-exact preview (M-2) for the "about to fire" moment.
-  // The nominal preview never fires, so it need not be bit-exact.
+  // F-A: use nominal 0.5 force when power bar idle so aim line always shows
+  // during aim drag. When power bar held, use real fraction (M-2 bit-exact).
   const _previewForce = _currentPowerFraction > 0 ? _currentPowerFraction : 0.5;
-  const hit = cue.getAimHit(_previewForce);
+  // F-B: suppress aim line during simulation (shot just fired) so it doesn't
+  // persist through the entire ball-motion replay and into the next turn.
+  const hit = physics.isSimulating ? null : cue.getAimHit(_previewForce);
   const power = _currentPowerFraction;
   aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
   ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);
