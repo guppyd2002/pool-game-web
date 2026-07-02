@@ -139,6 +139,19 @@ export interface CueController {
   resetForNewTurn(): void;
 
   /**
+   * 8BP v2.1 F-③/④: Read the canonical CUE-002 aim state for fine-adjust base snapshot.
+   * Returns { start, current } = { _lastAimStart, _lastAimCurrent }; may be null.
+   */
+  getAimState(): { start: TablePoint | null; current: TablePoint | null };
+
+  /**
+   * 8BP v2.1 F-④ C-2: Write _lastAimCurrent directly (fine-adjust bar per-move update).
+   * Rotates canonical current around _lastAimStart without changing _phase.
+   * No-op if _lastAimStart is null.
+   */
+  setFineAimCurrent(pt: TablePoint): void;
+
+  /**
    * CUE-008: Whether the aim line is shown during aiming.
    * Maps to C# CueShotManager.IsAutoShot (the UI toggle that shows/hides hitLine).
    * Defaults to true. Persists across turns (user preference).
@@ -434,6 +447,15 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
 
     toggleAimLine(): void {
       _aimLineVisible = !_aimLineVisible;
+    },
+
+    getAimState(): { start: TablePoint | null; current: TablePoint | null } {
+      return { start: _lastAimStart, current: _lastAimCurrent };
+    },
+
+    setFineAimCurrent(pt: TablePoint): void {
+      if (_lastAimStart === null) return;
+      _lastAimCurrent = pt;
     },
 
     onShotApplied: null,

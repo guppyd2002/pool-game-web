@@ -58,6 +58,12 @@ export function applyAimSensitivity(
   };
 }
 
+/** Pointer-pixel displacement below which a touch is classified as a tap. */
+export const TAP_MOVE_THRESH = 10;
+
+/** Maximum duration (ms) for a tap — upper bound only; displacement is primary. */
+export const TAP_TIME_THRESH = 200;
+
 export interface CueAdapterOptions {
   camera: THREE.Camera;
   /**
@@ -74,6 +80,12 @@ export interface CueAdapterOptions {
   /** Called on pinch or wheel zoom (delta > 0 = zoom in). */
   onZoom?: (delta: number) => void;
   // onShotFired removed: 8BP mode fires via power bar (main.ts), not the adapter.
+  /**
+   * F-③ tap-to-aim: returns cue ball world position (float meters).
+   * Required to compute C-1 aim pair (start = cueBall+1m*dir, current = cueBall).
+   * If omitted, tap-to-aim is disabled.
+   */
+  getCueBallWorld?: () => { x: number; z: number };
 }
 
 export function createCueAdapter(opts: CueAdapterOptions): {
@@ -104,6 +116,11 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   let _fineShift = false;
   // World-space drag start position, set in onPointerDown, used by applyAimSensitivity.
   let _dragStartWorld: { x: number; z: number } | null = null;
+  // F-③ tap detection state. _tapEligible cleared once displacement exceeds threshold (hysteresis).
+  let _tapEligible = false;
+  let _tapStartX = 0;
+  let _tapStartY = 0;
+  let _tapStartTime = 0;
 
   function toNDC(clientX: number, clientY: number): THREE.Vector2 {
     const rect = element.getBoundingClientRect();
@@ -138,6 +155,11 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     const pt = tableIntersection(raycaster, TABLE_PLANE_Y);
     if (!pt) return;
     _dragStartWorld = pt;  // CUE-024: anchor for fine-aim displacement scaling
+    // F-③: tap detection — track start position and time
+    _tapEligible = true;
+    _tapStartX = e.clientX;
+    _tapStartY = e.clientY;
+    _tapStartTime = e.timeStamp;
     dragging = true;
     controller.onDragStart(pt);
     e.preventDefault();
@@ -146,6 +168,14 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   function onPointerMove(e: PointerEvent): void {
     if (!dragging || !enabled || _zoomActive) return;
     sm.feedPointerMove(e.clientX, e.clientY);
+    // F-③ H-3: hysteresis — once displacement exceeds threshold, no longer a tap
+    if (_tapEligible) {
+      const dx = e.clientX - _tapStartX;
+      const dy = e.clientY - _tapStartY;
+      if (Math.sqrt(dx * dx + dy * dy) > TAP_MOVE_THRESH) {
+        _tapEligible = false;
+      }
+    }
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) {
       controller.onDragMove(_applyFine(pt));
@@ -160,6 +190,35 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     dragging = false;
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
+
+    // F-③ H-3: tap classification — displacement-primary, 200ms as upper bound only.
+    // _tapEligible is cleared when displacement > TAP_MOVE_THRESH (hysteresis).
+    // Slow deliberate taps (> threshold time but < threshold distance) are still taps.
+    const elapsed = e.timeStamp - _tapStartTime;
+    if (_tapEligible && elapsed < TAP_TIME_THRESH && opts.getCueBallWorld) {
+      const tapPt = pt ?? ndcToTablePoint(toNDC(_tapStartX, _tapStartY));
+      if (tapPt) {
+        const cb = opts.getCueBallWorld();
+        const dx = tapPt.x - cb.x;
+        const dz = tapPt.z - cb.z;
+        const nd = Math.sqrt(dx * dx + dz * dz);
+        if (nd > 0.001) {
+          const nx = dx / nd;
+          const nz = dz / nd;
+          // C-1: _lastAimStart = cueBall + 1m in tap direction; _lastAimCurrent = cueBall.
+          // (start − current) = +(tap−cueBall) = correct positive aim direction.
+          // M-3: fixed nd=1m avoids nd<0.001 silent failure for close taps.
+          controller.onDragStart({ x: cb.x + nx, z: cb.z + nz });
+          controller.onDragMove({ x: cb.x, z: cb.z });
+          controller.cancel();
+          opts.onAimUpdate?.();
+          return;
+        }
+      }
+      // Tap on an off-table point or cueball dead-center: fall through to normal cancel
+    }
+
+    // Normal drag end: commit aim direction and go idle.
     if (pt) {
       // 8BP: pointer-up commits aim direction only — no shot fires from the adapter.
       // Apply final fine-aim scaling then cancel the drag phase.
@@ -254,7 +313,7 @@ export function createCueAdapter(opts: CueAdapterOptions): {
 
   return {
     enable(): void { enabled = true; },
-    disable(): void { enabled = false; dragging = false; controller.cancel(); sm.reset(); },
+    disable(): void { enabled = false; dragging = false; _tapEligible = false; controller.cancel(); sm.reset(); },
     setFineAim(active: boolean): void { _fineBtn = active; },
     get isFineAim(): boolean { return _fineBtn || _fineShift; },
     dispose(): void {

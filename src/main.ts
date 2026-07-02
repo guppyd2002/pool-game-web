@@ -28,12 +28,14 @@ import { createGhostBall } from './renderer/ghost-ball';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
+import { MULTIPLIER } from './physics/fixed-math';
 import { CmVector } from './physics/cm-vector';
 import { backswingOffset } from './game/shot-animation';
 import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
 import { createSpinDiscUI } from './renderer/spin-disc-ui';
 import { createPowerSliderUI } from './renderer/power-slider-ui';
+import { createFineAdjustBarUI } from './renderer/fine-adjust-bar-ui';
 import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import { createBallPool8Session } from './game/game-session';
 import { attachAIDemo, parseDemoConfig } from './game/ai-demo';
@@ -135,6 +137,11 @@ const adapter = createCueAdapter({
     scene.camera.position.addScaledVector(dir, -delta * 0.5);
     scene.camera.position.clampLength(1.0, 5.0);
   },
+  // F-③ tap-to-aim: provide cueball world position (float meters) for C-1 aim pair.
+  getCueBallWorld: () => {
+    const b = physics.getBall(0);
+    return { x: b.position.x / MULTIPLIER, z: b.position.z / MULTIPLIER };
+  },
   // onShotFired removed: 8BP fires via power bar (see shotSlider.onShot below)
 });
 
@@ -150,8 +157,10 @@ const adapter = createCueAdapter({
 
 const shotSlider = createShotSlider({
   isAutoShot: true,
-  onStartControl: () => { adapter.disable(); },
-  onEndControl:   () => { adapter.enable(); },
+  // C-2 mutex (b): power charging locks both aim drag AND fine-adjust bar.
+  // Extends existing onStartControl→adapter.disable pattern to cover fine-adjust.
+  onStartControl: () => { adapter.disable(); fineAdjustBar.disable(); },
+  onEndControl:   () => { adapter.enable(); fineAdjustBar.enable(); },
   onMove:  (f) => {
     _currentPowerFraction = f;
     _updateAimVisuals();
@@ -188,6 +197,13 @@ const shotSlider = createShotSlider({
 const powerSliderUI = createPowerSliderUI(container, shotSlider);
 // Power bar starts hidden; shown when game starts (not in demo/replay spectator view)
 powerSliderUI.element.style.display = 'none';
+
+// F-④: Left-side fine-adjust bar — ±3° precision aim rotation.
+const fineAdjustBar = createFineAdjustBarUI(container, cue, () => {
+  turnPrompt.dismiss();
+  _updateAimVisuals();
+});
+fineAdjustBar.element.style.display = 'none';
 
 // CUE-006/CUE-008: spin disc
 const spinDisc = createSpinDisc({
@@ -276,6 +292,7 @@ loadReplayInput.addEventListener('change', () => {
     // Disable all human controls — replay drives the session
     adapter.disable();
     powerSliderUI.element.style.display = 'none';  // M-1: no power bar during replay
+    fineAdjustBar.element.style.display = 'none';
     spinDiscUI.element.style.display = 'none';
     replayHUD.start(gameSession, physics, scene, shots);
   };
@@ -291,6 +308,7 @@ startBtn.addEventListener('click', () => {
   topViewBtn.style.display = 'block';
   fineAimBtn.style.display = 'block';
   powerSliderUI.element.style.display = 'block';  // 8BP: show power bar for HotSeat
+  fineAdjustBar.element.style.display = 'block';  // F-④: show fine-adjust bar for HotSeat
   _inTopView = true;
   topViewBtn.textContent = '⬇ Table';
   scene.setOrthoTop(true);
@@ -314,6 +332,7 @@ gameOverUI.onExit = () => {
   topViewBtn.style.display = 'none';
   fineAimBtn.style.display = 'none';
   powerSliderUI.element.style.display = 'none';  // hide on exit to main menu
+  fineAdjustBar.element.style.display = 'none';
   adapter.setFineAim(false);
   _inTopView = false;
   topViewBtn.textContent = '⬆ Top';
@@ -477,6 +496,7 @@ if (_demoConfig) {
   // M-1: power bar hidden for AI spectator — no human can fire via power bar.
   // fireNow also checks _isEnabled (double gate), but hiding is the primary protection.
   powerSliderUI.element.style.display = 'none';
+  fineAdjustBar.element.style.display = 'none';
   spinDiscUI.element.style.display = 'none';
   _inTopView = true;
   topViewBtn.textContent = '⬇ Table';
@@ -523,6 +543,9 @@ function _enterBallInHandMode(): void {
   // M-3: disable power bar during BIH — dragging power bar would fire with an
   // uncommitted cue ball position, injecting a shot before placement.
   powerSliderUI.element.style.display = 'none';
+  // BIH: disable fine-adjust bar too (§5: BIH 期間左右兩 bar 都 disable)
+  fineAdjustBar.element.style.display = 'none';
+  fineAdjustBar.disable();
   _bihStartT = performance.now() / 1000;
   ballInHand.enter();
   const t = performance.now() / 1000 - _bihStartT;
@@ -545,6 +568,9 @@ function onBihPointerUp(_e: PointerEvent): void {
     adapter.enable();
     // M-3: re-enable power bar after ball is placed
     powerSliderUI.element.style.display = 'block';
+    // Re-enable fine-adjust bar after ball is placed
+    fineAdjustBar.element.style.display = 'block';
+    fineAdjustBar.enable();
   }
 }
 
@@ -565,6 +591,7 @@ window.addEventListener('beforeunload', () => {
   aimLine.dispose();
   ghostBall.dispose();
   powerSliderUI.dispose();
+  fineAdjustBar.dispose();
   spinDiscUI.dispose();
   uiEdgeFade.dispose();
   powerBar.dispose();

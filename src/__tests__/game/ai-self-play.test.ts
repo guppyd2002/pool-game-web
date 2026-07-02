@@ -71,6 +71,8 @@ const MOCK_CUE: CueController = {
   setVerticalAngle: () => {},
   getVerticalAngle: () => 0,
   toggleAimLine: () => {},
+  getAimState: () => ({ start: null, current: null }),
+  setFineAimCurrent: () => {},
 };
 
 // ─── Sync ReplayDriver (triggers completion immediately) ──────────────────────

@@ -2,10 +2,11 @@
  * CUE-002 / 8BP: Power Bar UI — vertical bar on the right side of the screen.
  *
  * 8BP 分離式設計：
- *   - Drag UP to charge (touch anywhere on the track); release = fire.
+ *   - F-②: Drag DOWN to charge (cue-pull metaphor); release = fire.
  *   - isAutoShot: true in ShotSlider → endControl() fires automatically.
- *   - Positioned right side, between top-view/fine-aim buttons (top-right)
- *     and the spin disc (bottom-right) — no overlap on typical mobile screens.
+ *   - F-①: Positioned right side with safe-area-inset-right margin to avoid
+ *     toolbar/notch overlap, between top-view/fine-aim buttons (top-right)
+ *     and the spin disc (bottom-right).
  *
  * Not unit-tested (DOM layer). Domain logic lives in game/shot-slider.ts.
  */
@@ -34,10 +35,14 @@ export function createPowerSliderUI(
 ): PowerSliderUI {
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Outer wrapper — right side, vertically centred
+  // F-①: Outer wrapper — right side, vertically centred.
+  // right uses max() so safe-area-inset-right (landscape notch) is respected, and
+  // enough fixed margin (56px) clears Vercel preview toolbar on portrait as well.
   const overlay = document.createElement('div');
   overlay.style.cssText = [
-    'position:absolute', 'right:12px', 'top:50%', 'transform:translateY(-50%)',
+    'position:absolute',
+    'right:max(56px, calc(16px + env(safe-area-inset-right, 0px)))',
+    'top:50%', 'transform:translateY(-50%)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
     'user-select:none',
@@ -62,17 +67,28 @@ export function createPowerSliderUI(
     'touch-action:none', 'cursor:ns-resize',
   ].join(';');
 
-  // Fill bar (bottom-up: low power = small fill, full power = full bar)
+  // F-②: Fill bar — top-anchored (cue-pull metaphor: drag DOWN = more power shown from top).
+  // Thumb shows current drag position; fill below thumb shows accumulated pullback.
   const fill = document.createElement('div');
   fill.style.cssText = [
-    'position:absolute', 'bottom:0', 'left:0', 'right:0',
+    'position:absolute', 'top:0', 'left:0', 'right:0',
     'height:0%',
-    // Green at bottom → yellow → red at top (matches 8BP convention)
-    'background:linear-gradient(to top,#44ff44,#ffcc00,#ff4444)',
+    // Weak (green) at top → strong (red) at bottom (charge level as cue is pulled further down)
+    'background:linear-gradient(to bottom,#44ff44,#ffcc00,#ff4444)',
     'border-radius:16px',
   ].join(';');
 
+  // Thumb indicator — moves down as power increases (start at top = 0 force)
+  const thumb = document.createElement('div');
+  thumb.style.cssText = [
+    'position:absolute', 'top:0', 'left:2px', 'right:2px', 'height:16px',
+    'background:rgba(255,255,255,0.85)', 'border-radius:8px',
+    'transition:top 0.05s linear',
+    'pointer-events:none',
+  ].join(';');
+
   track.appendChild(fill);
+  track.appendChild(thumb);
 
   // Percentage readout below the bar
   const pctText = document.createElement('div');
@@ -82,11 +98,18 @@ export function createPowerSliderUI(
     'font-weight:bold', 'pointer-events:none',
   ].join(';');
 
-  // Hint text
+  // F-②: Hint text — cue-pull metaphor
   const hint = document.createElement('div');
-  hint.textContent = '↑ Drag';
+  hint.textContent = '↓ 抽桿蓄力';
   hint.style.cssText = [
     'color:rgba(255,255,255,0.45)', 'font-size:9px', 'font-family:sans-serif',
+    'pointer-events:none', 'text-align:center',
+  ].join(';');
+
+  const hint2 = document.createElement('div');
+  hint2.textContent = '放開發射';
+  hint2.style.cssText = [
+    'color:rgba(255,255,255,0.35)', 'font-size:8px', 'font-family:sans-serif',
     'pointer-events:none', 'text-align:center',
   ].join(';');
 
@@ -94,13 +117,20 @@ export function createPowerSliderUI(
   overlay.appendChild(track);
   overlay.appendChild(pctText);
   overlay.appendChild(hint);
+  overlay.appendChild(hint2);
   container.appendChild(overlay);
 
   // ─── Visual sync ────────────────────────────────────────────────────────────
 
+  const THUMB_H = 16;
+
   function syncVisual(fraction: number): void {
     const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
+    // F-②: fill grows from top (more pull = more fill from top)
     fill.style.height = `${pct}%`;
+    // Thumb tracks drag position (top = 0, bottom = full power)
+    const thumbTop = fraction * (TRACK_H - THUMB_H);
+    thumb.style.top = `${thumbTop}px`;
     pctText.textContent = `${pct}%`;
   }
 
@@ -108,8 +138,9 @@ export function createPowerSliderUI(
 
   function clientYToFraction(clientY: number): number {
     const rect = track.getBoundingClientRect();
-    // Top of track = full power (1.0), bottom = zero (0.0)
-    return 1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    // F-②: DOWN = charge (cue-pull metaphor). Top = 0 force, bottom = full force.
+    // bit-exact neutral: only mapping direction changes, trunc(f*MAX_FORCE) unchanged.
+    return Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
   }
 
   // ─── Pointer events on the track ────────────────────────────────────────────
