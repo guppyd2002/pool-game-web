@@ -58,25 +58,12 @@ export function applyAimSensitivity(
   };
 }
 
-/** Pointer-pixel displacement below which a touch is classified as a tap. */
+/**
+ * Pointer-pixel displacement below which a release is classified as a tap.
+ * F-③ H-3: displacement is the SOLE gate — no time check. Any duration is valid;
+ * only a drag (displacement > threshold) disqualifies the event as a tap.
+ */
 export const TAP_MOVE_THRESH = 10;
-
-/**
- * Long-press exclusion threshold (ms) — upper bound only; displacement is primary.
- * H-3: 800ms so slow deliberate taps (e.g. 300ms, 2px) are never swallowed.
- * Only pathological long-presses (>800ms) are excluded to prevent accidental aim.
- */
-export const TAP_TIME_THRESH = 800;
-
-/**
- * F-③ H-3: Classify a pointer event as a tap.
- * Displacement is the primary gate; elapsed is an upper-bound long-press exclusion only.
- * "慢速定點按" (slow deliberate tap with small displacement) always returns true.
- * Pure function — export for unit testing.
- */
-export function classifyTap(displacementPx: number, elapsedMs: number): boolean {
-  return displacementPx < TAP_MOVE_THRESH && elapsedMs < TAP_TIME_THRESH;
-}
 
 /**
  * F-③ C-1: Compute canonical aim pair for tap-to-aim.
@@ -153,11 +140,11 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   let _fineShift = false;
   // World-space drag start position, set in onPointerDown, used by applyAimSensitivity.
   let _dragStartWorld: { x: number; z: number } | null = null;
-  // F-③ tap detection state. _tapEligible cleared once displacement exceeds threshold (hysteresis).
+  // F-③ H-3: tap detection — pure displacement gate. _tapEligible cleared in pointermove
+  // when displacement > TAP_MOVE_THRESH. No time tracking needed.
   let _tapEligible = false;
   let _tapStartX = 0;
   let _tapStartY = 0;
-  let _tapStartTime = 0;
 
   function toNDC(clientX: number, clientY: number): THREE.Vector2 {
     const rect = element.getBoundingClientRect();
@@ -192,11 +179,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     const pt = tableIntersection(raycaster, TABLE_PLANE_Y);
     if (!pt) return;
     _dragStartWorld = pt;  // CUE-024: anchor for fine-aim displacement scaling
-    // F-③: tap detection — track start position and time
+    // F-③ H-3: tap detection — track only start position (no time gate)
     _tapEligible = true;
     _tapStartX = e.clientX;
     _tapStartY = e.clientY;
-    _tapStartTime = e.timeStamp;
     dragging = true;
     controller.onDragStart(pt);
     e.preventDefault();
@@ -228,14 +214,10 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
 
-    // F-③ H-3: tap classification — displacement-primary (classifyTap), long-press exclusion only.
-    // _tapEligible is cleared once displacement > TAP_MOVE_THRESH (hysteresis, see onPointerMove).
-    // Slow deliberate taps (small displacement, any reasonable elapsed) are classified as taps.
-    const elapsed = e.timeStamp - _tapStartTime;
-    if (classifyTap(
-      Math.sqrt((e.clientX - _tapStartX) ** 2 + (e.clientY - _tapStartY) ** 2),
-      elapsed,
-    ) && _tapEligible && opts.getCueBallWorld) {
+    // F-③ H-3: pure displacement gate — _tapEligible is the only check.
+    // _tapEligible is cleared when displacement > TAP_MOVE_THRESH (see onPointerMove).
+    // No time condition: any duration tap with small displacement is valid.
+    if (_tapEligible && opts.getCueBallWorld) {
       const tapPt = pt ?? ndcToTablePoint(toNDC(_tapStartX, _tapStartY));
       if (tapPt) {
         const cb = opts.getCueBallWorld();
