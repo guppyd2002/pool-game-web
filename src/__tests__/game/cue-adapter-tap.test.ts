@@ -6,14 +6,18 @@
  *
  * Coverage:
  *   - C-1: tap direction = positive toward tap point (not reversed)
- *   - H-3: NO time gate — any elapsed with small displacement is a tap
+ *   - H-3: NO time gate — elapsed>200ms small displacement STILL taps → fireNow ≠ false
  *   - Drag (displacement > TAP_MOVE_THRESH) → NOT a tap path
  *   - TAP_MOVE_THRESH export constant
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as THREE from 'three';
 import { createCueAdapter, TAP_MOVE_THRESH } from '../../game/cue-adapter';
+import { createCueController } from '../../game/cue-controller';
+import { CmVector } from '../../physics/cm-vector';
 import type { CueController, TablePoint } from '../../game/cue-controller';
+import type { ShotData, BallState, ShotResult, AimHit, IBallPoolPhysics } from '../../game/ball-pool-physics';
+import { MAX_FORCE } from '../../physics/constants';
 
 // ─── Stubs for document/window (adapter registers key+blur listeners on them) ──
 
@@ -117,6 +121,44 @@ function makeCamera(): THREE.PerspectiveCamera {
 }
 
 const CUE_BALL = { x: 0, z: 0 };
+
+// ─── Minimal physics stub for real-controller H-3 fireNow test ───────────────
+
+const EMPTY_AIM_HIT: AimHit = {
+  hitType: 'none', ballId: null, cushionId: null,
+  point: CmVector.zero, normal: CmVector.zero, distance: 0,
+};
+const EMPTY_SHOT_RESULT: ShotResult = {
+  frames: [], finalStates: [], pocketed: [], outOfTable: [], contacts: [],
+};
+const EMPTY_BALL_STATE: BallState = {
+  id: 0, position: new CmVector(0, 285, 0),
+  velocity: CmVector.zero, angularVelocity: CmVector.zero,
+  isActive: false, isKinematic: false, isOutOfTable: false,
+};
+function makeMockPhysics(): IBallPoolPhysics {
+  return {
+    get isSimulating() { return false; },
+    applyShot(_s: ShotData): ShotResult { return EMPTY_SHOT_RESULT; },
+    predictAimLine(_f: CmVector, _d: CmVector): AimHit { return EMPTY_AIM_HIT; },
+    getBall(_id: number): BallState { return EMPTY_BALL_STATE; },
+    getActiveBalls: () => [],
+    get allBalls() { return [] as readonly BallState[]; },
+    get shotFrames() { return [] as readonly import('../../physics/simulate').SimFrame[]; },
+    step: () => {},
+    start: () => {},
+    stop: () => {},
+    getStateAsString: () => '',
+    setStateFromString: () => {},
+    resetToStartState: () => {},
+    getPhysicsConstants: () => ({
+      ballMass: 1700, ballRadius: 285, maxForce: MAX_FORCE,
+      tableScaleX: 30000, tableScaleZ: 20000,
+    }),
+    placeBall: () => {},
+    respotCueBall: () => {},
+  };
+}
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -222,5 +264,35 @@ describe('CueAdapter tap-to-aim — drives shipping pointer handler path', () =>
 
     // Drag path: only the initial pointerdown onDragStart, NO second from tap pair
     expect(starts).toHaveLength(1);
+  });
+
+  it('H-3 fireNow: elapsed=300ms + 2px → tap classifies, aim set, fireNow(0.5) ≠ false', () => {
+    // 卡卡西 要求：elapsed>200ms 且位移<10px → 判 tap 且 fireNow 發得出
+    // Uses real createCueController so _lastAimStart/_lastAimCurrent are truly set
+    const { el, fire } = makeEventCapture();
+    const ctrl = createCueController(makeMockPhysics());
+
+    createCueAdapter({
+      camera: makeCamera(),
+      element: el,
+      cueBallMesh: new THREE.Mesh(),
+      controller: ctrl,
+      getCueBallWorld: () => CUE_BALL,
+    });
+
+    // Simulate deliberate slow tap: small displacement, 300ms elapsed
+    fire('pointerdown', { clientX: 150, clientY: 100, timeStamp: 0 });
+    fire('pointerup',   { clientX: 152, clientY: 100, timeStamp: 300 });
+
+    // Aim state must be set (tap path ran) — _lastAimStart/Current persisted after cancel()
+    const { start, current } = ctrl.getAimState();
+    expect(start).not.toBeNull();
+    expect(current).not.toBeNull();
+
+    // C-1: aim direction toward tap (positive X — right half of canvas)
+    expect(start!.x - current!.x).toBeGreaterThan(0);
+
+    // fireNow must succeed (aim set → nd ≈ 1m > 0.001, force > 0 at f=0.5)
+    expect(ctrl.fireNow(0.5)).toBe(true);
   });
 });
