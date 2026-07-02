@@ -16,6 +16,7 @@ import { CmVector } from '../../physics/cm-vector';
 import type { ShotData, BallState, ShotResult, AimHit, IBallPoolPhysics } from '../../game/ball-pool-physics';
 import { MAX_FORCE } from '../../physics/constants';
 import { createCueController } from '../../game/cue-controller';
+import { applyFineAimRotation } from '../../renderer/fine-adjust-bar-ui';
 
 const CUE_BALL_POS = new CmVector(0, 9440, 0);
 
@@ -168,12 +169,9 @@ describe('setFineAimCurrent() — C-2 immediate canonical write', () => {
     expect(Math.abs(previewDir.z)).toBeGreaterThan(0);
   });
 
-  it('rotation geometry: direction after setFineAimCurrent matches expected rotation', () => {
-    // Verify: setFineAimCurrent can express a 90° rotation correctly.
-    // Initial aim: start=(1,0), current=(0,0) → direction=(+1, 0)
-    // After 90° CCW rotation around start: new direction=(0, +1)?
-    // Actually: new direction = rotate(start-current, θ) = rotate((1,0), 90°) = (0, 1)
-    // newCurrent = start - newDirection = (1,0) - (0,1) = (1, -1)
+  it('round-trip: setFineAimCurrent with applyFineAimRotation produces correct canonical', () => {
+    // End-to-end: applyFineAimRotation (production function from fine-adjust-bar-ui.ts)
+    // → setFineAimCurrent → getAimState matches expected rotated position.
     const ctrl = createCueController(makeMockPhysics());
     ctrl.onDragStart({ x: 1, z: 0 });
     ctrl.onDragMove({ x: 0, z: 0 });
@@ -181,24 +179,52 @@ describe('setFineAimCurrent() — C-2 immediate canonical write', () => {
 
     const baseStart = { x: 1, z: 0 };
     const baseCurrent = { x: 0, z: 0 };
-    const θ = Math.PI / 2;  // 90° CCW
-
-    const dx = baseStart.x - baseCurrent.x;  // 1
-    const dz = baseStart.z - baseCurrent.z;  // 0
-    const cosT = Math.cos(θ);  // 0
-    const sinT = Math.sin(θ);  // 1
-    const newDx = dx * cosT - dz * sinT;  // 0
-    const newDz = dx * sinT + dz * cosT;  // 1
-    const newCurrent = { x: baseStart.x - newDx, z: baseStart.z - newDz };  // (1, -1)
+    const θ = Math.PI / 2;
+    const newCurrent = applyFineAimRotation(baseStart, baseCurrent, θ);
 
     ctrl.setFineAimCurrent(newCurrent);
     const { current } = ctrl.getAimState();
-    expect(current!.x).toBeCloseTo(1, 5);
-    expect(current!.z).toBeCloseTo(-1, 5);
+    expect(current!.x).toBeCloseTo(newCurrent.x, 5);
+    expect(current!.z).toBeCloseTo(newCurrent.z, 5);
+  });
+});
 
-    // Aim direction after setFineAimCurrent: (start - current) = (0, 1) = 90° CCW from (1,0) ✓
-    const aimDir = { x: 1 - newCurrent.x, z: 0 - newCurrent.z };
-    expect(aimDir.x).toBeCloseTo(0, 5);
-    expect(aimDir.z).toBeCloseTo(1, 5);
+// ─── applyFineAimRotation — production geometry function ──────────────────────
+
+describe('applyFineAimRotation() — production rotation pure function', () => {
+  it('0° rotation returns identical current', () => {
+    const result = applyFineAimRotation({ x: 1, z: 0 }, { x: 0, z: 0 }, 0);
+    expect(result.x).toBeCloseTo(0, 5);
+    expect(result.z).toBeCloseTo(0, 5);
+  });
+
+  it('90° CCW: (start=(1,0), current=(0,0)) → new current = (1, -1)', () => {
+    // direction = (1,0) rotated 90° CCW = (0,1); newCurrent = start − newDir = (1,-1)
+    const result = applyFineAimRotation({ x: 1, z: 0 }, { x: 0, z: 0 }, Math.PI / 2);
+    expect(result.x).toBeCloseTo(1, 5);
+    expect(result.z).toBeCloseTo(-1, 5);
+  });
+
+  it('−90° CW: (start=(1,0), current=(0,0)) → new current = (1, 1)', () => {
+    const result = applyFineAimRotation({ x: 1, z: 0 }, { x: 0, z: 0 }, -Math.PI / 2);
+    expect(result.x).toBeCloseTo(1, 5);
+    expect(result.z).toBeCloseTo(1, 5);
+  });
+
+  it('180°: reverses direction — current ends up at 2*start−original_current', () => {
+    // start=(1,0), current=(0,0): dir=(1,0) rotated 180° = (-1,0); newCurrent=(1,0)-(−1,0)=(2,0)
+    const result = applyFineAimRotation({ x: 1, z: 0 }, { x: 0, z: 0 }, Math.PI);
+    expect(result.x).toBeCloseTo(2, 5);
+    expect(result.z).toBeCloseTo(0, 5);
+  });
+
+  it('±3° (FINE_ANGLE_MAX_DEG): small rotation preserves distance', () => {
+    const θ = 3 * (Math.PI / 180);
+    const start = { x: 1, z: 0 };
+    const current = { x: 0, z: 0 };
+    const result = applyFineAimRotation(start, current, θ);
+    // Distance from start to new current should equal original distance (1m)
+    const d = Math.sqrt((start.x - result.x) ** 2 + (start.z - result.z) ** 2);
+    expect(d).toBeCloseTo(1, 4);
   });
 });

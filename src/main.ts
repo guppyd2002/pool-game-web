@@ -493,6 +493,9 @@ if (_demoConfig) {
   mainMenuEl.style.display = 'none';
   topViewBtn.style.display = 'block';
   fineAimBtn.style.display = 'none';  // demo/spectator: no fine-aim (AI drives input)
+  // M-1 defense-in-depth: disable adapter (not just hide bars) so tap/drag cannot
+  // pollute _lastAim* during AI demo. Primary gates: hidden bars + _isEnabled in fireNow.
+  adapter.disable();
   // M-1: power bar hidden for AI spectator — no human can fire via power bar.
   // fireNow also checks _isEnabled (double gate), but hiding is the primary protection.
   powerSliderUI.element.style.display = 'none';

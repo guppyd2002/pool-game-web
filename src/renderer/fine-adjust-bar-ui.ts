@@ -21,6 +21,25 @@ const THUMB_H = 20;
 export const FINE_ANGLE_MAX_DEG = 3;
 const FINE_ANGLE_MAX = FINE_ANGLE_MAX_DEG * (Math.PI / 180);
 
+/**
+ * Rotate the aim direction by deltaTheta radians.
+ * _lastAimCurrent rotates around _lastAimStart so (start−current) rotates by deltaTheta.
+ * Returns the new current point. Pure function — exported for unit testing.
+ */
+export function applyFineAimRotation(
+  baseStart: { x: number; z: number },
+  baseCurrent: { x: number; z: number },
+  deltaTheta: number,
+): { x: number; z: number } {
+  const dx = baseStart.x - baseCurrent.x;
+  const dz = baseStart.z - baseCurrent.z;
+  const cosT = Math.cos(deltaTheta);
+  const sinT = Math.sin(deltaTheta);
+  const newDx = dx * cosT - dz * sinT;
+  const newDz = dx * sinT + dz * cosT;
+  return { x: baseStart.x - newDx, z: baseStart.z - newDz };
+}
+
 export interface FineAdjustBarUI {
   readonly element: HTMLElement;
   enable(): void;
@@ -124,14 +143,7 @@ export function createFineAdjustBarUI(
 
   function _applyRotation(deltaTheta: number): void {
     if (!_baseStart || !_baseCurrent) return;
-    const dx = _baseStart.x - _baseCurrent.x;
-    const dz = _baseStart.z - _baseCurrent.z;
-    const cosT = Math.cos(deltaTheta);
-    const sinT = Math.sin(deltaTheta);
-    const newDx = dx * cosT - dz * sinT;
-    const newDz = dx * sinT + dz * cosT;
-    // newCurrent = baseStart - rotated(baseStart - baseCurrent)
-    controller.setFineAimCurrent({ x: _baseStart.x - newDx, z: _baseStart.z - newDz });
+    controller.setFineAimCurrent(applyFineAimRotation(_baseStart, _baseCurrent, deltaTheta));
     onAimUpdate();
   }
 

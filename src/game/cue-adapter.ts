@@ -61,8 +61,45 @@ export function applyAimSensitivity(
 /** Pointer-pixel displacement below which a touch is classified as a tap. */
 export const TAP_MOVE_THRESH = 10;
 
-/** Maximum duration (ms) for a tap — upper bound only; displacement is primary. */
-export const TAP_TIME_THRESH = 200;
+/**
+ * Long-press exclusion threshold (ms) — upper bound only; displacement is primary.
+ * H-3: 800ms so slow deliberate taps (e.g. 300ms, 2px) are never swallowed.
+ * Only pathological long-presses (>800ms) are excluded to prevent accidental aim.
+ */
+export const TAP_TIME_THRESH = 800;
+
+/**
+ * F-③ H-3: Classify a pointer event as a tap.
+ * Displacement is the primary gate; elapsed is an upper-bound long-press exclusion only.
+ * "慢速定點按" (slow deliberate tap with small displacement) always returns true.
+ * Pure function — export for unit testing.
+ */
+export function classifyTap(displacementPx: number, elapsedMs: number): boolean {
+  return displacementPx < TAP_MOVE_THRESH && elapsedMs < TAP_TIME_THRESH;
+}
+
+/**
+ * F-③ C-1: Compute canonical aim pair for tap-to-aim.
+ * start = cueBall + 1m * normalize(tapPt − cueBall); current = cueBall.
+ * (start − current) = +(tapPt − cueBall) = positive direction toward tap. ✓
+ * M-3: nd fixed at 1m — avoids nd<0.001 silent failure for close taps.
+ * Pure function — export for unit testing.
+ */
+export function computeTapAimPair(
+  cueBall: { x: number; z: number },
+  tapPt: { x: number; z: number },
+): { start: { x: number; z: number }; current: { x: number; z: number } } | null {
+  const dx = tapPt.x - cueBall.x;
+  const dz = tapPt.z - cueBall.z;
+  const nd = Math.sqrt(dx * dx + dz * dz);
+  if (nd < 0.001) return null;
+  const nx = dx / nd;
+  const nz = dz / nd;
+  return {
+    start: { x: cueBall.x + nx, z: cueBall.z + nz },
+    current: { x: cueBall.x, z: cueBall.z },
+  };
+}
 
 export interface CueAdapterOptions {
   camera: THREE.Camera;
@@ -191,25 +228,22 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
 
-    // F-③ H-3: tap classification — displacement-primary, 200ms as upper bound only.
-    // _tapEligible is cleared when displacement > TAP_MOVE_THRESH (hysteresis).
-    // Slow deliberate taps (> threshold time but < threshold distance) are still taps.
+    // F-③ H-3: tap classification — displacement-primary (classifyTap), long-press exclusion only.
+    // _tapEligible is cleared once displacement > TAP_MOVE_THRESH (hysteresis, see onPointerMove).
+    // Slow deliberate taps (small displacement, any reasonable elapsed) are classified as taps.
     const elapsed = e.timeStamp - _tapStartTime;
-    if (_tapEligible && elapsed < TAP_TIME_THRESH && opts.getCueBallWorld) {
+    if (classifyTap(
+      Math.sqrt((e.clientX - _tapStartX) ** 2 + (e.clientY - _tapStartY) ** 2),
+      elapsed,
+    ) && _tapEligible && opts.getCueBallWorld) {
       const tapPt = pt ?? ndcToTablePoint(toNDC(_tapStartX, _tapStartY));
       if (tapPt) {
         const cb = opts.getCueBallWorld();
-        const dx = tapPt.x - cb.x;
-        const dz = tapPt.z - cb.z;
-        const nd = Math.sqrt(dx * dx + dz * dz);
-        if (nd > 0.001) {
-          const nx = dx / nd;
-          const nz = dz / nd;
-          // C-1: _lastAimStart = cueBall + 1m in tap direction; _lastAimCurrent = cueBall.
-          // (start − current) = +(tap−cueBall) = correct positive aim direction.
-          // M-3: fixed nd=1m avoids nd<0.001 silent failure for close taps.
-          controller.onDragStart({ x: cb.x + nx, z: cb.z + nz });
-          controller.onDragMove({ x: cb.x, z: cb.z });
+        // C-1: computeTapAimPair ensures (start−current) = +(tap−cueBall), nd=1m (M-3)
+        const pair = computeTapAimPair(cb, tapPt);
+        if (pair) {
+          controller.onDragStart(pair.start);
+          controller.onDragMove(pair.current);
           controller.cancel();
           opts.onAimUpdate?.();
           return;
