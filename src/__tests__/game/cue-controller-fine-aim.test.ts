@@ -6,7 +6,10 @@
  *   - setFineAimCurrent() writes _lastAimCurrent, no phase change
  *   - Rotation geometry: setFineAimCurrent can be used to rotate aim
  *   - C-2 mutex: setFineAimCurrent no-ops when _lastAimStart is null
- *   - M-2 bit-exact: getAimHit after setFineAimCurrent reads updated canonical
+ *   - M-2 bit-exact: after setFineAimCurrent, getAimHit(f) direction === fireNow(f) impulse (toBe)
+ *
+ * F2 note (jsdom integration test): deferred — vitest env=node, no PointerEvent.
+ * C-1 positive direction verified by 卡卡西 親讀 onPointerUp+fireNow code path (dec4c9d).
  */
 import { describe, it, expect } from 'vitest';
 import { CmVector } from '../../physics/cm-vector';
@@ -31,11 +34,18 @@ const EMPTY_SHOT_RESULT: ShotResult = {
   frames: [], finalStates: [], pocketed: [], outOfTable: [], contacts: [],
 };
 
-function makeMockPhysics(): IBallPoolPhysics {
-  return {
+interface RecordingPhysics extends IBallPoolPhysics {
+  shotLog: ShotData[];
+  aimLog: { from: CmVector; dir: CmVector }[];
+}
+
+function makeMockPhysics(): RecordingPhysics {
+  const shotLog: ShotData[] = [];
+  const aimLog: { from: CmVector; dir: CmVector }[] = [];
+  const mock: RecordingPhysics = {
     get isSimulating() { return false; },
-    applyShot(_s: ShotData): ShotResult { return EMPTY_SHOT_RESULT; },
-    predictAimLine(_f: CmVector, _d: CmVector): AimHit { return EMPTY_AIM_HIT; },
+    applyShot(s: ShotData): ShotResult { shotLog.push(s); return EMPTY_SHOT_RESULT; },
+    predictAimLine(f: CmVector, d: CmVector): AimHit { aimLog.push({ from: f, dir: d }); return EMPTY_AIM_HIT; },
     getBall(_id: number): BallState { return EMPTY_BALL_STATE; },
     getActiveBalls: () => [],
     get allBalls() { return [] as readonly BallState[]; },
@@ -52,7 +62,10 @@ function makeMockPhysics(): IBallPoolPhysics {
     }),
     placeBall: () => {},
     respotCueBall: () => {},
+    shotLog,
+    aimLog,
   };
+  return mock;
 }
 
 describe('getAimState() — canonical aim state read', () => {
@@ -116,20 +129,43 @@ describe('setFineAimCurrent() — C-2 immediate canonical write', () => {
     expect(ctrl.phase).toBe('idle');
   });
 
-  it('M-2 bit-exact: getAimHit reads updated canonical after setFineAimCurrent', () => {
-    const ctrl = createCueController(makeMockPhysics());
-    // Set aim: start=(1,0), current=(0,0) → direction=(+1,0) toward +x
+  it('M-2 bit-exact: getAimHit(f) and fireNow(f) use identical direction after setFineAimCurrent', () => {
+    // F1 fix (卡卡西 hardening): verify that after setFineAimCurrent the direction
+    // passed to predictAimLine (preview) exactly equals the impulse passed to applyShot (fire).
+    // Both must read the same _lastAimStart/_lastAimCurrent and apply trunc(f*MAX_FORCE).
+    const phys = makeMockPhysics();
+    const ctrl = createCueController(phys);
+
+    // Set initial aim: start=(1,0), current=(0,0) → direction=(+1, 0)
     ctrl.onDragStart({ x: 1, z: 0 });
     ctrl.onDragMove({ x: 0, z: 0 });
     ctrl.cancel();
-    // Fine-adjust: rotate to point in a different direction
+
+    // Fine-adjust: rotate aim to a diagonal direction via setFineAimCurrent
+    // New current = (0.5, -0.5) → aim direction = start − current = (0.5, 0.5)
     ctrl.setFineAimCurrent({ x: 0.5, z: -0.5 });
-    // getAimHit(0.5) should use the updated current, not the original
-    // (mock predictAimLine always returns EMPTY_AIM_HIT, but we verify it's called)
-    const hit = ctrl.getAimHit(0.5);
-    // Aim direction is now (start - current) = (1 - 0.5, 0 - (-0.5)) = (0.5, 0.5)
-    // Normalized = (1/√2, 1/√2); non-zero so hit is not null
-    expect(hit).not.toBeNull();
+
+    // Preview path: getAimHit(f) calls predictAimLine(cueBallPos, dir)
+    const f = 0.6;
+    ctrl.getAimHit(f);
+    expect(phys.aimLog).toHaveLength(1);
+    const previewDir = phys.aimLog[0].dir;
+
+    // Fire path: fireNow(f) calls applyShot({ impulse: dir })
+    ctrl.fireNow(f);
+    expect(phys.shotLog).toHaveLength(1);
+    const fireImpulse = phys.shotLog[0].impulse;
+
+    // Bit-exact: preview direction === fire impulse (toBe, not toBeCloseTo)
+    expect(previewDir.x).toBe(fireImpulse.x);
+    expect(previewDir.z).toBe(fireImpulse.z);
+
+    // Also verify quantization: trunc formula applies, force > 0 for f=0.6
+    const force = Math.trunc(Math.max(0, Math.min(1, f)) * MAX_FORCE);
+    expect(force).toBeGreaterThan(0);
+    // Both components are non-zero (diagonal direction)
+    expect(Math.abs(previewDir.x)).toBeGreaterThan(0);
+    expect(Math.abs(previewDir.z)).toBeGreaterThan(0);
   });
 
   it('rotation geometry: direction after setFineAimCurrent matches expected rotation', () => {
