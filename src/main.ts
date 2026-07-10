@@ -578,4 +578,5 @@ window.addEventListener('beforeunload', () => {
   renderer: scene.renderer,
   scene: scene.scene,
   gameSession,
+  cue,  // exposes getAimState() for overlay hitTest guard smoke test
 };
