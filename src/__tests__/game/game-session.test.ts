@@ -244,6 +244,16 @@ describe('game-session — IGameSession (GAME-018)', () => {
       session.startNewGame();
       expect(cue.onShotApplied).not.toBeNull();
     });
+
+    it('resets store to Aiming when called from BallInHand phase', () => {
+      const { cue, replayDriver, session } = setup();
+      session.startNewGame();
+      cue.fireShotApplied(noShot());   // break foul → InShot
+      replayDriver.triggerComplete();  // → BallInHand
+      expect(session.store.getState().phase).toBe('BallInHand');
+      session.startNewGame();
+      expect(session.store.getState().phase).toBe('Aiming');
+    });
   });
 
   describe('shot pipeline — SHOT_FIRED + replay', () => {

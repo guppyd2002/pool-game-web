@@ -255,6 +255,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       _ballInHandActive = false;
       _shotCounter = 0;
       _lastCueBallPlaced = null;
+      store.dispatch({ type: 'EXIT_GAME' });   // force MainMenu so START_GAME gate passes from any phase
       store.dispatch({ type: 'START_GAME' });
       // GAME-014: cue bind id=0 + resetForNewTurn initial state
       cue.resetForNewTurn();
