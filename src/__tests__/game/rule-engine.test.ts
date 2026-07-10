@@ -589,6 +589,92 @@ describe('LOC-003 — English reason strings', () => {
   });
 });
 
+// ─── reset() — full state wipe ───────────────────────────────────────────────
+
+describe('reset() — full state wipe to initial', () => {
+  it('restores all observable persistent state after a mid-game call', () => {
+    const engine = makeEngine();
+    const fresh = makeEngine();
+
+    // Break: pocket solid 1 → tableIsOpened=true after shot, reservedBalls=[1]
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({
+      contacts: [cueHits(1)],
+      pocketed: [pocketed(1)],
+    }));
+    // Second shot: pocket solid 2 → type assigned (P0=Solids, P1=Stripes)
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({
+      contacts: [cueHits(2)],
+      pocketed: [pocketed(2)],
+    }));
+    // Third shot: miss → turn switches to P1, ball-in-hand
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({ contacts: [] }));
+
+    // Confirm non-initial state
+    expect(engine.isFirstShot).toBe(false);
+    expect(engine.tableIsOpened).toBe(true);
+    expect(engine.currentPlayerIndex).toBe(1);
+    expect(engine.players[0].currentBallType).toBe(BallType.Solids);
+
+    engine.reset();
+
+    // All observable state must match a fresh engine
+    expect(engine.currentPlayerIndex).toBe(fresh.currentPlayerIndex);       // 0
+    expect(engine.gameIsEnded).toBe(fresh.gameIsEnded);                     // false
+    expect(engine.isFirstShot).toBe(fresh.isFirstShot);                     // true
+    expect(engine.tableIsOpened).toBe(fresh.tableIsOpened);                 // false
+    expect(engine.players[0].currentBallType).toBe(fresh.players[0].currentBallType); // Non
+    expect(engine.players[1].currentBallType).toBe(fresh.players[1].currentBallType); // Non
+    expect(engine.players[0].hasBlackBallToShot).toBe(false);
+    expect(engine.players[1].hasBlackBallToShot).toBe(false);
+    expect(engine.players[0].balls).toEqual(fresh.players[0].balls);        // all zeros
+    expect(engine.players[1].balls).toEqual(fresh.players[1].balls);
+  });
+
+  it('after reset(), beginShot+processShotResult behaves identically to a fresh engine', () => {
+    const engine = makeEngine();
+
+    // Dirty all state
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({
+      contacts: [cueHits(1)],
+      pocketed: [pocketed(1)],
+    }));
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({
+      contacts: [cueHits(2)],
+      pocketed: [pocketed(2)],
+    }));
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({ contacts: [] }));
+
+    engine.reset();
+
+    const fresh = makeEngine();
+    const breakShot = makeShotResult({
+      contacts: [cueHits(1), railHit(1)],
+      pocketed: [pocketed(1)],
+    });
+
+    engine.beginShot();
+    fresh.beginShot();
+    const v1 = engine.processShotResult(
+      makeShotResult({ contacts: [cueHits(1), railHit(1)], pocketed: [pocketed(1)] }),
+    );
+    const v2 = fresh.processShotResult(
+      makeShotResult({ contacts: [cueHits(1), railHit(1)], pocketed: [pocketed(1)] }),
+    );
+
+    expect(v1).toEqual(v2);
+    expect(engine.currentPlayerIndex).toBe(fresh.currentPlayerIndex);
+    expect(engine.tableIsOpened).toBe(fresh.tableIsOpened);
+    expect(engine.players[0].currentBallType).toBe(fresh.players[0].currentBallType);
+    void breakShot; // referenced above; suppresses unused-var warning
+  });
+});
+
 // ─── RULE-007: serialize / deserialize roundtrip ────────────────────────────
 
 describe('RULE-007 — GameLogicStateV1 roundtrip', () => {

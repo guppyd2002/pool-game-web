@@ -249,6 +249,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     startNewGame(): void {
       // Reset physics to canonical start state (GAME-010 rack positions)
       physics.resetToStartState();
+      ruleEngine.reset();
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
       _ballInHandActive = false;
@@ -269,6 +270,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
 
     playAgain(): void {
       physics.resetToStartState();
+      ruleEngine.reset();
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
       _ballInHandActive = false;
