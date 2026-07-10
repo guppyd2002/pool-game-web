@@ -1,7 +1,7 @@
 /**
  * Landscape HUD — top full-width 36dp strip.
  *
- * Layout: [P1] | [turn info] | [P2] | [TopView] [LeftHand] [FineAim]
+ * Layout: [P1] | [turn info] | [P2] | [TopView] [FineAim] [LeftHand]
  * Background: #000 80% opacity, white text, WCAG AAA contrast (ratio >7:1).
  */
 
