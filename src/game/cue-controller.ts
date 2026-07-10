@@ -65,9 +65,16 @@ export interface CueController {
 
   /**
    * Aim-line preview. Calls predictAimLine on the current drag direction.
-   * Returns null when idle, at drag origin, or direction is near-zero.
+   *
+   * Without forceFraction (legacy drag-power): returns null when idle, at drag
+   * origin, or direction is near-zero. Reads live _startPoint/_currentPoint.
+   *
+   * With forceFraction (8BP mode, M-2): reads the saved CUE-002 aim state
+   * (_lastAimStart/_lastAimCurrent) so preview works while the power bar is
+   * held (phase=idle). Uses trunc(forceFraction*MAX_FORCE) — identical
+   * quantization to fireNow — ensuring preview==execution bit-exact.
    */
-  getAimHit(): AimHit | null;
+  getAimHit(forceFraction?: number): AimHit | null;
 
   /** MON-018 stub — always true until energy system is implemented. */
   hasEnergy(): boolean;
@@ -130,6 +137,19 @@ export interface CueController {
    * Called by P1-T03 rules after simulation ends. Never called internally.
    */
   resetForNewTurn(): void;
+
+  /**
+   * 8BP v2.1 F-③/④: Read the canonical CUE-002 aim state for fine-adjust base snapshot.
+   * Returns { start, current } = { _lastAimStart, _lastAimCurrent }; may be null.
+   */
+  getAimState(): { start: TablePoint | null; current: TablePoint | null };
+
+  /**
+   * 8BP v2.1 F-④ C-2: Write _lastAimCurrent directly (fine-adjust bar per-move update).
+   * Rotates canonical current around _lastAimStart without changing _phase.
+   * No-op if _lastAimStart is null.
+   */
+  setFineAimCurrent(pt: TablePoint): void;
 
   /**
    * CUE-008: Whether the aim line is shown during aiming.
@@ -271,6 +291,9 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
     },
 
     fireNow(forceFraction: number): boolean {
+      // M-1 (8BP): fireNow is now the main shot path (power bar), so it must
+      // respect _isEnabled to prevent AI-turn / opponent-turn injection.
+      if (!_isEnabled) return false;
       if (!_lastAimStart || !_lastAimCurrent) return false;
       if (physics.isSimulating) return false;
 
@@ -322,7 +345,28 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       return Math.min(planeDistXZ(_startPoint, _currentPoint) / CUE_MAX_DRAG, 1.0);
     },
 
-    getAimHit(): AimHit | null {
+    getAimHit(forceFraction?: number): AimHit | null {
+      if (forceFraction !== undefined) {
+        // M-2 (8BP power-bar path): read from saved CUE-002 aim state so that
+        // the aim line preview works while phase=idle (power bar held, no live drag).
+        // Quantization: trunc(forceFraction*MAX_FORCE) — identical to fireNow.
+        if (!_lastAimStart || !_lastAimCurrent) return null;
+        const dx = _lastAimStart.x - _lastAimCurrent.x;
+        const dz = _lastAimStart.z - _lastAimCurrent.z;
+        const nd = Math.sqrt(dx * dx + dz * dz);
+        if (nd < 0.001) return null;
+        const nx = dx / nd;
+        const nz = dz / nd;
+        const clamped = Math.max(0, Math.min(1, forceFraction));
+        const force = Math.trunc(clamped * MAX_FORCE);
+        const qx = Math.trunc(nx * force);
+        const qz = Math.trunc(nz * force);
+        if (qx === 0 && qz === 0) return null;
+        const cueBall = physics.getBall(cueBallId);
+        return physics.predictAimLine(cueBall.position, new CmVector(qx, 0, qz));
+      }
+      // Legacy (drag-power) path: gated on aiming phase, reads live drag points.
+      // F-1: use trunc(nx*force) so preview matches execution at low force.
       if (_phase !== 'aiming' || !_startPoint || !_currentPoint) return null;
       const dx = _startPoint.x - _currentPoint.x;
       const dz = _startPoint.z - _currentPoint.z;
@@ -330,11 +374,12 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       if (nd < 0.001) return null;
       const nx = dx / nd;
       const nz = dz / nd;
+      const force = dragDistToForce(nd);
+      const qx = Math.trunc(nx * force);
+      const qz = Math.trunc(nz * force);
+      if (qx === 0 && qz === 0) return null;
       const cueBall = physics.getBall(cueBallId);
-      return physics.predictAimLine(
-        cueBall.position,
-        new CmVector(Math.trunc(nx * MULTIPLIER), 0, Math.trunc(nz * MULTIPLIER)),
-      );
+      return physics.predictAimLine(cueBall.position, new CmVector(qx, 0, qz));
     },
 
     hasEnergy,
@@ -390,6 +435,10 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
       _phase = 'idle';
       _startPoint = null;
       _currentPoint = null;
+      // Clear CUE-002 saved aim state so the next player starts with no aim direction.
+      // Prevents cross-turn stale aim line (F-A / boundary-#2).
+      _lastAimStart = null;
+      _lastAimCurrent = null;
       _isEnabled = true;
       // _aimLineVisible intentionally NOT reset — user preference persists across turns
     },
@@ -398,6 +447,15 @@ export function createCueController(physics: IBallPoolPhysics, cueBallId = 0): C
 
     toggleAimLine(): void {
       _aimLineVisible = !_aimLineVisible;
+    },
+
+    getAimState(): { start: TablePoint | null; current: TablePoint | null } {
+      return { start: _lastAimStart, current: _lastAimCurrent };
+    },
+
+    setFineAimCurrent(pt: TablePoint): void {
+      if (_lastAimStart === null) return;
+      _lastAimCurrent = pt;
     },
 
     onShotApplied: null,

@@ -505,6 +505,15 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
 
     resetToStartState(): void {
       space.setStateFromString(_startState, null);
+      // hitColliders is not captured in the state string but IS consulted by
+      // moveAndCheckIsActive() on the first simulation step.  Stale values from a
+      // previous shot sequence cause the `_checkIsActive` branch to be taken instead
+      // of the gravity branch for balls activated mid-step by a higher-id ball,
+      // producing one missed gravity application and diverging trajectories on the
+      // second and subsequent seeks.  Clear here to match fresh-instance behaviour.
+      for (const body of space.rigidbodies) {
+        body.hitColliders = [];
+      }
     },
 
     // ── 物理常數（C4：從 constants.ts 投影）───────────────────────────────

@@ -9,6 +9,8 @@ export interface GameOverUI {
   hide(): void;
   onPlayAgain: (() => void) | null;
   onExit: (() => void) | null;
+  /** Set to enable the Download Replay button; null hides the button. */
+  onDownloadRecord: (() => void) | null;
   readonly element: HTMLElement;
   dispose(): void;
 }
@@ -32,31 +34,31 @@ export function createGameOverUI(container: HTMLElement): GameOverUI {
   el.innerHTML = [
     '<div id="go-title" style="font-size:32px;margin-bottom:12px;font-weight:bold;"></div>',
     '<div id="go-reason" style="font-size:16px;margin-bottom:28px;opacity:0.85;"></div>',
-    '<div style="display:flex;gap:16px;">',
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">',
     '  <button id="go-replay" style="padding:10px 28px;font-size:16px;border-radius:4px;cursor:pointer;border:none;background:#4caf50;color:#fff;">Play Again</button>',
+    '  <button id="go-dl"     style="padding:10px 28px;font-size:16px;border-radius:4px;cursor:pointer;border:none;background:#1976d2;color:#fff;display:none;">⬇ Download Replay</button>',
     '  <button id="go-exit"   style="padding:10px 28px;font-size:16px;border-radius:4px;cursor:pointer;border:none;background:#555;color:#fff;">Exit</button>',
     '</div>',
   ].join('');
 
   container.appendChild(el);
 
-  const titleEl  = el.querySelector('#go-title')  as HTMLElement;
-  const reasonEl = el.querySelector('#go-reason') as HTMLElement;
+  const titleEl   = el.querySelector('#go-title')  as HTMLElement;
+  const reasonEl  = el.querySelector('#go-reason') as HTMLElement;
   const replayBtn = el.querySelector('#go-replay') as HTMLButtonElement;
+  const dlBtn     = el.querySelector('#go-dl')     as HTMLButtonElement;
   const exitBtn   = el.querySelector('#go-exit')   as HTMLButtonElement;
 
   const ui: GameOverUI = {
     onPlayAgain: null,
     onExit: null,
+    onDownloadRecord: null,
     get element() { return el; },
 
     show(winner: 0 | 1 | null, reason: string): void {
-      if (winner === null) {
-        titleEl.textContent = "Draw!";
-      } else {
-        titleEl.textContent = `Player ${winner + 1} wins!`;
-      }
+      titleEl.textContent = winner === null ? 'Draw!' : `Player ${winner + 1} wins!`;
       reasonEl.textContent = reason;
+      dlBtn.style.display = ui.onDownloadRecord ? 'inline-block' : 'none';
       el.style.display = 'flex';
     },
 
@@ -70,6 +72,7 @@ export function createGameOverUI(container: HTMLElement): GameOverUI {
   };
 
   replayBtn.addEventListener('click', () => ui.onPlayAgain?.());
+  dlBtn.addEventListener('click', () => ui.onDownloadRecord?.());
   exitBtn.addEventListener('click', () => ui.onExit?.());
 
   return ui;

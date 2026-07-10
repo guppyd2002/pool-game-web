@@ -152,12 +152,9 @@ describe('CUE-002: fireNow() — slider-based fire', () => {
     ctrl.onDragStart({ x: 0, z: 0 });
     ctrl.onDragMove({ x: 1, z: 0 });
     ctrl.disable();
-    // fireNow ignores isEnabled (it's an explicit slider fire, separate from drag CUE-019)
-    // Actually per design: fireNow respects isEnabled → returns false when disabled
-    // This matches C# where TriggerOthers(false) prevents OTHER managers from acting
-    // but the slider ITSELF fires (it set disabled via TriggerOthers on others, not itself)
-    // So fireNow does NOT check isEnabled — it's the slider's own fire path.
-    // → fireNow returns true even when cue is disabled (slider fires independently)
-    expect(ctrl.fireNow(0.5)).toBe(true);
+    // M-1 (8BP mode): fireNow IS the main shot path (power bar), so it must
+    // respect _isEnabled to prevent opponent-turn / spectator shots.
+    // C# analogy: TriggerOthers(false) covers all managers when disabled.
+    expect(ctrl.fireNow(0.5)).toBe(false);
   });
 });

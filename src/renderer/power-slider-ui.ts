@@ -1,27 +1,33 @@
 /**
- * CUE-002: Power slider HTML overlay — browser UI wrapper for ShotSlider domain.
+ * CUE-002 / 8BP: Power Bar UI — vertical bar on the right side of the screen.
  *
- * Ports C# CueShotUIManager visual elements:
- *   slider       → <input type="range"> (horizontal, 0..100%)
- *   shotButton   → "Shot" button (manual mode only)
- *   cue image    → power percentage label
- *   indicator    → filled track colour (green→red with power)
+ * 8BP 分離式設計：
+ *   - F-②: Drag DOWN to charge (cue-pull metaphor); release = fire.
+ *   - isAutoShot: true in ShotSlider → endControl() fires automatically.
+ *   - F-①: Positioned right side with safe-area-inset-right margin to avoid
+ *     toolbar/notch overlap, between top-view/fine-aim buttons (top-right)
+ *     and the spin disc (bottom-right).
  *
- * Positioned bottom-left to complement the spin disc (bottom-right).
- * Not unit-tested (DOM layer). All logic lives in game/shot-slider.ts.
+ * Not unit-tested (DOM layer). Domain logic lives in game/shot-slider.ts.
  */
 
 import type { ShotSlider } from '../game/shot-slider';
 
 export interface PowerSliderUI {
-  /** Sync slider track to current force fraction (e.g. from physics replay). */
+  /** Sync bar fill to current force fraction (e.g. from external update). */
   update(force: number): void;
-  /** Called by CueController.resetForNewTurn(). */
+  /** Reset visual to 0 (called on turn start or after shot). */
   reset(): void;
-  /** CUE-021: outer overlay element for opacity fade. */
+  /** CUE-021: outer overlay element for opacity fade and show/hide. */
   readonly element: HTMLElement;
   dispose(): void;
 }
+
+/** Height of the draggable track in CSS pixels. Landscape spec: 240dp. */
+const TRACK_H = 240;
+
+/** Width of the draggable track in CSS pixels. Landscape spec: 48dp. */
+const TRACK_W = 48;
 
 export function createPowerSliderUI(
   container: HTMLElement,
@@ -29,90 +35,151 @@ export function createPowerSliderUI(
 ): PowerSliderUI {
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
+  // Outer wrapper — right side, vertically centred.
+  // right uses max() so safe-area-inset-right (landscape notch) is respected.
+  // Overlay on table right edge — semi-transparent, opacity transitions on interaction.
+  // CSS class used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
+  overlay.className = 'power-slider-overlay';
   overlay.style.cssText = [
-    'position:fixed', 'bottom:20px', 'left:20px', 'z-index:100',
-    'display:flex', 'flex-direction:column', 'align-items:flex-start', 'gap:8px',
-    'background:rgba(0,0,0,0.5)', 'border:1px solid rgba(255,255,255,0.4)',
-    'border-radius:8px', 'padding:10px 14px',
+    'position:absolute',
+    'right:max(12px, calc(12px + env(safe-area-inset-right, 0px)))',
+    'top:50%', 'transform:translateY(-50%)',
+    'z-index:100',
+    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
+    'user-select:none',
+    'opacity:0.4',
+    'transition:opacity 0.15s ease-out',
   ].join(';');
 
-  // Power label + percentage
+  // Label above the bar
   const label = document.createElement('div');
+  label.textContent = 'POWER';
   label.style.cssText = [
-    'color:white', 'font-size:12px', 'font-family:sans-serif',
-    'display:flex', 'justify-content:space-between', 'width:100%',
+    'color:rgba(255,255,255,0.7)', 'font-size:10px', 'font-family:sans-serif',
+    'letter-spacing:1px', 'pointer-events:none',
   ].join(';');
-  const labelText = document.createElement('span');
-  labelText.textContent = 'Power';
-  const pctText = document.createElement('span');
+
+  // Track container — semi-transparent pill overlaid on table edge.
+  const track = document.createElement('div');
+  track.style.cssText = [
+    `width:${TRACK_W}px`, `height:${TRACK_H}px`, 'border-radius:18px',
+    'background:rgba(0,0,0,0.50)', 'border:2px solid rgba(255,255,255,0.55)',
+    'box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 4px 16px rgba(0,0,0,0.6)',
+    'position:relative', 'overflow:hidden',
+    'touch-action:none', 'cursor:ns-resize',
+  ].join(';');
+
+  // F-②: Fill bar — top-anchored (cue-pull metaphor: drag DOWN = more power shown from top).
+  // Thumb shows current drag position; fill below thumb shows accumulated pullback.
+  const fill = document.createElement('div');
+  fill.style.cssText = [
+    'position:absolute', 'top:0', 'left:0', 'right:0',
+    'height:0%',
+    // Weak (green) at top → strong (red) at bottom (charge level as cue is pulled further down)
+    'background:linear-gradient(to bottom,#44ff44,#ffcc00,#ff4444)',
+    'border-radius:16px',
+  ].join(';');
+
+  // Thumb indicator — moves down as power increases (start at top = 0 force)
+  const thumb = document.createElement('div');
+  thumb.style.cssText = [
+    'position:absolute', 'top:0', 'left:2px', 'right:2px', 'height:16px',
+    'background:rgba(255,255,255,0.85)', 'border-radius:8px',
+    'transition:top 0.05s linear',
+    'pointer-events:none',
+  ].join(';');
+
+  track.appendChild(fill);
+  track.appendChild(thumb);
+
+  // Percentage readout below the bar
+  const pctText = document.createElement('div');
   pctText.textContent = '0%';
-  label.appendChild(labelText);
-  label.appendChild(pctText);
-
-  // Range slider
-  const rangeInput = document.createElement('input');
-  rangeInput.type = 'range';
-  rangeInput.min = '0';
-  rangeInput.max = '100';
-  rangeInput.value = '0';
-  rangeInput.style.cssText = [
-    'width:160px', 'height:20px', 'cursor:pointer',
-    'accent-color:hsl(120,80%,50%)',  // starts green; updated by JS
-    'touch-action:none',
+  pctText.style.cssText = [
+    'color:white', 'font-size:11px', 'font-family:sans-serif',
+    'font-weight:bold', 'pointer-events:none',
   ].join(';');
 
-  // Shot button
-  const shotBtn = document.createElement('button');
-  shotBtn.textContent = 'Shot';
-  shotBtn.style.cssText = [
-    'width:100%', 'padding:6px 0', 'background:rgba(255,100,0,0.8)', 'color:white',
-    'border:1px solid rgba(255,255,255,0.6)', 'border-radius:4px',
-    'cursor:pointer', 'font-size:14px', 'font-weight:bold', 'touch-action:none',
+  // Hint text — cue-pull metaphor (landscape: pull down = power, release = shoot)
+  const hint = document.createElement('div');
+  hint.textContent = '↓ Pull = Power';
+  hint.style.cssText = [
+    'color:rgba(255,255,255,0.45)', 'font-size:9px', 'font-family:sans-serif',
+    'pointer-events:none', 'text-align:center',
+  ].join(';');
+
+  const hint2 = document.createElement('div');
+  hint2.textContent = 'Release = Shoot';
+  hint2.style.cssText = [
+    'color:rgba(255,255,255,0.35)', 'font-size:8px', 'font-family:sans-serif',
+    'pointer-events:none', 'text-align:center',
   ].join(';');
 
   overlay.appendChild(label);
-  overlay.appendChild(rangeInput);
-  overlay.appendChild(shotBtn);
+  overlay.appendChild(track);
+  overlay.appendChild(pctText);
+  overlay.appendChild(hint);
+  overlay.appendChild(hint2);
   container.appendChild(overlay);
 
   // ─── Visual sync ────────────────────────────────────────────────────────────
 
+  const THUMB_H = 16;
+
   function syncVisual(fraction: number): void {
-    const pct = Math.round(fraction * 100);
-    rangeInput.value = String(pct);
+    const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
+    // F-②: fill grows from top (more pull = more fill from top)
+    fill.style.height = `${pct}%`;
+    // Thumb tracks drag position (top = 0, bottom = full power)
+    const thumbTop = fraction * (TRACK_H - THUMB_H);
+    thumb.style.top = `${thumbTop}px`;
     pctText.textContent = `${pct}%`;
-    // Green (low) → yellow → red (full), same ramp as power-bar.ts
-    const r = Math.round(255 * Math.min(fraction * 2, 1));
-    const g = Math.round(255 * Math.min((1 - fraction) * 2, 1));
-    rangeInput.style.accentColor = `rgb(${r},${g},0)`;
   }
 
-  // ─── Slider pointer events ──────────────────────────────────────────────────
-  // Use pointerdown/pointermove/pointerup (not input/change) so we can track
-  // startControl/endControl precisely, mirroring C# OnPointerDown / MouseInfo.Up.
+  // ─── Coordinate → force fraction ────────────────────────────────────────────
 
-  rangeInput.addEventListener('pointerdown', () => {
+  function clientYToFraction(clientY: number): number {
+    const rect = track.getBoundingClientRect();
+    // F-②: DOWN = charge (cue-pull metaphor). Top = 0 force, bottom = full force.
+    // bit-exact neutral: only mapping direction changes, trunc(f*MAX_FORCE) unchanged.
+    return Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+  }
+
+  // ─── Pointer events on the track ────────────────────────────────────────────
+
+  track.addEventListener('pointerdown', (e: PointerEvent) => {
+    track.setPointerCapture(e.pointerId);
+    overlay.style.opacity = '0.9';  // active state: full opacity
+    const f = clientYToFraction(e.clientY);
     slider.startControl();
-    const fraction = Number(rangeInput.value) / 100;
-    slider.setValue(fraction);
-    syncVisual(fraction);
+    slider.setValue(f);
+    syncVisual(f);
+    e.preventDefault();
+    e.stopPropagation();  // don't bubble to canvas aim-drag handler
   });
 
-  rangeInput.addEventListener('input', () => {
-    const fraction = Number(rangeInput.value) / 100;
-    slider.setValue(fraction);
-    syncVisual(fraction);
+  track.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!slider.isSelected) return;
+    const f = clientYToFraction(e.clientY);
+    slider.setValue(f);
+    syncVisual(f);
+    e.preventDefault();
   });
 
-  rangeInput.addEventListener('pointerup', () => {
-    slider.endControl();
+  track.addEventListener('pointerup', (_e: PointerEvent) => {
+    if (!slider.isSelected) return;
+    slider.endControl();  // isAutoShot=true → fires if force > minForce
+    syncVisual(0);
+    overlay.style.opacity = '0.4';  // return to idle opacity
   });
 
-  // ─── Shot button ─────────────────────────────────────────────────────────────
-
-  shotBtn.addEventListener('click', () => {
-    slider.fire();
+  track.addEventListener('pointercancel', (_e: PointerEvent) => {
+    if (slider.isSelected) {
+      slider.disable();  // cancel if pointer stolen
+      syncVisual(0);
+    }
+    overlay.style.opacity = '0.4';
   });
 
   // ─── Public interface ────────────────────────────────────────────────────────
@@ -121,7 +188,7 @@ export function createPowerSliderUI(
     get element() { return overlay; },
 
     update(force: number): void {
-      syncVisual(Math.max(0, Math.min(1, force)));
+      syncVisual(force);
     },
 
     reset(): void {

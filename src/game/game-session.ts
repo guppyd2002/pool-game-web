@@ -249,11 +249,13 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     startNewGame(): void {
       // Reset physics to canonical start state (GAME-010 rack positions)
       physics.resetToStartState();
+      ruleEngine.reset();
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
       _ballInHandActive = false;
       _shotCounter = 0;
       _lastCueBallPlaced = null;
+      store.dispatch({ type: 'EXIT_GAME' });   // force MainMenu so START_GAME gate passes from any phase
       store.dispatch({ type: 'START_GAME' });
       // GAME-014: cue bind id=0 + resetForNewTurn initial state
       cue.resetForNewTurn();
@@ -269,6 +271,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
 
     playAgain(): void {
       physics.resetToStartState();
+      ruleEngine.reset();
       replayDriver.resetVisibility(scene, 16);
       _placeRack();
       _ballInHandActive = false;

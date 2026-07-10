@@ -20,6 +20,14 @@ import type { CueController } from './cue-controller';
 export const TABLE_PLANE_Y = 0.028;
 
 /**
+ * CUE-024: Fine-aim sensitivity multiplier.
+ * Scales the displacement from drag-start to 15% — same angular change per
+ * pointer pixel as pulling back ~6.7× farther in normal mode.
+ * Sensitivity is a pure function of cursor displacement (no time/velocity).
+ */
+export const FINE_AIM_SENSITIVITY = 0.15;
+
+/**
  * Intersect a pre-aimed raycaster with a horizontal plane at world Y = planeY.
  * Returns null if the ray is parallel to the plane or pointing away from it.
  * Pure function — call raycaster.setFromCamera(ndc, camera) before invoking.
@@ -32,6 +40,52 @@ export function tableIntersection(
   const target = new THREE.Vector3();
   const hit = raycaster.ray.intersectPlane(plane, target);
   return hit ? { x: target.x, z: target.z } : null;
+}
+
+/**
+ * CUE-024: Scale the current-point displacement from startPt by sensitivity.
+ * Returns a point that is `sensitivity` of the way from startPt toward rawPt.
+ * Pure function of (rawPt, startPt, sensitivity) — no time/velocity dependency.
+ */
+export function applyAimSensitivity(
+  rawPt: { x: number; z: number },
+  startPt: { x: number; z: number },
+  sensitivity: number,
+): { x: number; z: number } {
+  return {
+    x: startPt.x + (rawPt.x - startPt.x) * sensitivity,
+    z: startPt.z + (rawPt.z - startPt.z) * sensitivity,
+  };
+}
+
+/**
+ * Pointer-pixel displacement below which a release is classified as a tap.
+ * F-③ H-3: displacement is the SOLE gate — no time check. Any duration is valid;
+ * only a drag (displacement > threshold) disqualifies the event as a tap.
+ */
+export const TAP_MOVE_THRESH = 10;
+
+/**
+ * F-③ C-1: Compute canonical aim pair for tap-to-aim.
+ * start = cueBall + 1m * normalize(tapPt − cueBall); current = cueBall.
+ * (start − current) = +(tapPt − cueBall) = positive direction toward tap. ✓
+ * M-3: nd fixed at 1m — avoids nd<0.001 silent failure for close taps.
+ * Pure function — export for unit testing.
+ */
+export function computeTapAimPair(
+  cueBall: { x: number; z: number },
+  tapPt: { x: number; z: number },
+): { start: { x: number; z: number }; current: { x: number; z: number } } | null {
+  const dx = tapPt.x - cueBall.x;
+  const dz = tapPt.z - cueBall.z;
+  const nd = Math.sqrt(dx * dx + dz * dz);
+  if (nd < 0.001) return null;
+  const nx = dx / nd;
+  const nz = dz / nd;
+  return {
+    start: { x: cueBall.x + nx, z: cueBall.z + nz },
+    current: { x: cueBall.x, z: cueBall.z },
+  };
 }
 
 export interface CueAdapterOptions {
@@ -49,16 +103,27 @@ export interface CueAdapterOptions {
   onAimUpdate?: () => void;
   /** Called on pinch or wheel zoom (delta > 0 = zoom in). */
   onZoom?: (delta: number) => void;
-  /** CUE-011: Called when a shot fires, with the power fraction [0,1] at release. */
-  onShotFired?: (powerFraction: number) => void;
+  // onShotFired removed: 8BP mode fires via power bar (main.ts), not the adapter.
+  /**
+   * F-③ tap-to-aim: returns cue ball world position (float meters).
+   * Required to compute C-1 aim pair (start = cueBall+1m*dir, current = cueBall).
+   * If omitted, tap-to-aim is disabled.
+   */
+  getCueBallWorld?: () => { x: number; z: number };
 }
 
 export function createCueAdapter(opts: CueAdapterOptions): {
   enable(): void;
   disable(): void;
   dispose(): void;
+  /** CUE-024: Toggle fine-aim mode (for touch UI). Shift key also controls this. */
+  setFineAim(active: boolean): void;
+  /** CUE-024: Whether fine-aim mode is currently active. */
+  readonly isFineAim: boolean;
 } {
-  const { element, cueBallMesh, controller } = opts;
+  const { element, controller } = opts;
+  // cueBallMesh kept in options for API compat but no longer used for hit-testing
+  // (8BP: aim drag works anywhere on the canvas, not just on the cue ball).
   // Resolve the active camera at each raycasting call so ortho/perspective switches work correctly.
   const getCamera = opts.getCameraFn ?? (() => opts.camera);
   const sm = new PointerStateMachine();
@@ -68,6 +133,18 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   // CUE-023: zoom-suspend flag — set during 2-finger pinch, cleared when fingers lift.
   // Independent of `enabled` (CUE-019 mutex). Cue input blocked when either is false.
   let _zoomActive = false;
+  // CUE-024: fine-aim mode — scales displacement from drag-start by FINE_AIM_SENSITIVITY.
+  // _fineBtn = persistent toggle (⌖ Fine button); _fineShift = held Shift key.
+  // Active when either is true so releasing Shift doesn't clear a button-set fine mode.
+  let _fineBtn = false;
+  let _fineShift = false;
+  // World-space drag start position, set in onPointerDown, used by applyAimSensitivity.
+  let _dragStartWorld: { x: number; z: number } | null = null;
+  // F-③ H-3: tap detection — pure displacement gate. _tapEligible cleared in pointermove
+  // when displacement > TAP_MOVE_THRESH. No time tracking needed.
+  let _tapEligible = false;
+  let _tapStartX = 0;
+  let _tapStartY = 0;
 
   function toNDC(clientX: number, clientY: number): THREE.Vector2 {
     const rect = element.getBoundingClientRect();
@@ -84,16 +161,28 @@ export function createCueAdapter(opts: CueAdapterOptions): {
 
   // ─── Pointer events (mouse + single-touch via PointerEvents API) ─────────────
 
+  // CUE-024: apply fine-aim scaling — scales displacement from drag-start so that
+  // the same pointer movement produces a smaller aim/power change in fine mode.
+  function _applyFine(pt: { x: number; z: number }): { x: number; z: number } {
+    return (_fineBtn || _fineShift) && _dragStartWorld
+      ? applyAimSensitivity(pt, _dragStartWorld, FINE_AIM_SENSITIVITY)
+      : pt;
+  }
+
   function onPointerDown(e: PointerEvent): void {
     if (!enabled || _zoomActive) return;  // CUE-023: block drag during pinch
     const ndc = toNDC(e.clientX, e.clientY);
     raycaster.setFromCamera(ndc, getCamera());
-    // Only begin drag when the pointer hits the cue ball mesh
-    if (raycaster.intersectObject(cueBallMesh).length === 0) return;
-
+    // 8BP aim: drag anywhere on canvas rotates the aim line.
+    // No cue ball mesh intersection required.
     sm.feedPointerDown(e.clientX, e.clientY);
     const pt = tableIntersection(raycaster, TABLE_PLANE_Y);
     if (!pt) return;
+    _dragStartWorld = pt;  // CUE-024: anchor for fine-aim displacement scaling
+    // F-③ H-3: tap detection — track only start position (no time gate)
+    _tapEligible = true;
+    _tapStartX = e.clientX;
+    _tapStartY = e.clientY;
     dragging = true;
     controller.onDragStart(pt);
     e.preventDefault();
@@ -102,9 +191,17 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   function onPointerMove(e: PointerEvent): void {
     if (!dragging || !enabled || _zoomActive) return;
     sm.feedPointerMove(e.clientX, e.clientY);
+    // F-③ H-3: hysteresis — once displacement exceeds threshold, no longer a tap
+    if (_tapEligible) {
+      const dx = e.clientX - _tapStartX;
+      const dy = e.clientY - _tapStartY;
+      if (Math.sqrt(dx * dx + dy * dy) > TAP_MOVE_THRESH) {
+        _tapEligible = false;
+      }
+    }
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
     if (pt) {
-      controller.onDragMove(pt);
+      controller.onDragMove(_applyFine(pt));
       opts.onAimUpdate?.();
     }
     e.preventDefault();
@@ -116,15 +213,39 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     dragging = false;
     if (!enabled) return;
     const pt = ndcToTablePoint(toNDC(e.clientX, e.clientY));
-    if (pt) {
-      // CUE-011: capture power before onDragEnd clears drag state
-      const powerAtRelease = controller.getPowerFraction();
-      const shotFired = controller.onDragEnd(pt);
-      if (shotFired) opts.onShotFired?.(powerAtRelease);
-    } else {
-      controller.cancel();  // pointer went off-table: cancel drag, clears aim line
+
+    // F-③ H-3: pure displacement gate — _tapEligible is the only check.
+    // _tapEligible is cleared when displacement > TAP_MOVE_THRESH (see onPointerMove).
+    // No time condition: any duration tap with small displacement is valid.
+    if (_tapEligible && opts.getCueBallWorld) {
+      const tapPt = pt ?? ndcToTablePoint(toNDC(_tapStartX, _tapStartY));
+      if (tapPt) {
+        const cb = opts.getCueBallWorld();
+        // C-1: computeTapAimPair ensures (start−current) = +(tap−cueBall), nd=1m (M-3)
+        const pair = computeTapAimPair(cb, tapPt);
+        if (pair) {
+          controller.onDragStart(pair.start);
+          controller.onDragMove(pair.current);
+          controller.cancel();
+          opts.onAimUpdate?.();
+          return;
+        }
+      }
+      // Tap on an off-table point or cueball dead-center: fall through to normal cancel
     }
-    opts.onAimUpdate?.();  // clear aim+power visuals when shot fires or drag drops
+
+    // Normal drag end: commit aim direction and go idle.
+    if (pt) {
+      // 8BP: pointer-up commits aim direction only — no shot fires from the adapter.
+      // Apply final fine-aim scaling then cancel the drag phase.
+      // _lastAimStart/_lastAimCurrent in CueController persist after cancel()
+      // so the power bar can later call fireNow() with the saved aim.
+      controller.onDragMove(_applyFine(pt));  // update aim to final pointer position
+      controller.cancel();                    // go idle, keep _lastAimStart/_lastAimCurrent
+    } else {
+      controller.cancel();  // pointer went off-table: cancel drag
+    }
+    opts.onAimUpdate?.();  // refresh aim-line visuals after drag ends
   }
 
   // ─── Touch events for multi-finger pinch (P1-T12 PointerStateMachine) ────────
@@ -179,6 +300,20 @@ export function createCueAdapter(opts: CueAdapterOptions): {
     e.preventDefault();
   }
 
+  // ─── CUE-024: Shift key — hold for fine-aim mode ─────────────────────────────
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Shift') _fineShift = true;
+  }
+  function onKeyUp(e: KeyboardEvent): void {
+    if (e.key === 'Shift') _fineShift = false;
+  }
+  // Reset _fineShift on focus-loss so a Shift+tab or alt-tab doesn't leave fine
+  // mode stuck on (keyup never fires after the window loses focus).
+  function onWindowBlur(): void {
+    _fineShift = false;
+  }
+
   // ─── Register listeners ───────────────────────────────────────────────────────
 
   element.addEventListener('pointerdown', onPointerDown as EventListener);
@@ -188,10 +323,15 @@ export function createCueAdapter(opts: CueAdapterOptions): {
   element.addEventListener('touchmove', onTouchMove as EventListener, { passive: false });
   element.addEventListener('touchend', onTouchEnd as EventListener);
   element.addEventListener('wheel', onWheel as EventListener, { passive: false });
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', onWindowBlur);
 
   return {
     enable(): void { enabled = true; },
-    disable(): void { enabled = false; dragging = false; controller.cancel(); sm.reset(); },
+    disable(): void { enabled = false; dragging = false; _tapEligible = false; controller.cancel(); sm.reset(); },
+    setFineAim(active: boolean): void { _fineBtn = active; },
+    get isFineAim(): boolean { return _fineBtn || _fineShift; },
     dispose(): void {
       element.removeEventListener('pointerdown', onPointerDown as EventListener);
       element.removeEventListener('pointermove', onPointerMove as EventListener);
@@ -200,6 +340,9 @@ export function createCueAdapter(opts: CueAdapterOptions): {
       element.removeEventListener('touchmove', onTouchMove as EventListener);
       element.removeEventListener('touchend', onTouchEnd as EventListener);
       element.removeEventListener('wheel', onWheel as EventListener);
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onWindowBlur);
     },
   };
 }

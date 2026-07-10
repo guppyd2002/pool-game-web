@@ -244,6 +244,16 @@ describe('game-session — IGameSession (GAME-018)', () => {
       session.startNewGame();
       expect(cue.onShotApplied).not.toBeNull();
     });
+
+    it('resets store to Aiming when called from BallInHand phase', () => {
+      const { cue, replayDriver, session } = setup();
+      session.startNewGame();
+      cue.fireShotApplied(noShot());   // break foul → InShot
+      replayDriver.triggerComplete();  // → BallInHand
+      expect(session.store.getState().phase).toBe('BallInHand');
+      session.startNewGame();
+      expect(session.store.getState().phase).toBe('Aiming');
+    });
   });
 
   describe('shot pipeline — SHOT_FIRED + replay', () => {
@@ -355,6 +365,26 @@ describe('game-session — IGameSession (GAME-018)', () => {
       expect(onTurnChanged).toHaveBeenCalledWith(0, false);
       expect(session.store.getState().phase).toBe('Aiming');
     });
+
+    it('resets rule engine — getAllowableFn shows BallType.Non after startNewGame', () => {
+      const { cue, replayDriver, session } = setup();
+      session.startNewGame();
+
+      // Break: pocket solid 1 → tableIsOpened=true, P0 keeps turn, reservedBalls=[1]
+      cue.fireShotApplied(breakPocketSolid1());
+      replayDriver.triggerComplete();
+
+      // Shot 2: pocket solid 2 → P0=Solids, P1=Stripes assigned
+      cue.fireShotApplied(pocketSolid2());
+      replayDriver.triggerComplete();
+
+      // P0=Solids: stripe 9 must NOT be allowed
+      expect(session.getAllowableFn()(9)).toBe(false);
+
+      // startNewGame() must reset rule engine → BallType.Non → stripe 9 allowed again
+      session.startNewGame();
+      expect(session.getAllowableFn()(9)).toBe(true);
+    });
   });
 
   describe('exitGame()', () => {
@@ -384,6 +414,31 @@ describe('game-session — IGameSession (GAME-018)', () => {
       expect(session.store.getState().phase).toBe('Aiming');
       expect(physics.resetToStartState).toHaveBeenCalledTimes(2);
       expect(onTurnChanged).toHaveBeenLastCalledWith(0, false);
+    });
+
+    it('resets rule engine — getAllowableFn shows BallType.Non after playAgain', () => {
+      const { cue, replayDriver, session } = setup();
+      session.startNewGame();
+
+      // Break: pocket solid 1
+      cue.fireShotApplied(breakPocketSolid1());
+      replayDriver.triggerComplete();
+
+      // Shot 2: pocket solid 2 → P0=Solids assigned
+      cue.fireShotApplied(pocketSolid2());
+      replayDriver.triggerComplete();
+
+      expect(session.getAllowableFn()(9)).toBe(false);
+
+      // Get to GameOver (pocket black) then playAgain
+      cue.fireShotApplied(blackPocketed());
+      replayDriver.triggerComplete();
+      expect(session.store.getState().phase).toBe('GameOver');
+
+      session.playAgain();
+
+      // Rule engine must be clean — stripe 9 allowed again
+      expect(session.getAllowableFn()(9)).toBe(true);
     });
   });
 

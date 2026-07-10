@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { tableIntersection, TABLE_PLANE_Y } from '../../game/cue-adapter';
+import { tableIntersection, TABLE_PLANE_Y, applyAimSensitivity, FINE_AIM_SENSITIVITY } from '../../game/cue-adapter';
 
 // ─── Camera fixture: overhead view (camera at y=5, looking down) ──────────────
 
@@ -110,5 +110,61 @@ describe('tableIntersection — NDC → world TablePoint', () => {
 describe('TABLE_PLANE_Y constant', () => {
   it('TABLE_PLANE_Y matches scene BALL_RADIUS (0.028 m)', () => {
     expect(TABLE_PLANE_Y).toBe(0.028);
+  });
+});
+
+describe('applyAimSensitivity — CUE-024 fine-aim scaling', () => {
+  const start = { x: 0, z: 0 };
+
+  it('sensitivity=1 returns raw point unchanged', () => {
+    const raw = { x: 0.5, z: -0.3 };
+    const result = applyAimSensitivity(raw, start, 1);
+    expect(result.x).toBeCloseTo(0.5, 6);
+    expect(result.z).toBeCloseTo(-0.3, 6);
+  });
+
+  it('sensitivity=0 collapses to start point', () => {
+    const raw = { x: 0.5, z: -0.3 };
+    const result = applyAimSensitivity(raw, start, 0);
+    expect(result.x).toBeCloseTo(0, 6);
+    expect(result.z).toBeCloseTo(0, 6);
+  });
+
+  it('FINE_AIM_SENSITIVITY scales displacement proportionally', () => {
+    const raw = { x: 0.4, z: -0.2 };
+    const result = applyAimSensitivity(raw, start, FINE_AIM_SENSITIVITY);
+    expect(result.x).toBeCloseTo(0.4 * FINE_AIM_SENSITIVITY, 6);
+    expect(result.z).toBeCloseTo(-0.2 * FINE_AIM_SENSITIVITY, 6);
+  });
+
+  it('at the start point (zero displacement) returns start regardless of sensitivity', () => {
+    const result = applyAimSensitivity(start, start, FINE_AIM_SENSITIVITY);
+    expect(result.x).toBe(0);
+    expect(result.z).toBe(0);
+  });
+
+  it('works with non-origin start point', () => {
+    const s = { x: 1.0, z: 0.5 };
+    const raw = { x: 1.2, z: 0.3 };
+    const result = applyAimSensitivity(raw, s, FINE_AIM_SENSITIVITY);
+    expect(result.x).toBeCloseTo(1.0 + 0.2 * FINE_AIM_SENSITIVITY, 6);
+    expect(result.z).toBeCloseTo(0.5 + (-0.2) * FINE_AIM_SENSITIVITY, 6);
+  });
+
+  it('is a pure function — same inputs always produce same output', () => {
+    const raw = { x: 0.3, z: -0.1 };
+    const r1 = applyAimSensitivity(raw, start, FINE_AIM_SENSITIVITY);
+    const r2 = applyAimSensitivity(raw, start, FINE_AIM_SENSITIVITY);
+    expect(r1.x).toBe(r2.x);
+    expect(r1.z).toBe(r2.z);
+  });
+
+  it('preserves aim direction (angle from start) in fine mode', () => {
+    // Direction from start to raw and from start to scaled should be identical.
+    const raw = { x: 0.6, z: -0.8 };
+    const scaled = applyAimSensitivity(raw, start, FINE_AIM_SENSITIVITY);
+    const angleRaw = Math.atan2(raw.x - start.x, raw.z - start.z);
+    const angleScaled = Math.atan2(scaled.x - start.x, scaled.z - start.z);
+    expect(angleScaled).toBeCloseTo(angleRaw, 10);
   });
 });

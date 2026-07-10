@@ -57,6 +57,9 @@ export interface RuleEngine {
   readonly isFirstShot: boolean;
   readonly tableIsOpened: boolean;
 
+  /** Reset ALL game state to initial — equivalent to creating a fresh instance. */
+  reset(): void;
+
   // ── per-shot lifecycle ────────────────────────────────────────────────────
   /** Reset per-shot counters. Call before applyShot(). C# Shot(). */
   beginShot(): void;
@@ -113,6 +116,36 @@ export function createRuleEngine(): RuleEngine {
   let _turnIsChanged = false;
   let _shotBallInHand = false;             // BallInHand for THIS shot's verdict
   let _ballTypeAssigned = false;
+
+  // Resets every mutable field — persistent game state AND per-shot accumulators.
+  // Single authoritative list; adding a new field here is the only place to update.
+  function _resetAll(): void {
+    _currentPlayerIndex = 0;
+    _players[0].applyRawState(BallType.Non, [0, 0, 0, 0, 0, 0, 0]);
+    _players[0].checkBlackBallToShot();
+    _players[1].applyRawState(BallType.Non, [0, 0, 0, 0, 0, 0, 0]);
+    _players[1].checkBlackBallToShot();
+    _gameIsEnded = false;
+    _isFirstShot = true;
+    _tableIsOpened = false;
+    _hasBallType = false;
+    _setBallTypeFlag = false;
+    _isWinner = false;
+    _lastReason = Reason.Non;
+    _pocketedBalls.length = 0;
+    _reservedBalls.length = 0;
+    _playerBallInHand = [false, false];
+    // per-shot accumulators
+    _hitRightTargetBall = false;
+    _rightBallInPocket = false;
+    _hitBoardCount = 0;
+    _cueBallInPocket = false;
+    _cueBallIsOutOfTable = false;
+    _blackBallInPocket = false;
+    _turnIsChanged = false;
+    _shotBallInHand = false;
+    _ballTypeAssigned = false;
+  }
 
   function _nextPlayerIndex(): 0 | 1 { return _currentPlayerIndex === 0 ? 1 : 0; }
   function _curPlayer() { return _players[_currentPlayerIndex]; }
@@ -324,6 +357,10 @@ export function createRuleEngine(): RuleEngine {
     get gameIsEnded() { return _gameIsEnded; },
     get isFirstShot() { return _isFirstShot; },
     get tableIsOpened() { return _tableIsOpened; },
+
+    reset(): void {
+      _resetAll();
+    },
 
     // ── C# Shot() ──────────────────────────────────────────────────────────
     beginShot(): void {

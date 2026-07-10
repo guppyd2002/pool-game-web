@@ -17,7 +17,9 @@ export { computeShotChecksum } from './game-session';
 
 import { MULTIPLIER } from '../physics/fixed-math';
 import { BALL_RADIUS, MAX_FORCE, MAX_SIM_STEPS } from '../physics/constants';
+import { CmVector } from '../physics/cm-vector';
 import type { RecordedShot } from './game-session';
+import type { GameLogicStateV1 } from './rule-engine';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -99,9 +101,8 @@ export function createRecordDriver(config: RecordConfig): RecordDriverHandle {
             ? { x: s.cueBallPlaced.x, y: s.cueBallPlaced.y, z: s.cueBallPlaced.z }
             : null,
           checksum: s.checksum,
-          // physicsState and ruleState excluded from core record (they're debug-layer data).
-          // The checksum already commits to their content; re-running from seed+shotData
-          // regenerates them on demand.
+          physicsState: s.physicsState,  // included for shot-seek (setStateFromString) in replay viewer
+          // ruleState excluded (large, not needed for visual replay)
         })),
         outcome: _outcome ?? { winner: null, reason: 0, totalShots: shots.length },
       }, null, 0);  // compact JSON — minimize download size
@@ -122,6 +123,47 @@ export function createRecordDriver(config: RecordConfig): RecordDriverHandle {
 }
 
 // ─── Download helper ──────────────────────────────────────────────────────────
+
+/**
+ * Parse a .poolrecord JSON string into RecordedShot[].
+ * Reconstructs CmVector objects from plain {x,y,z} JSON.
+ * Returns null on parse error or unknown version.
+ */
+export function parseRecord(json: string): RecordedShot[] | null {
+  try {
+    const d = JSON.parse(json) as {
+      v: string;
+      shots: Array<{
+        n: number; player: 0 | 1;
+        shotData: {
+          position: { x: number; y: number; z: number };
+          impulse:  { x: number; y: number; z: number };
+          torque:   { x: number; y: number; z: number };
+        };
+        cueBallPlaced: { x: number; y: number; z: number } | null;
+        physicsState?: string;
+        ruleState?: unknown;
+        checksum: string;
+      }>;
+    };
+    if (d.v !== '1' || !Array.isArray(d.shots)) return null;
+    return d.shots.map(s => ({
+      n: s.n,
+      player: s.player,
+      shotData: {
+        position: new CmVector(s.shotData.position.x, s.shotData.position.y, s.shotData.position.z),
+        impulse:  new CmVector(s.shotData.impulse.x,  s.shotData.impulse.y,  s.shotData.impulse.z),
+        torque:   new CmVector(s.shotData.torque.x,   s.shotData.torque.y,   s.shotData.torque.z),
+      },
+      cueBallPlaced: s.cueBallPlaced
+        ? new CmVector(s.cueBallPlaced.x, s.cueBallPlaced.y, s.cueBallPlaced.z)
+        : null,
+      physicsState: s.physicsState ?? '',
+      ruleState: (s.ruleState ?? {}) as GameLogicStateV1,
+      checksum: s.checksum,
+    }));
+  } catch { return null; }
+}
 
 /**
  * Trigger a browser file download of the core record JSON.

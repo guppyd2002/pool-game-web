@@ -1,14 +1,17 @@
 /**
- * Pool Game Web — P1-T04 main entry point.
+ * Pool Game Web — Landscape UX entry point.
  *
  * GAME-002: Simplified startup — HTML HotSeat menu, no FB/PlayFab/IAP/WebSocket.
  * GAME-003: "Play HotSeat" button → session.startNewGame() → cue input enabled.
  * GAME-015 B-lite: camera tween overview↔table on game start/exit.
  * GAME-018: createBallPool8Session() wires physics + cue + replay → session.
  *
- * Ball-in-hand (GAME-014):
- *   BallInHandController handles physics.placeBall() + free-zone validation.
- *   After commit(), session.notifyBallPlaced() advances session state.
+ * Landscape layout (landscape-ux):
+ *   HUD  = top 36dp strip (P1 | turn info | P2 | controls).
+ *   Aim  = tap/drag on canvas (C-1 tap=absolute, drag=relative).
+ *   Power = right-side vertical bar 48×240dp (down=charge, release=fire).
+ *   Fine  = bottom-centre horizontal bar 680dp (left/right ±5°).
+ *   Spin  = left-side collapsible disc (auto-close 2s).
  */
 
 import { createScene } from './renderer/scene';
@@ -23,16 +26,20 @@ import { createGhostBall } from './renderer/ghost-ball';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
+import { MULTIPLIER } from './physics/fixed-math';
 import { CmVector } from './physics/cm-vector';
 import { backswingOffset } from './game/shot-animation';
 import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
 import { createSpinDiscUI } from './renderer/spin-disc-ui';
 import { createPowerSliderUI } from './renderer/power-slider-ui';
+import { createFineAdjustBarUI } from './renderer/fine-adjust-bar-ui';
 import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import { createBallPool8Session } from './game/game-session';
 import { attachAIDemo, parseDemoConfig } from './game/ai-demo';
 import { pickValidSeed } from './game/headless-game';
+import { createRecordDriver, downloadRecord, parseRecord } from './game/record-driver';
+import { createReplayHUD } from './renderer/replay-hud';
 import { createReplayDriver } from './renderer/replay-driver';
 import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
@@ -40,6 +47,8 @@ import { createGameOverUI } from './renderer/game-over-ui';
 import { REASON_MESSAGES } from './game/game-play-reason';
 import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
 import { createTurnPrompt } from './renderer/turn-prompt';
+import { createHudBar } from './renderer/hud-bar';
+import { createTutorialOverlay } from './renderer/tutorial-overlay';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -63,9 +72,53 @@ const placementMarker = createPlacementMarker(scene.scene);
 const _bihRaycaster = new THREE.Raycaster();
 let _bihStartT = 0;
 
+// ─── Aim/shot visual state ────────────────────────────────────────────────────
+
 let _lastAimTime = 0;
+// Current power fraction from the power bar (0..1); used by aim line preview.
+let _currentPowerFraction = 0;
 let _punchSavedAimDir: CmVector | null = null;
 let _punchSavedCueBallPos: CmVector | null = null;
+
+/**
+ * Refresh all aim-line visuals using the current power fraction and CUE-002
+ * saved aim state.  Called both from the aim-drag adapter (onAimUpdate) and
+ * from the power bar (onMove) so the preview stays honest in both directions.
+ */
+function _updateAimVisuals(): void {
+  const now = performance.now() / 1000;
+  const dt = _lastAimTime === 0 ? 0.016 : Math.min(now - _lastAimTime, 0.1);
+  _lastAimTime = now;
+
+  const cueBall = physics.getBall(0);
+  // F-A: use nominal 0.5 force when power bar idle so aim line always shows
+  // during aim drag. When power bar held, use real fraction (M-2 bit-exact).
+  const _previewForce = _currentPowerFraction > 0 ? _currentPowerFraction : 0.5;
+  // F-B: suppress aim line during simulation (shot just fired) so it doesn't
+  // persist through the entire ball-motion replay and into the next turn.
+  const hit = physics.isSimulating ? null : cue.getAimHit(_previewForce);
+  const power = _currentPowerFraction;
+  aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
+  ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);
+  powerBar.update(power);  // small overlay power indicator
+
+  const aimDir = hit
+    ? new CmVector(
+        hit.point.x - cueBall.position.x,
+        0,
+        hit.point.z - cueBall.position.z,
+      )
+    : null;
+
+  if (aimDir) {
+    _punchSavedAimDir = aimDir;
+    _punchSavedCueBallPos = cueBall.position;
+  }
+
+  cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), power);
+}
+
+// ─── CUE-adapter ─────────────────────────────────────────────────────────────
 
 const adapter = createCueAdapter({
   camera: scene.camera,
@@ -75,68 +128,87 @@ const adapter = createCueAdapter({
   cueBallMesh: scene.balls[0],
   controller: cue,
   onAimUpdate: () => {
-    // B4: dismiss turn prompt on first player interaction
     turnPrompt.dismiss();
-
-    const now = performance.now() / 1000;
-    const dt = _lastAimTime === 0 ? 0.016 : Math.min(now - _lastAimTime, 0.1);
-    _lastAimTime = now;
-
-    const cueBall = physics.getBall(0);
-    const hit = cue.getAimHit();
-    const power = cue.getPowerFraction();
-    aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
-    ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);
-    powerBar.update(power);
-
-    const aimDir = hit
-      ? new CmVector(
-          hit.point.x - cueBall.position.x,
-          0,
-          hit.point.z - cueBall.position.z,
-        )
-      : null;
-
-    if (aimDir) {
-      _punchSavedAimDir = aimDir;
-      _punchSavedCueBallPos = cueBall.position;
-    }
-
-    cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), power);
-  },
-  onShotFired: (power) => {
-    if (!_punchSavedAimDir || !_punchSavedCueBallPos) return;
-    const savedDir = _punchSavedAimDir;
-    const savedPos = _punchSavedCueBallPos;
-
-    let punchDone = false;
-    let lastTs = 0;
-    cueMesh.startPunchAnimation(backswingOffset(power), () => { punchDone = true; });
-
-    function punchFrame(ts: number): void {
-      if (punchDone) return;
-      const dt = lastTs === 0 ? 0.016 : Math.min((ts - lastTs) / 1000, 0.1);
-      lastTs = ts;
-      cueMesh.update(savedPos, savedDir, dt, 0, 0);
-      if (!punchDone) requestAnimationFrame(punchFrame);
-    }
-    requestAnimationFrame(punchFrame);
+    tutorial.onAimSet();
+    _updateAimVisuals();
   },
   onZoom: (delta) => {
     const dir = scene.camera.position.clone().normalize();
     scene.camera.position.addScaledVector(dir, -delta * 0.5);
     scene.camera.position.clampLength(1.0, 5.0);
   },
+  // F-③ tap-to-aim: provide cueball world position (float meters) for C-1 aim pair.
+  getCueBallWorld: () => {
+    const b = physics.getBall(0);
+    return { x: b.position.x / MULTIPLIER, z: b.position.z / MULTIPLIER };
+  },
+  // onShotFired removed: 8BP fires via power bar (see shotSlider.onShot below)
 });
 
-// CUE-002: power slider
+// ─── CUE-002: Power bar (8BP main shot path) ──────────────────────────────────
+//
+// 8BP分離模式:
+//   ShotSlider domain: isAutoShot=true → endControl() fires automatically.
+//   PowerSliderUI: vertical bar right side; drag ↑ to charge, release to fire.
+//   onStartControl: disable aim adapter (prevent aim/fire overlap).
+//   onEndControl:   re-enable aim adapter after shot/cancel.
+//   onShot: fireNow(forceFraction) — uses saved CUE-002 aim state.
+//           M-1: fireNow now checks _isEnabled, so AI/opponent turns are safe.
+
 const shotSlider = createShotSlider({
-  onStartControl: () => { adapter.disable(); },
-  onEndControl:   () => { adapter.enable(); },
-  onMove:  (f) => { powerBar.update(f); },
-  onShot:  (f) => { cue.fireNow(f); },
+  isAutoShot: true,
+  // C-2 mutex (b): power charging locks both aim drag AND fine-adjust bar.
+  // Extends existing onStartControl→adapter.disable pattern to cover fine-adjust.
+  onStartControl: () => {
+    adapter.disable();
+    fineAdjustBar.disable();
+    tutorial.onPowerStart();
+  },
+  onEndControl:   () => { adapter.enable(); fineAdjustBar.enable(); },
+  onMove:  (f) => {
+    _currentPowerFraction = f;
+    _updateAimVisuals();
+  },
+  onShot:  (f) => {
+    _currentPowerFraction = f;
+    const fired = cue.fireNow(f);
+    if (fired) tutorial.onShot();
+    if (fired && _punchSavedAimDir && _punchSavedCueBallPos) {
+      // Trigger punch animation using last saved aim direction
+      const savedDir = _punchSavedAimDir;
+      const savedPos = _punchSavedCueBallPos;
+      let punchDone = false;
+      let lastTs = 0;
+      cueMesh.startPunchAnimation(backswingOffset(f), () => { punchDone = true; });
+      function punchFrame(ts: number): void {
+        if (punchDone) return;
+        const dt = lastTs === 0 ? 0.016 : Math.min((ts - lastTs) / 1000, 0.1);
+        lastTs = ts;
+        cueMesh.update(savedPos, savedDir, dt, 0, 0);
+        if (!punchDone) requestAnimationFrame(punchFrame);
+      }
+      requestAnimationFrame(punchFrame);
+    }
+    // Reset power fraction and visuals after shot attempt
+    _currentPowerFraction = 0;
+    _updateAimVisuals();
+  },
+  onCancel: () => {
+    _currentPowerFraction = 0;
+    _updateAimVisuals();
+  },
 });
+
 const powerSliderUI = createPowerSliderUI(container, shotSlider);
+// Power bar starts hidden; shown when game starts (not in demo/replay spectator view)
+powerSliderUI.element.style.display = 'none';
+
+// Fine-adjust bar — bottom-centre horizontal, ±5° precision aim rotation.
+const fineAdjustBar = createFineAdjustBarUI(container, cue, () => {
+  turnPrompt.dismiss();
+  _updateAimVisuals();
+});
+fineAdjustBar.element.style.display = 'none';
 
 // CUE-006/CUE-008: spin disc
 const spinDisc = createSpinDisc({
@@ -146,16 +218,17 @@ const spinDisc = createSpinDisc({
 });
 const spinDiscUI = createSpinDiscUI(container, spinDisc);
 
-// CUE-021: UI edge fade
+// CUE-021: UI edge fade — passive indicators only; powerSliderUI excluded
+// because it is the primary interactive control and must remain at full opacity.
 const uiEdgeFade = createUIEdgeFade(scene.camera, [
   powerBar.element,
-  powerSliderUI.element,
   spinDiscUI.element,
 ]);
 
 // ─── B4: turn prompt + cue standby ────────────────────────────────────────────
 
 const turnPrompt = createTurnPrompt(container);
+const tutorial = createTutorialOverlay(container);
 
 // ─── GAME-015 B-lite: camera tween ────────────────────────────────────────────
 
@@ -199,20 +272,52 @@ mainMenuEl.innerHTML = [
   '<h1 style="font-size:36px;margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
   '<p style="font-size:14px;opacity:0.6;margin-bottom:32px;">HotSeat — 2 players, same screen</p>',
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
+  '<label id="btn-load-replay" style="margin-top:16px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
+  '<input id="inp-record" type="file" accept=".poolrecord,.json" style="display:none;">',
 ].join('');
 container.appendChild(mainMenuEl);
 
 const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
+const loadReplayLabel = mainMenuEl.querySelector('#btn-load-replay') as HTMLLabelElement;
+const loadReplayInput = mainMenuEl.querySelector('#inp-record') as HTMLInputElement;
+loadReplayLabel.htmlFor = 'inp-record';
+
+loadReplayInput.addEventListener('change', () => {
+  const file = loadReplayInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const shots = parseRecord(reader.result as string);
+    if (!shots || shots.length === 0) { alert('Invalid or empty .poolrecord file.'); return; }
+    mainMenuEl.style.display = 'none';
+    hudBar.setVisible(true);
+    hudBar.setTopViewLabel('⬇ Table');
+    _inTopView = true;
+    scene.setOrthoTop(true);
+    // Disable all human controls — replay drives the session
+    adapter.disable();
+    powerSliderUI.element.style.display = 'none';  // M-1: no power bar during replay
+    fineAdjustBar.element.style.display = 'none';
+    spinDiscUI.element.style.display = 'none';
+    replayHUD.start(gameSession, physics, scene, shots);
+  };
+  reader.readAsText(file);
+  // Reset so the same file can be re-loaded
+  loadReplayInput.value = '';
+});
 
 // ─── GAME-003: start → Aiming, cue enabled ───────────────────────────────────
 
 startBtn.addEventListener('click', () => {
   mainMenuEl.style.display = 'none';
-  topViewBtn.style.display = 'block';
-  _inTopView = false;
-  topViewBtn.textContent = '⬆ Top';
-  cameraTween.tweenTo(POSE_TABLE, 0.5);
-  _runCameraTween(true);
+  hudBar.setVisible(true);
+  hudBar.setTopViewLabel('⬇ Table');
+  powerSliderUI.element.style.display = 'block';
+  fineAdjustBar.element.style.display = 'block';
+  spinDiscUI.element.style.display = 'block';
+  _inTopView = true;
+  scene.setOrthoTop(true);
+  tutorial.start();
   gameSession.startNewGame();
 });
 
@@ -221,6 +326,7 @@ startBtn.addEventListener('click', () => {
 const reasonBanner = createReasonBanner(container);
 
 const gameOverUI = createGameOverUI(container);
+const replayHUD = createReplayHUD(container);
 gameOverUI.onPlayAgain = () => {
   gameOverUI.hide();
   gameSession.playAgain();
@@ -229,80 +335,73 @@ gameOverUI.onExit = () => {
   gameOverUI.hide();
   turnPrompt.dismiss();
   gameSession.exitGame();
-  topViewBtn.style.display = 'none';
+  hudBar.setVisible(false);
+  powerSliderUI.element.style.display = 'none';
+  fineAdjustBar.element.style.display = 'none';
+  spinDiscUI.element.style.display = 'none';
+  adapter.setFineAim(false);
+  hudBar.setFineAimActive(false);
   _inTopView = false;
-  topViewBtn.textContent = '⬆ Top';
-  scene.setOrthoTop(false);  // ensure ortho is cleared on exit
+  hudBar.setTopViewLabel('⬆ Top');
+  scene.setOrthoTop(false);
   cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
   _runCameraTween(true);
   mainMenuEl.style.display = 'flex';
 };
 
-// ─── B3: top-view toggle button + keyboard shortcut ──────────────────────────
-
-const topViewBtn = document.createElement('button');
-topViewBtn.textContent = '⬆ Top';
-topViewBtn.style.cssText = [
-  'position:absolute', 'top:12px', 'right:12px',
-  'background:rgba(0,0,0,0.55)', 'color:#fff',
-  'border:1px solid rgba(255,255,255,0.3)',
-  'padding:6px 14px', 'border-radius:6px',
-  'font-family:sans-serif', 'font-size:13px',
-  'cursor:pointer', 'z-index:100',
-  'display:none',
-].join(';');
-container.appendChild(topViewBtn);
+// ─── HUD bar (top strip) — landscape layout ──────────────────────────────────
 
 let _inTopView = false;
+let _isLeftHand = false;
 
-topViewBtn.addEventListener('click', () => {
-  // Cancel any in-progress aim drag so the aim-line overlay doesn't persist across camera switch.
+function _toggleView(): void {
   cue.cancel();
   _inTopView = !_inTopView;
   if (_inTopView) {
-    // Switch to strict ortho top-down; ortho camera is self-contained, no tween needed.
     scene.setOrthoTop(true);
   } else {
-    // Return to perspective; snap back to table pose (no tween — instant, avoids disorientation).
     scene.setOrthoTop(false);
     cameraTween.tweenTo(POSE_TABLE, 0);
   }
-  topViewBtn.textContent = _inTopView ? '⬇ Table' : '⬆ Top';
+  hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
+}
+
+function _toggleFineAim(): void {
+  adapter.setFineAim(!adapter.isFineAim);
+  hudBar.setFineAimActive(adapter.isFineAim);
+}
+
+const hudBar = createHudBar(container, {
+  onToggleView: _toggleView,
+  onToggleLeftHand: () => {
+    _isLeftHand = !_isLeftHand;
+    container.classList.toggle('left-hand-mode', _isLeftHand);
+    hudBar.setLeftHandActive(_isLeftHand);
+  },
+  onToggleFineAim: _toggleFineAim,
 });
+hudBar.setVisible(false);  // hidden until game starts
 
 window.addEventListener('keydown', (e: KeyboardEvent) => {
-  if ((e.key === 't' || e.key === 'T') && topViewBtn.style.display !== 'none') {
-    topViewBtn.click();
+  if ((e.key === 't' || e.key === 'T') && !mainMenuEl.style.display.includes('flex')) {
+    _toggleView();
   }
+  if (e.key === 'Shift') hudBar.setFineAimActive(adapter.isFineAim);
+});
+window.addEventListener('keyup', (e: KeyboardEvent) => {
+  if (e.key === 'Shift') hudBar.setFineAimActive(adapter.isFineAim);
 });
 
-// ─── Player turn indicator ────────────────────────────────────────────────────
+// ─── Player turn indicator (via HUD bar) ─────────────────────────────────────
 
-const playerIndicatorEl = document.createElement('div');
-playerIndicatorEl.id = 'player-indicator';
-playerIndicatorEl.style.cssText = [
-  'position:absolute', 'top:12px', 'left:50%',
-  'transform:translateX(-50%)',
-  'background:rgba(0,0,0,0.55)', 'color:#fff',
-  'padding:6px 20px', 'border-radius:20px',
-  'font-family:sans-serif', 'font-size:14px',
-  'pointer-events:none', 'display:none', 'z-index:100',
-].join(';');
-container.appendChild(playerIndicatorEl);
-
-function _updatePlayerIndicator(playerIndex: 0 | 1, ballInHand: boolean): void {
-  playerIndicatorEl.style.display = 'block';
-  const playerLabel = `Player ${playerIndex + 1}`;
-  playerIndicatorEl.textContent = ballInHand
-    ? `${playerLabel} — Place cue ball`
-    : `${playerLabel}'s turn`;
+function _updatePlayerIndicator(playerIndex: 0 | 1, isBallInHand: boolean): void {
+  hudBar.setPlayerTurn(playerIndex, isBallInHand);
 }
 
 // ─── Session callbacks ─────────────────────────────────────────────────────────
 
 // onGameEnded and onReasonMessage are shared by both HotSeat and demo modes
 gameSession.onGameEnded = (winner, reason) => {
-  playerIndicatorEl.style.display = 'none';
   turnPrompt.dismiss();
   gameOverUI.show(winner, REASON_MESSAGES[reason] ?? '');
 };
@@ -326,33 +425,65 @@ if (_demoConfig) {
   attachAIDemo(gameSession, physics, space, _demoConfig);
   // Wrap to also update player indicator (shows which AI is playing)
   const _demoTurnFn = gameSession.onTurnChanged;
-  gameSession.onTurnChanged = (playerIndex, ballInHand) => {
-    _updatePlayerIndicator(playerIndex, ballInHand);
-    _demoTurnFn?.(playerIndex, ballInHand);
+  gameSession.onTurnChanged = (playerIndex, isBallInHand) => {
+    _updatePlayerIndicator(playerIndex, isBallInHand);
+    _demoTurnFn?.(playerIndex, isBallInHand);
   };
-  // Auto-start: skip main menu, tween camera to table, begin game
+
+  // Recording: wire onShotFired to accumulate per-shot records for download
+  const _recConfig = {
+    engineVersion: 'dev',
+    players: [
+      { type: 'AI' as const, rank: _demoConfig.rank0 },
+      { type: 'AI' as const, rank: _demoConfig.rank1 },
+    ] as [{ type: 'AI'; rank: number }, { type: 'AI'; rank: number }],
+    gameSeed: _demoConfig.seed,
+  };
+  const { driver: _recDriver, record: _recRecord } = createRecordDriver(_recConfig);
+  gameSession.onShotFired = (s) => _recDriver.onShotFired(s);
+
+  // Override onGameEnded to finalize recording and expose download button
+  const _prevDemoGameEnded = gameSession.onGameEnded;
+  gameSession.onGameEnded = (winner, reason) => {
+    _recDriver.finalize({ winner, reason, totalShots: _recRecord.shots.length });
+    gameOverUI.onDownloadRecord = () => downloadRecord(_recRecord, _recConfig);
+    _prevDemoGameEnded?.(winner, reason);
+  };
+
+  // Auto-start: skip main menu, enter ortho top-view, begin game
   mainMenuEl.style.display = 'none';
-  topViewBtn.style.display = 'block';
-  _inTopView = false;
-  topViewBtn.textContent = '⬆ Top';
-  // Spectator view: hide Power/Shot and Spin/Top controls (AI drives all input)
+  hudBar.setVisible(true);
+  hudBar.setTopViewLabel('⬇ Table');
+  // M-1 defense-in-depth: disable adapter (not just hide bars) so tap/drag cannot
+  // pollute _lastAim* during AI demo. Primary gates: hidden bars + _isEnabled in fireNow.
+  adapter.disable();
+  // M-1: power bar + controls hidden for AI spectator — no human can fire.
+  // fireNow also checks _isEnabled (double gate), but hiding is the primary protection.
   powerSliderUI.element.style.display = 'none';
+  fineAdjustBar.element.style.display = 'none';
   spinDiscUI.element.style.display = 'none';
-  cameraTween.tweenTo(POSE_TABLE, 0.5);
-  _runCameraTween(true);
+  _inTopView = true;
+  scene.setOrthoTop(true);
   gameSession.startNewGame();
 } else {
   // Normal HotSeat mode: human-controlled turn changes
-  gameSession.onTurnChanged = (playerIndex, ballInHand) => {
-    _updatePlayerIndicator(playerIndex, ballInHand);
+  gameSession.onTurnChanged = (playerIndex, isBallInHand) => {
+    _updatePlayerIndicator(playerIndex, isBallInHand);
+    // Reset power bar at each turn start
+    powerSliderUI.reset();
+    _currentPowerFraction = 0;
     // B4: show clear instruction overlay + cue standby preview
-    turnPrompt.show(playerIndex, ballInHand);
-    if (ballInHand) {
+    turnPrompt.show(playerIndex, isBallInHand);
+    if (isBallInHand) {
       _enterBallInHandMode();
     } else {
-      // Show cue stick at default angle pointing toward the rack until player drags
-      const cueBall = physics.getBall(0);
-      cueMesh.update(cueBall.position, new CmVector(0.5, 0, 0), 0, 0, 0);
+      // G-2: set default aim so _updateAimVisuals shows cue + line before first drag.
+      // direction = start − current = (0.2, 0) → normalized +X (toward rack).
+      // resetForNewTurn() already cleared stale aim; this sets a fresh default each turn.
+      cue.onDragStart({ x: 0.1, z: 0 });
+      cue.onDragMove({ x: -0.1, z: 0 });
+      cue.cancel();
+      _updateAimVisuals();
     }
   };
 }
@@ -372,6 +503,12 @@ function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: numbe
 
 function _enterBallInHandMode(): void {
   adapter.disable();
+  // M-3: disable power bar during BIH — dragging power bar would fire with an
+  // uncommitted cue ball position, injecting a shot before placement.
+  powerSliderUI.element.style.display = 'none';
+  // BIH: disable fine-adjust bar too (§5: BIH 期間左右兩 bar 都 disable)
+  fineAdjustBar.element.style.display = 'none';
+  fineAdjustBar.disable();
   _bihStartT = performance.now() / 1000;
   ballInHand.enter();
   const t = performance.now() / 1000 - _bihStartT;
@@ -392,6 +529,11 @@ function onBihPointerUp(_e: PointerEvent): void {
     placementMarker.update(null, false, 0);
     gameSession.notifyBallPlaced();  // session state (store, trail, cue) — physics already done
     adapter.enable();
+    // M-3: re-enable power bar after ball is placed
+    powerSliderUI.element.style.display = 'block';
+    // Re-enable fine-adjust bar after ball is placed
+    fineAdjustBar.element.style.display = 'block';
+    fineAdjustBar.enable();
   }
 }
 
@@ -412,6 +554,7 @@ window.addEventListener('beforeunload', () => {
   aimLine.dispose();
   ghostBall.dispose();
   powerSliderUI.dispose();
+  fineAdjustBar.dispose();
   spinDiscUI.dispose();
   uiEdgeFade.dispose();
   powerBar.dispose();
@@ -419,8 +562,11 @@ window.addEventListener('beforeunload', () => {
   placementMarker.dispose();
   reasonBanner.dispose();
   gameOverUI.dispose();
+  replayHUD.dispose();
   replayDriver.dispose();
   turnPrompt.dispose();
+  hudBar.dispose();
+  tutorial.dispose();
 });
 
 // ─── Playwright / test hook ──────────────────────────────────────────────────
@@ -432,5 +578,5 @@ window.addEventListener('beforeunload', () => {
   renderer: scene.renderer,
   scene: scene.scene,
   gameSession,
+  cue,  // exposes getAimState() for overlay hitTest guard smoke test
 };
-
