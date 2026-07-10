@@ -3,14 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>pool-game-web</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body, #app { width: 100%; height: 100%; overflow: hidden; }
+
+      /* Landscape UX: left-hand mode flips power (right→left) and spin (left→right) */
+      #app.left-hand-mode .power-slider-overlay {
+        right: auto !important;
+        left: max(16px, calc(16px + env(safe-area-inset-left, 0px))) !important;
+      }
+      #app.left-hand-mode .spin-disc-overlay {
+        left: auto !important;
+        right: max(12px, calc(12px + env(safe-area-inset-right, 0px))) !important;
+      }
+
+      /* Rotate-device prompt — shown only in portrait on mobile */
+      #rotate-prompt {
+        display: none;
+        position: fixed; inset: 0; z-index: 9999;
+        background: #0a0a1a;
+        color: #fff;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: sans-serif;
+        gap: 16px;
+        text-align: center;
+        padding: 32px;
+      }
+      #rotate-prompt .rotate-icon { font-size: 64px; }
+      @media screen and (orientation: portrait) and (max-width: 900px) {
+        #rotate-prompt { display: flex; }
+      }
     </style>
   </head>
   <body>
+    <div id="rotate-prompt">
+      <div class="rotate-icon">📱↻</div>
+      <div style="font-size:18px;font-weight:bold;">Please rotate your device</div>
+      <div style="font-size:14px;opacity:0.6;">Hustle Pool plays in landscape mode</div>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

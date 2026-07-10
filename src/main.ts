@@ -1,19 +1,17 @@
 /**
- * Pool Game Web — P1-T04 main entry point.
+ * Pool Game Web — Landscape UX entry point.
  *
  * GAME-002: Simplified startup — HTML HotSeat menu, no FB/PlayFab/IAP/WebSocket.
  * GAME-003: "Play HotSeat" button → session.startNewGame() → cue input enabled.
  * GAME-015 B-lite: camera tween overview↔table on game start/exit.
  * GAME-018: createBallPool8Session() wires physics + cue + replay → session.
  *
- * Ball-in-hand (GAME-014):
- *   BallInHandController handles physics.placeBall() + free-zone validation.
- *   After commit(), session.notifyBallPlaced() advances session state.
- *
- * 8BP controls (8BP-v1):
- *   Aim  = drag anywhere on canvas → rotates aim line (no shot on release).
- *   Power = vertical bar on right side; drag ↑ to charge, release to fire.
- *   Aim and power are separate gestures (8BP pattern, no accidental shots).
+ * Landscape layout (landscape-ux):
+ *   HUD  = top 36dp strip (P1 | turn info | P2 | controls).
+ *   Aim  = tap/drag on canvas (C-1 tap=absolute, drag=relative).
+ *   Power = right-side vertical bar 48×240dp (down=charge, release=fire).
+ *   Fine  = bottom-centre horizontal bar 680dp (left/right ±5°).
+ *   Spin  = left-side collapsible disc (auto-close 2s).
  */
 
 import { createScene } from './renderer/scene';
@@ -49,6 +47,8 @@ import { createGameOverUI } from './renderer/game-over-ui';
 import { REASON_MESSAGES } from './game/game-play-reason';
 import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
 import { createTurnPrompt } from './renderer/turn-prompt';
+import { createHudBar } from './renderer/hud-bar';
+import { createTutorialOverlay } from './renderer/tutorial-overlay';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -128,8 +128,8 @@ const adapter = createCueAdapter({
   cueBallMesh: scene.balls[0],
   controller: cue,
   onAimUpdate: () => {
-    // B4: dismiss turn prompt on first player interaction
     turnPrompt.dismiss();
+    tutorial.onAimSet();
     _updateAimVisuals();
   },
   onZoom: (delta) => {
@@ -159,7 +159,11 @@ const shotSlider = createShotSlider({
   isAutoShot: true,
   // C-2 mutex (b): power charging locks both aim drag AND fine-adjust bar.
   // Extends existing onStartControl→adapter.disable pattern to cover fine-adjust.
-  onStartControl: () => { adapter.disable(); fineAdjustBar.disable(); },
+  onStartControl: () => {
+    adapter.disable();
+    fineAdjustBar.disable();
+    tutorial.onPowerStart();
+  },
   onEndControl:   () => { adapter.enable(); fineAdjustBar.enable(); },
   onMove:  (f) => {
     _currentPowerFraction = f;
@@ -168,6 +172,7 @@ const shotSlider = createShotSlider({
   onShot:  (f) => {
     _currentPowerFraction = f;
     const fired = cue.fireNow(f);
+    if (fired) tutorial.onShot();
     if (fired && _punchSavedAimDir && _punchSavedCueBallPos) {
       // Trigger punch animation using last saved aim direction
       const savedDir = _punchSavedAimDir;
@@ -198,7 +203,7 @@ const powerSliderUI = createPowerSliderUI(container, shotSlider);
 // Power bar starts hidden; shown when game starts (not in demo/replay spectator view)
 powerSliderUI.element.style.display = 'none';
 
-// F-④: Left-side fine-adjust bar — ±3° precision aim rotation.
+// Fine-adjust bar — bottom-centre horizontal, ±5° precision aim rotation.
 const fineAdjustBar = createFineAdjustBarUI(container, cue, () => {
   turnPrompt.dismiss();
   _updateAimVisuals();
@@ -223,6 +228,7 @@ const uiEdgeFade = createUIEdgeFade(scene.camera, [
 // ─── B4: turn prompt + cue standby ────────────────────────────────────────────
 
 const turnPrompt = createTurnPrompt(container);
+const tutorial = createTutorialOverlay(container);
 
 // ─── GAME-015 B-lite: camera tween ────────────────────────────────────────────
 
@@ -284,10 +290,9 @@ loadReplayInput.addEventListener('change', () => {
     const shots = parseRecord(reader.result as string);
     if (!shots || shots.length === 0) { alert('Invalid or empty .poolrecord file.'); return; }
     mainMenuEl.style.display = 'none';
-    topViewBtn.style.display = 'block';
-    fineAimBtn.style.display = 'none';  // replay: no fine-aim (human controls disabled)
+    hudBar.setVisible(true);
+    hudBar.setTopViewLabel('⬇ Table');
     _inTopView = true;
-    topViewBtn.textContent = '⬇ Table';
     scene.setOrthoTop(true);
     // Disable all human controls — replay drives the session
     adapter.disable();
@@ -305,13 +310,14 @@ loadReplayInput.addEventListener('change', () => {
 
 startBtn.addEventListener('click', () => {
   mainMenuEl.style.display = 'none';
-  topViewBtn.style.display = 'block';
-  fineAimBtn.style.display = 'block';
-  powerSliderUI.element.style.display = 'block';  // 8BP: show power bar for HotSeat
-  fineAdjustBar.element.style.display = 'block';  // F-④: show fine-adjust bar for HotSeat
+  hudBar.setVisible(true);
+  hudBar.setTopViewLabel('⬇ Table');
+  powerSliderUI.element.style.display = 'block';
+  fineAdjustBar.element.style.display = 'block';
+  spinDiscUI.element.style.display = 'block';
   _inTopView = true;
-  topViewBtn.textContent = '⬇ Table';
   scene.setOrthoTop(true);
+  tutorial.start();
   gameSession.startNewGame();
 });
 
@@ -329,118 +335,73 @@ gameOverUI.onExit = () => {
   gameOverUI.hide();
   turnPrompt.dismiss();
   gameSession.exitGame();
-  topViewBtn.style.display = 'none';
-  fineAimBtn.style.display = 'none';
-  powerSliderUI.element.style.display = 'none';  // hide on exit to main menu
+  hudBar.setVisible(false);
+  powerSliderUI.element.style.display = 'none';
   fineAdjustBar.element.style.display = 'none';
+  spinDiscUI.element.style.display = 'none';
   adapter.setFineAim(false);
+  hudBar.setFineAimActive(false);
   _inTopView = false;
-  topViewBtn.textContent = '⬆ Top';
-  scene.setOrthoTop(false);  // ensure ortho is cleared on exit
+  hudBar.setTopViewLabel('⬆ Top');
+  scene.setOrthoTop(false);
   cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
   _runCameraTween(true);
   mainMenuEl.style.display = 'flex';
 };
 
-// ─── B3: top-view toggle button + keyboard shortcut ──────────────────────────
-
-const topViewBtn = document.createElement('button');
-topViewBtn.textContent = '⬆ Top';
-topViewBtn.style.cssText = [
-  'position:absolute', 'top:12px', 'right:12px',
-  'background:rgba(0,0,0,0.55)', 'color:#fff',
-  'border:1px solid rgba(255,255,255,0.3)',
-  'padding:8px 14px', 'border-radius:6px', 'min-height:44px',
-  'font-family:sans-serif', 'font-size:13px',
-  'cursor:pointer', 'z-index:100',
-  'display:none',
-].join(';');
-container.appendChild(topViewBtn);
-
-// CUE-024: fine-aim toggle button — stacked below topViewBtn so it never
-// overlaps the centered player indicator on small screens.
-const fineAimBtn = document.createElement('button');
-fineAimBtn.textContent = '⌖ Fine';
-fineAimBtn.title = 'Fine aim (hold Shift)';
-fineAimBtn.style.cssText = [
-  'position:absolute', 'top:60px', 'right:12px',
-  'background:rgba(0,0,0,0.55)', 'color:#fff',
-  'border:1px solid rgba(255,255,255,0.3)',
-  'padding:8px 14px', 'border-radius:6px', 'min-height:44px',
-  'font-family:sans-serif', 'font-size:13px',
-  'cursor:pointer', 'z-index:100',
-  'display:none',
-].join(';');
-container.appendChild(fineAimBtn);
-
-function _updateFineAimBtn(): void {
-  fineAimBtn.style.background = adapter.isFineAim
-    ? 'rgba(76,175,80,0.7)'
-    : 'rgba(0,0,0,0.55)';
-}
-
-fineAimBtn.addEventListener('click', () => {
-  adapter.setFineAim(!adapter.isFineAim);
-  _updateFineAimBtn();
-});
+// ─── HUD bar (top strip) — landscape layout ──────────────────────────────────
 
 let _inTopView = false;
+let _isLeftHand = false;
 
-topViewBtn.addEventListener('click', () => {
-  // Cancel any in-progress aim drag so the aim-line overlay doesn't persist across camera switch.
+function _toggleView(): void {
   cue.cancel();
   _inTopView = !_inTopView;
   if (_inTopView) {
-    // Switch to strict ortho top-down; ortho camera is self-contained, no tween needed.
     scene.setOrthoTop(true);
   } else {
-    // Return to perspective; snap back to table pose (no tween — instant, avoids disorientation).
     scene.setOrthoTop(false);
     cameraTween.tweenTo(POSE_TABLE, 0);
   }
-  topViewBtn.textContent = _inTopView ? '⬇ Table' : '⬆ Top';
+  hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
+}
+
+function _toggleFineAim(): void {
+  adapter.setFineAim(!adapter.isFineAim);
+  hudBar.setFineAimActive(adapter.isFineAim);
+}
+
+const hudBar = createHudBar(container, {
+  onToggleView: _toggleView,
+  onToggleLeftHand: () => {
+    _isLeftHand = !_isLeftHand;
+    container.classList.toggle('left-hand-mode', _isLeftHand);
+    hudBar.setLeftHandActive(_isLeftHand);
+  },
+  onToggleFineAim: _toggleFineAim,
 });
+hudBar.setVisible(false);  // hidden until game starts
 
 window.addEventListener('keydown', (e: KeyboardEvent) => {
-  if ((e.key === 't' || e.key === 'T') && topViewBtn.style.display !== 'none') {
-    topViewBtn.click();
+  if ((e.key === 't' || e.key === 'T') && !mainMenuEl.style.display.includes('flex')) {
+    _toggleView();
   }
-  // Sync fine-aim button highlight when Shift is pressed
-  if (e.key === 'Shift') _updateFineAimBtn();
+  if (e.key === 'Shift') hudBar.setFineAimActive(adapter.isFineAim);
 });
 window.addEventListener('keyup', (e: KeyboardEvent) => {
-  if (e.key === 'Shift') _updateFineAimBtn();
+  if (e.key === 'Shift') hudBar.setFineAimActive(adapter.isFineAim);
 });
 
-// ─── Player turn indicator ────────────────────────────────────────────────────
-
-const playerIndicatorEl = document.createElement('div');
-playerIndicatorEl.id = 'player-indicator';
-playerIndicatorEl.style.cssText = [
-  'position:absolute', 'top:12px', 'left:50%',
-  'transform:translateX(-50%)',
-  'background:rgba(0,0,0,0.55)', 'color:#fff',
-  'padding:6px 20px', 'border-radius:20px',
-  'font-family:sans-serif', 'font-size:14px',
-  'pointer-events:none', 'display:none', 'z-index:100',
-  'max-width:calc(100% - 110px)',
-  'overflow:hidden', 'text-overflow:ellipsis', 'white-space:nowrap',
-].join(';');
-container.appendChild(playerIndicatorEl);
+// ─── Player turn indicator (via HUD bar) ─────────────────────────────────────
 
 function _updatePlayerIndicator(playerIndex: 0 | 1, isBallInHand: boolean): void {
-  playerIndicatorEl.style.display = 'block';
-  const playerLabel = `Player ${playerIndex + 1}`;
-  playerIndicatorEl.textContent = isBallInHand
-    ? `${playerLabel} — Place cue ball`
-    : `${playerLabel}'s turn`;
+  hudBar.setPlayerTurn(playerIndex, isBallInHand);
 }
 
 // ─── Session callbacks ─────────────────────────────────────────────────────────
 
 // onGameEnded and onReasonMessage are shared by both HotSeat and demo modes
 gameSession.onGameEnded = (winner, reason) => {
-  playerIndicatorEl.style.display = 'none';
   turnPrompt.dismiss();
   gameOverUI.show(winner, REASON_MESSAGES[reason] ?? '');
 };
@@ -491,18 +452,17 @@ if (_demoConfig) {
 
   // Auto-start: skip main menu, enter ortho top-view, begin game
   mainMenuEl.style.display = 'none';
-  topViewBtn.style.display = 'block';
-  fineAimBtn.style.display = 'none';  // demo/spectator: no fine-aim (AI drives input)
+  hudBar.setVisible(true);
+  hudBar.setTopViewLabel('⬇ Table');
   // M-1 defense-in-depth: disable adapter (not just hide bars) so tap/drag cannot
   // pollute _lastAim* during AI demo. Primary gates: hidden bars + _isEnabled in fireNow.
   adapter.disable();
-  // M-1: power bar hidden for AI spectator — no human can fire via power bar.
+  // M-1: power bar + controls hidden for AI spectator — no human can fire.
   // fireNow also checks _isEnabled (double gate), but hiding is the primary protection.
   powerSliderUI.element.style.display = 'none';
   fineAdjustBar.element.style.display = 'none';
   spinDiscUI.element.style.display = 'none';
   _inTopView = true;
-  topViewBtn.textContent = '⬇ Table';
   scene.setOrthoTop(true);
   gameSession.startNewGame();
 } else {
@@ -605,6 +565,8 @@ window.addEventListener('beforeunload', () => {
   replayHUD.dispose();
   replayDriver.dispose();
   turnPrompt.dispose();
+  hudBar.dispose();
+  tutorial.dispose();
 });
 
 // ─── Playwright / test hook ──────────────────────────────────────────────────

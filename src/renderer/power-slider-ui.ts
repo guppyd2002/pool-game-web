@@ -23,11 +23,11 @@ export interface PowerSliderUI {
   dispose(): void;
 }
 
-/** Height of the draggable track in CSS pixels. */
-const TRACK_H = 180;
+/** Height of the draggable track in CSS pixels. Landscape spec: 240dp. */
+const TRACK_H = 240;
 
-/** Width of the draggable track in CSS pixels. */
-const TRACK_W = 36;
+/** Width of the draggable track in CSS pixels. Landscape spec: 48dp. */
+const TRACK_W = 48;
 
 export function createPowerSliderUI(
   container: HTMLElement,
@@ -35,13 +35,14 @@ export function createPowerSliderUI(
 ): PowerSliderUI {
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // F-①: Outer wrapper — right side, vertically centred.
-  // right uses max() so safe-area-inset-right (landscape notch) is respected, and
-  // enough fixed margin (56px) clears Vercel preview toolbar on portrait as well.
+  // Outer wrapper — right side, vertically centred.
+  // right uses max() so safe-area-inset-right (landscape notch) is respected.
+  // CSS class name used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
+  overlay.className = 'power-slider-overlay';
   overlay.style.cssText = [
     'position:absolute',
-    'right:max(56px, calc(16px + env(safe-area-inset-right, 0px)))',
+    'right:max(16px, calc(16px + env(safe-area-inset-right, 0px)))',
     'top:50%', 'transform:translateY(-50%)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
@@ -98,16 +99,16 @@ export function createPowerSliderUI(
     'font-weight:bold', 'pointer-events:none',
   ].join(';');
 
-  // F-②: Hint text — cue-pull metaphor
+  // Hint text — cue-pull metaphor (landscape: pull down = power, release = shoot)
   const hint = document.createElement('div');
-  hint.textContent = '↓ 抽桿蓄力';
+  hint.textContent = '↓ Pull = Power';
   hint.style.cssText = [
     'color:rgba(255,255,255,0.45)', 'font-size:9px', 'font-family:sans-serif',
     'pointer-events:none', 'text-align:center',
   ].join(';');
 
   const hint2 = document.createElement('div');
-  hint2.textContent = '放開發射';
+  hint2.textContent = 'Release = Shoot';
   hint2.style.cssText = [
     'color:rgba(255,255,255,0.35)', 'font-size:8px', 'font-family:sans-serif',
     'pointer-events:none', 'text-align:center',

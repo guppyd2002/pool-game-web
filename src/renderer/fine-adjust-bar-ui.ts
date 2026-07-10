@@ -1,24 +1,26 @@
 /**
- * 8BP v2.1 F-④: Left-side fine-adjust bar — ±θ precision aim rotation.
+ * 8BP v2.1 landscape: Bottom-centre fine-adjust bar — ±θ precision aim rotation.
  *
- * 設計要點：
- *   - 左側直立 bar，與右側 power bar 對稱；拇指可達。
- *   - 每次 pointermove 立即把旋轉後的新角寫回 controller._lastAimCurrent（C-2）。
+ * 設計要點（橫屏）：
+ *   - 底部中央水平 bar，680dp 行程（68px/°）。
+ *   - 左右拖曳 = 瞄準角度 ±5°，立即寫回 controller._lastAimCurrent（C-2）。
  *   - 繞 _lastAimStart 旋 _lastAimCurrent，保點對，不建平行 θ。
  *   - 放開歸中＝純視覺（canonical 不變）。
  *   - Mutex: 由 main.ts onStartControl/onEndControl 呼叫 disable()/enable()。
+ *   - stopPropagation: 底部 32dp 不傳播到球桌觸控區。
  *
  * Not unit-tested (DOM layer). Domain logic lives in cue-controller.ts.
+ * applyFineAimRotation is exported for unit tests.
  */
 
 import type { CueController, TablePoint } from '../game/cue-controller';
 
-const BAR_H = 160;
-const BAR_W = 32;
-const THUMB_H = 20;
+const TRACK_H = 32;
+const THUMB_W = 48;
+const THUMB_H = 28;
 
-/** ±degrees for full bar travel. M-5: real-device verify if ±3° is sufficient. */
-export const FINE_ANGLE_MAX_DEG = 3;
+/** ±degrees for full bar travel — landscape gives 68px/° precision. */
+export const FINE_ANGLE_MAX_DEG = 5;
 const FINE_ANGLE_MAX = FINE_ANGLE_MAX_DEG * (Math.PI / 180);
 
 /**
@@ -54,87 +56,84 @@ export function createFineAdjustBarUI(
 ): FineAdjustBarUI {
   let _enabled = true;
   let _dragging = false;
-  let _baseDragY = 0;
+  let _baseDragX = 0;
+  let _trackWidth = 0;
   let _baseStart: TablePoint | null = null;
   let _baseCurrent: TablePoint | null = null;
 
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
+  // Outer wrapper — bottom centre, horizontally adaptive.
   const overlay = document.createElement('div');
   overlay.style.cssText = [
     'position:absolute',
-    'left:max(12px, calc(4px + env(safe-area-inset-left, 0px)))',
-    'top:50%', 'transform:translateY(-50%)',
+    'bottom:12px',
+    'left:50%', 'transform:translateX(-50%)',
+    'width:min(680px, calc(100vw - 160px))',
     'z-index:100',
-    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
+    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:4px',
     'user-select:none',
   ].join(';');
 
   const label = document.createElement('div');
-  label.textContent = '精瞄';
+  label.textContent = '← Fine Aim →';
   label.style.cssText = [
-    'color:rgba(255,255,255,0.7)', 'font-size:10px', 'font-family:sans-serif',
+    'color:rgba(255,255,255,0.5)', 'font-size:9px', 'font-family:sans-serif',
     'letter-spacing:1px', 'pointer-events:none',
   ].join(';');
 
+  // Track — horizontal, full overlay width, captures pointer events.
   const track = document.createElement('div');
   track.style.cssText = [
-    `width:${BAR_W}px`, `height:${BAR_H}px`, 'border-radius:18px',
-    'background:rgba(0,0,0,0.88)', 'border:2px solid rgba(255,255,255,0.45)',
-    'box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 4px 20px rgba(0,0,0,0.8)',
+    `width:100%`, `height:${TRACK_H}px`, 'border-radius:16px',
+    'background:rgba(0,0,0,0.88)', 'border:2px solid rgba(0,206,209,0.4)',
+    'box-shadow:0 0 0 1px rgba(0,206,209,0.1),0 4px 20px rgba(0,0,0,0.8)',
     'position:relative', 'overflow:hidden',
-    'touch-action:none', 'cursor:ns-resize',
+    'touch-action:none', 'cursor:ew-resize',
   ].join(';');
 
-  // Center reference line
-  const centerLine = document.createElement('div');
-  centerLine.style.cssText = [
-    'position:absolute', `top:${(BAR_H - 2) / 2}px`, 'left:4px', 'right:4px', 'height:2px',
-    'background:rgba(255,255,255,0.25)', 'pointer-events:none',
+  // Centre reference mark
+  const centerMark = document.createElement('div');
+  centerMark.style.cssText = [
+    'position:absolute', 'top:4px', 'bottom:4px',
+    'left:50%', 'width:2px', 'transform:translateX(-50%)',
+    'background:rgba(255,255,255,0.2)', 'pointer-events:none',
   ].join(';');
-  track.appendChild(centerLine);
+  track.appendChild(centerMark);
 
-  // Thumb (draggable indicator, starts at center)
+  // Thumb — starts at centre, moves left/right
   const thumb = document.createElement('div');
   thumb.style.cssText = [
-    'position:absolute', 'left:2px', 'right:2px', `height:${THUMB_H}px`,
-    `top:${(BAR_H - THUMB_H) / 2}px`,
-    'background:rgba(100,200,255,0.85)', 'border-radius:8px',
+    'position:absolute', 'top:50%', 'transform:translate(-50%,-50%)',
+    `width:${THUMB_W}px`, `height:${THUMB_H}px`,
+    'background:rgba(0,206,209,0.85)', 'border-radius:14px',
     'pointer-events:none',
+    'left:50%',
   ].join(';');
   track.appendChild(thumb);
 
   const angleText = document.createElement('div');
   angleText.textContent = '0°';
   angleText.style.cssText = [
-    'color:rgba(255,255,255,0.7)', 'font-size:10px', 'font-family:sans-serif',
+    'color:rgba(0,206,209,0.8)', 'font-size:10px', 'font-family:sans-serif',
     'font-weight:bold', 'pointer-events:none',
   ].join(';');
 
-  const hint = document.createElement('div');
-  hint.textContent = '± 微調';
-  hint.style.cssText = [
-    'color:rgba(255,255,255,0.35)', 'font-size:8px', 'font-family:sans-serif',
-    'pointer-events:none', 'text-align:center',
-  ].join(';');
-
-  overlay.appendChild(label);
   overlay.appendChild(track);
+  overlay.appendChild(label);
   overlay.appendChild(angleText);
-  overlay.appendChild(hint);
   container.appendChild(overlay);
 
   // ─── Visual sync ────────────────────────────────────────────────────────────
 
   function _setThumbCenter(): void {
-    thumb.style.top = `${(BAR_H - THUMB_H) / 2}px`;
+    thumb.style.left = '50%';
     angleText.textContent = '0°';
   }
 
   function _syncThumb(fraction: number): void {
-    // fraction ∈ [-1, 1]: -1 = top (max CCW), 0 = center, +1 = bottom (max CW)
-    const centerY = (BAR_H - THUMB_H) / 2;
-    thumb.style.top = `${centerY + fraction * centerY}px`;
+    // fraction ∈ [-1, 1]: -1 = far left (max CCW), 0 = centre, +1 = far right (max CW)
+    thumb.style.left = `${50 + fraction * 50}%`;
     const deg = Math.round(fraction * FINE_ANGLE_MAX_DEG * 10) / 10;
     angleText.textContent = `${deg > 0 ? '+' : ''}${deg}°`;
   }
@@ -152,10 +151,11 @@ export function createFineAdjustBarUI(
   track.addEventListener('pointerdown', (e: PointerEvent) => {
     if (!_enabled) return;
     const { start, current } = controller.getAimState();
-    if (!start || !current) return;  // no aim to fine-adjust yet
+    if (!start || !current) return;
     track.setPointerCapture(e.pointerId);
     _dragging = true;
-    _baseDragY = e.clientY;
+    _baseDragX = e.clientX;
+    _trackWidth = track.getBoundingClientRect().width;
     _baseStart = { ...start };
     _baseCurrent = { ...current };
     e.preventDefault();
@@ -164,10 +164,10 @@ export function createFineAdjustBarUI(
 
   track.addEventListener('pointermove', (e: PointerEvent) => {
     if (!_dragging || !_enabled) return;
-    const deltaY = e.clientY - _baseDragY;
-    const halfRange = BAR_H / 2;
-    // Clamp normalized position to [-1, 1]
-    const normalizedPos = Math.max(-1, Math.min(1, deltaY / halfRange));
+    const deltaX = e.clientX - _baseDragX;
+    const halfRange = _trackWidth / 2;
+    const normalizedPos = Math.max(-1, Math.min(1, deltaX / halfRange));
+    // Right drag = CW rotation (positive theta)
     const deltaTheta = normalizedPos * FINE_ANGLE_MAX;
     _applyRotation(deltaTheta);
     _syncThumb(normalizedPos);
@@ -177,9 +177,7 @@ export function createFineAdjustBarUI(
   track.addEventListener('pointerup', (_e: PointerEvent) => {
     if (!_dragging) return;
     _dragging = false;
-    // Visual reset to center only — canonical _lastAimCurrent unchanged
     _setThumbCenter();
-    // Update base state so next drag starts from current rotated position
     _baseStart = null;
     _baseCurrent = null;
   });
