@@ -40,7 +40,8 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
 
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Wrapper: left side, vertically centred. CSS class spin-disc-overlay used by left-hand-mode.
+  // Overlay on table left edge — semi-transparent, opacity transitions on interaction.
+  // CSS class spin-disc-overlay used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
   overlay.className = 'spin-disc-overlay';
   overlay.style.cssText = [
@@ -50,6 +51,8 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:8px',
     'user-select:none',
+    'opacity:0.4',
+    'transition:opacity 0.15s ease-out',
   ].join(';');
 
   // Collapsed button — 68×68dp circle showing cueball icon
@@ -176,6 +179,7 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     panel.style.transform = 'scale(0.6)';
     panel.style.opacity = '0';
     btn.style.borderColor = 'rgba(255,255,255,0.35)';
+    overlay.style.opacity = '0.4';
     setTimeout(() => { panel.style.display = 'none'; }, 150);
   }
 
@@ -183,9 +187,11 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     if (panel.style.display === 'none' || panel.style.opacity === '0') {
       disc.open();
       showPanel();
+      overlay.style.opacity = '0.9';
     } else {
       disc.close();
       hidePanel();
+      overlay.style.opacity = '0.4';
     }
   });
 

@@ -37,16 +37,19 @@ export function createPowerSliderUI(
 
   // Outer wrapper — right side, vertically centred.
   // right uses max() so safe-area-inset-right (landscape notch) is respected.
-  // CSS class name used by left-hand-mode override in index.html.
+  // Overlay on table right edge — semi-transparent, opacity transitions on interaction.
+  // CSS class used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
   overlay.className = 'power-slider-overlay';
   overlay.style.cssText = [
     'position:absolute',
-    'right:max(16px, calc(16px + env(safe-area-inset-right, 0px)))',
+    'right:max(12px, calc(12px + env(safe-area-inset-right, 0px)))',
     'top:50%', 'transform:translateY(-50%)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
     'user-select:none',
+    'opacity:0.4',
+    'transition:opacity 0.15s ease-out',
   ].join(';');
 
   // Label above the bar
@@ -57,13 +60,12 @@ export function createPowerSliderUI(
     'letter-spacing:1px', 'pointer-events:none',
   ].join(';');
 
-  // Track container — captures pointer events for drag
+  // Track container — semi-transparent pill overlaid on table edge.
   const track = document.createElement('div');
   track.style.cssText = [
     `width:${TRACK_W}px`, `height:${TRACK_H}px`, 'border-radius:18px',
-    // G-1: raised opacity + stronger border so track is visible on dark table bg (#1a1a2e)
-    'background:rgba(0,0,0,0.88)', 'border:2px solid rgba(255,255,255,0.65)',
-    'box-shadow:0 0 0 1px rgba(255,255,255,0.15),0 4px 20px rgba(0,0,0,0.9)',
+    'background:rgba(0,0,0,0.50)', 'border:2px solid rgba(255,255,255,0.55)',
+    'box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 4px 16px rgba(0,0,0,0.6)',
     'position:relative', 'overflow:hidden',
     'touch-action:none', 'cursor:ns-resize',
   ].join(';');
@@ -148,6 +150,7 @@ export function createPowerSliderUI(
 
   track.addEventListener('pointerdown', (e: PointerEvent) => {
     track.setPointerCapture(e.pointerId);
+    overlay.style.opacity = '0.9';  // active state: full opacity
     const f = clientYToFraction(e.clientY);
     slider.startControl();
     slider.setValue(f);
@@ -167,7 +170,8 @@ export function createPowerSliderUI(
   track.addEventListener('pointerup', (_e: PointerEvent) => {
     if (!slider.isSelected) return;
     slider.endControl();  // isAutoShot=true → fires if force > minForce
-    syncVisual(0);        // reset fill immediately after release
+    syncVisual(0);
+    overlay.style.opacity = '0.4';  // return to idle opacity
   });
 
   track.addEventListener('pointercancel', (_e: PointerEvent) => {
@@ -175,6 +179,7 @@ export function createPowerSliderUI(
       slider.disable();  // cancel if pointer stolen
       syncVisual(0);
     }
+    overlay.style.opacity = '0.4';
   });
 
   // ─── Public interface ────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ const TRACK_H = 32;
 const THUMB_W = 48;
 const THUMB_H = 28;
 
-/** ±degrees for full bar travel — landscape gives 68px/° precision. */
+/** ±degrees for full bar travel — landscape gives 78px/° precision (780dp ÷ 10°). */
 export const FINE_ANGLE_MAX_DEG = 5;
 const FINE_ANGLE_MAX = FINE_ANGLE_MAX_DEG * (Math.PI / 180);
 
@@ -69,7 +69,7 @@ export function createFineAdjustBarUI(
     'position:absolute',
     'bottom:12px',
     'left:50%', 'transform:translateX(-50%)',
-    'width:min(680px, calc(100vw - 160px))',
+    'width:min(780px, calc(100vw - 80px))',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:4px',
     'user-select:none',
