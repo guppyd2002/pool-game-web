@@ -159,8 +159,13 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
     for (const mat of mats) {
       if (mat.name === 'Sukno') {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
-        // GLB baseColor map is grey-scale weave detail; tint green (color × map = green felt)
         const sukno = mat as THREE.MeshStandardMaterial;
+        // Diagnostics — locate felt grid root cause (remove after fix confirmed).
+        console.log('[Sukno] geometry.index:', obj.geometry.index);
+        console.log('[Sukno] wireframe:', sukno.wireframe, '| flatShading:', sukno.flatShading);
+        console.log('[Sukno] map:', sukno.map ? `wrapS=${sukno.map.wrapS} wrapT=${sukno.map.wrapT} repeat=${sukno.map.repeat.x},${sukno.map.repeat.y}` : 'null');
+        console.log('[Sukno] normalMap:', sukno.normalMap ? `wrapS=${sukno.normalMap.wrapS} wrapT=${sukno.normalMap.wrapT} repeat=${sukno.normalMap.repeat.x},${sukno.normalMap.repeat.y}` : 'null');
+        console.log('[Sukno] roughnessMap:', sukno.roughnessMap ? `wrapS=${sukno.roughnessMap.wrapS} wrapT=${sukno.roughnessMap.wrapT} repeat=${sukno.roughnessMap.repeat.x},${sukno.roughnessMap.repeat.y}` : 'null');
         sukno.color.set(0x0d6b32);
         sukno.flatShading = false;  // force smooth normals (GLB v3 is all shade_smooth)
         sukno.needsUpdate = true;
@@ -168,6 +173,7 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
         // mergeVertices collapses duplicate vertices so smooth normals can interpolate.
         if (obj.geometry.index === null) {
           obj.geometry = mergeVertices(obj.geometry);
+          console.log('[Sukno] mergeVertices applied — index after:', obj.geometry.index);
         }
       }
     }
