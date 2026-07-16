@@ -159,7 +159,10 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
       if (mat.name === 'Sukno') {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
         // GLB baseColor map is grey-scale weave detail; tint green (color × map = green felt)
-        (mat as THREE.MeshStandardMaterial).color.set(0x0d6b32);
+        const sukno = mat as THREE.MeshStandardMaterial;
+        sukno.color.set(0x0d6b32);
+        sukno.flatShading = false;  // GLB may embed flatShading; force smooth normals
+        sukno.needsUpdate = true;
       }
     }
   });
