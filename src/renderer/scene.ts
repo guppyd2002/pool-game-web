@@ -156,6 +156,9 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
         suknoX = s.x;            // GLB X → scene X (long axis, TABLE_W)
         suknoZ = s.z;            // GLB Z → scene Z (short axis, TABLE_H)
         rawFeltTopY = b.max.y;   // top surface = ball rolling plane → scene Y=0
+        // GLB embeds a grey-scale detail map as baseColor; tint with felt green so
+        // final colour = green × map (cloth weave detail preserved, colour corrected).
+        (mat as THREE.MeshStandardMaterial).color.set(0x0d6b32);
       }
     }
   });
