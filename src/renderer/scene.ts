@@ -160,20 +160,21 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
       if (mat.name === 'Sukno') {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
         const sukno = mat as THREE.MeshStandardMaterial;
-        // Diagnostics — locate felt grid root cause (remove after fix confirmed).
-        console.log('[Sukno] geometry.index:', obj.geometry.index);
-        console.log('[Sukno] wireframe:', sukno.wireframe, '| flatShading:', sukno.flatShading);
-        console.log('[Sukno] map:', sukno.map ? `wrapS=${sukno.map.wrapS} wrapT=${sukno.map.wrapT} repeat=${sukno.map.repeat.x},${sukno.map.repeat.y}` : 'null');
-        console.log('[Sukno] normalMap:', sukno.normalMap ? `wrapS=${sukno.normalMap.wrapS} wrapT=${sukno.normalMap.wrapT} repeat=${sukno.normalMap.repeat.x},${sukno.normalMap.repeat.y}` : 'null');
-        console.log('[Sukno] roughnessMap:', sukno.roughnessMap ? `wrapS=${sukno.roughnessMap.wrapS} wrapT=${sukno.roughnessMap.wrapT} repeat=${sukno.roughnessMap.repeat.x},${sukno.roughnessMap.repeat.y}` : 'null');
         sukno.color.set(0x0d6b32);
         sukno.flatShading = false;  // force smooth normals (GLB v3 is all shade_smooth)
+        // UV tiling fix: GLB embeds a weave baseColorMap with repeat>1 — clamp to 1×1 tile
+        // to eliminate the moiré grid visible in orthographic top-down view.
+        if (sukno.map) {
+          sukno.map.wrapS = sukno.map.wrapT = THREE.ClampToEdgeWrapping;
+          sukno.map.repeat.set(1, 1);
+          sukno.map.anisotropy = 16;
+          sukno.map.needsUpdate = true;
+        }
         sukno.needsUpdate = true;
         // If GLTFLoader emits non-indexed geometry, normals are per-triangle (faceted).
         // mergeVertices collapses duplicate vertices so smooth normals can interpolate.
         if (obj.geometry.index === null) {
           obj.geometry = mergeVertices(obj.geometry);
-          console.log('[Sukno] mergeVertices applied — index after:', obj.geometry.index);
         }
       }
     }
