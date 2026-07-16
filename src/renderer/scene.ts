@@ -138,11 +138,12 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // Find Sukno (felt) mesh for precise scale and Y anchor.
-  // GLB aspect (felt ≈1.774:1) differs from physics TABLE_W:TABLE_H (2.00:1);
-  // we fit the felt LONG axis → TABLE_W.  Short axis will overhang slightly
-  // until 鼬 resolves which dimension is the Unity ground truth.
-  let feltLongExtent = 0;
+  // Find Sukno (felt) mesh for scale and Y anchor.
+  // GLB felt aspect ≈1.774:1; physics TABLE_W:TABLE_H = 2.54:1.27 = 2.00:1.
+  // Non-uniform scale: X→TABLE_W, Z→TABLE_H so all four cushions align to
+  // physics collider extents.  Y scale = X scale to keep table height correct.
+  let suknoX = 0;
+  let suknoZ = 0;
   let rawFeltTopY = 0;
   model.traverse(obj => {
     if (!(obj instanceof THREE.Mesh)) return;
@@ -152,32 +153,36 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
         const b = new THREE.Box3().setFromObject(obj);
         const s = new THREE.Vector3();
         b.getSize(s);
-        feltLongExtent = Math.max(s.x, s.z);
+        suknoX = s.x;            // GLB X → scene X (long axis, TABLE_W)
+        suknoZ = s.z;            // GLB Z → scene Z (short axis, TABLE_H)
         rawFeltTopY = b.max.y;   // top surface = ball rolling plane → scene Y=0
       }
     }
   });
 
-  // Fallback to full model long axis if Sukno not found
+  // Fallback to full model extents if Sukno not found
   const rawBox = new THREE.Box3().setFromObject(model);
-  if (feltLongExtent === 0) {
+  if (suknoX === 0) {
     const fs = new THREE.Vector3();
     rawBox.getSize(fs);
-    feltLongExtent = Math.max(fs.x, fs.z);
+    suknoX = fs.x;
+    suknoZ = fs.z;
     rawFeltTopY = rawBox.max.y;
   }
 
-  const tableScale = TABLE_W / feltLongExtent;
+  const scaleX = TABLE_W / suknoX;
+  const scaleZ = TABLE_H / suknoZ;
+  const scaleY = scaleX;   // height proportional to long axis
 
-  // Raw XZ center (鼬 measured offset X≈−3.58, Z≈0.50 raw units → <4 mm after scale)
+  // Raw XZ center (鼬: X≈−3.58, Z≈0.50 raw → negligible <4 mm after scale)
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);
 
-  model.scale.setScalar(tableScale);
+  model.scale.set(scaleX, scaleY, scaleZ);
   model.position.set(
-    -rawCenter.x * tableScale,
-    -rawFeltTopY * tableScale,   // felt top → scene Y=0
-    -rawCenter.z * tableScale,
+    -rawCenter.x * scaleX,
+    -rawFeltTopY * scaleY,   // felt top → scene Y=0
+    -rawCenter.z * scaleZ,
   );
 
   model.traverse(obj => {
