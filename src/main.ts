@@ -579,4 +579,5 @@ window.addEventListener('beforeunload', () => {
   scene: scene.scene,
   gameSession,
   cue,  // exposes getAimState() for overlay hitTest guard smoke test
+  toggleColliders: () => scene.toggleColliders?.(),  // show/hide physics boundary overlay
 };

@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
+import { createColliderDebug } from './debug-colliders';
+import { RAIL_LONG_X, PHYSICS_MULTIPLIER } from '../physics/constants';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -69,6 +71,8 @@ export interface SceneAPI {
    * false → restore PerspectiveCamera + orbit controls.
    */
   setOrthoTop(active: boolean): void;
+  /** Toggle physics collision boundary overlay (cyan lines, default off). */
+  toggleColliders?(): void;
   render(): void;
   dispose(): void;
 }
@@ -138,12 +142,14 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // GLB dimensions — 鼬's mm measurements × 0.01 (Blender mm → Three.js unit).
-  // Slab X = 2682.40mm → 26.824 Three.js; aligns felt slab edge to RAIL_LONG_X after scale.
-  // Play Z = 1512.58mm → 15.1258 Three.js; aligns felt Z to RAIL_BACK_Z after scale.
-  // (Play X = 2622mm ≠ slab; short-side cushion nose sits ~31mm past WALL_X — inherent model gap.)
-  const GLB_SLAB_X = 26.824;   // Three.js units (2682.40mm ÷ 100), long axis anchor
-  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), short axis anchor
+  // GLB local half-extents (Blender mm ÷ 100 = Three.js unit), measured via runtime probe.
+  // GLB_NOSE_X: short-side cushion rubber inner face (nose) — the ball-contact line.
+  //   Probe at 380dcdb: world NOSE_X = 1.3005m / scaleX_old(0.09468) = 13.736 local.
+  //   Scale so nose aligns to RAIL_LONG_X (physics wall) → eliminates 30mm visual gap.
+  // GLB_PLAY_Z: felt slab Z half-extent; on long sides the rubber nose ≈ coincides with
+  //   felt edge, so slab Z is the correct anchor (QA confirmed long sides flush).
+  const GLB_NOSE_X = 13.736;   // Three.js local units — cushion nose, short-side anchor
+  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), long-side anchor
 
   let rawFeltTopY = 0;
   model.traverse(obj => {
@@ -161,7 +167,8 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const scaleX = TABLE_W / GLB_SLAB_X;  // 2.54 / 26.824 ≈ 9.468e-2
+  const WALL_X = RAIL_LONG_X / PHYSICS_MULTIPLIER;  // 1.2699m — physics ball-bounce line
+  const scaleX = WALL_X / GLB_NOSE_X;   // 1.2699 / 13.736 ≈ 9.245e-2 — nose → WALL_X
   const scaleZ = TABLE_H / GLB_PLAY_Z;  // 1.27 / 15.1258 ≈ 8.395e-2
   const scaleY = scaleX;                // height proportional to long axis
 
@@ -189,6 +196,10 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   createPocketMeshes(tableGroup);
 
   scene.add(tableGroup);
+
+  // ─── Physics collision debug overlay (off by default, toggle via API) ────
+  const colliderDebug = createColliderDebug();
+  scene.add(colliderDebug);
 
   // ─── Balls ───────────────────────────────────────────────────────────
   const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 16);
@@ -274,6 +285,9 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
       _useOrtho = active;
       // Orbit controls orbit the perspective camera only; disable in ortho to avoid confusion.
       controls.enabled = !active;
+    },
+    toggleColliders(): void {
+      colliderDebug.visible = !colliderDebug.visible;
     },
     render() {
       controls.update();
