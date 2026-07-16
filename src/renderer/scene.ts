@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
 
@@ -159,19 +160,15 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
       if (mat.name === 'Sukno') {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
         const sukno = mat as THREE.MeshStandardMaterial;
-        // Felt mesh has split vertices with per-face normals — lighting produces a facet grid.
-        // MeshBasicMaterial is unlit (no normal dependence) → guaranteed clean felt surface.
-        // Wood/metal meshes keep MeshStandardMaterial for shaded quality.
-        const unlit = new THREE.MeshBasicMaterial({
-          color: 0x0d6b32,
-          map: sukno.map ?? null,
-        });
-        if (Array.isArray(obj.material)) {
-          const idx = (obj.material as THREE.Material[]).indexOf(mat);
-          if (idx !== -1) obj.material[idx] = unlit;
-        } else {
-          obj.material = unlit;
-        }
+        sukno.color.set(0x0d6b32);
+        sukno.flatShading = false;
+        sukno.needsUpdate = true;
+        // Felt mesh has split vertices (per-triangle layout) — normals are per-face even with
+        // flatShading=false. Fix: delete stale normals, weld by position, recompute smooth.
+        // Safe to call computeVertexNormals here because obj IS the Sukno mesh, not the whole table.
+        obj.geometry.deleteAttribute('normal');
+        obj.geometry = mergeVertices(obj.geometry);
+        obj.geometry.computeVertexNormals();
       }
     }
   });
