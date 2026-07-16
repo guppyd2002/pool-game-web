@@ -138,46 +138,33 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // Find Sukno (felt) mesh for scale and Y anchor.
-  // GLB felt aspect ≈1.774:1; physics TABLE_W:TABLE_H = 2.54:1.27 = 2.00:1.
-  // Non-uniform scale: X→TABLE_W, Z→TABLE_H so all four cushions align to
-  // physics collider extents.  Y scale = X scale to keep table height correct.
-  let suknoX = 0;
-  let suknoZ = 0;
+  // GLB playing-surface dimensions measured by 鼬 from upward top face.
+  // Full Sukno slab bounding-box X ≈ 2682 (includes apron); playing surface X = 2622.
+  // GLB felt aspect ≈1.773:1; physics TABLE_W:TABLE_H = 2.54:1.27 = 2.00:1.
+  // Non-uniform scale: X→TABLE_W, Z→TABLE_H so all four cushions align to physics extents.
+  const GLB_PLAY_X = 2622.00;  // raw GLB units, long axis → scene X
+  const GLB_PLAY_Z = 1512.58;  // raw GLB units, short axis → scene Z
+
   let rawFeltTopY = 0;
   model.traverse(obj => {
     if (!(obj instanceof THREE.Mesh)) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const mat of mats) {
       if (mat.name === 'Sukno') {
-        const b = new THREE.Box3().setFromObject(obj);
-        const s = new THREE.Vector3();
-        b.getSize(s);
-        suknoX = s.x;            // GLB X → scene X (long axis, TABLE_W)
-        suknoZ = s.z;            // GLB Z → scene Z (short axis, TABLE_H)
-        rawFeltTopY = b.max.y;   // top surface = ball rolling plane → scene Y=0
-        // GLB embeds a grey-scale detail map as baseColor; tint with felt green so
-        // final colour = green × map (cloth weave detail preserved, colour corrected).
+        rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
+        // GLB baseColor map is grey-scale weave detail; tint green (color × map = green felt)
         (mat as THREE.MeshStandardMaterial).color.set(0x0d6b32);
       }
     }
   });
 
-  // Fallback to full model extents if Sukno not found
   const rawBox = new THREE.Box3().setFromObject(model);
-  if (suknoX === 0) {
-    const fs = new THREE.Vector3();
-    rawBox.getSize(fs);
-    suknoX = fs.x;
-    suknoZ = fs.z;
-    rawFeltTopY = rawBox.max.y;
-  }
+  if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const scaleX = TABLE_W / suknoX;
-  const scaleZ = TABLE_H / suknoZ;
-  const scaleY = scaleX;   // height proportional to long axis
+  const scaleX = TABLE_W / GLB_PLAY_X;  // 2.54 / 2622.00 ≈ 9.687e-4
+  const scaleZ = TABLE_H / GLB_PLAY_Z;  // 1.27 / 1512.58 ≈ 8.395e-4
+  const scaleY = scaleX;                // height proportional to long axis
 
-  // Raw XZ center (鼬: X≈−3.58, Z≈0.50 raw → negligible <4 mm after scale)
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);
 
