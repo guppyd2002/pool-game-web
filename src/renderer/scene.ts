@@ -161,21 +161,14 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
         const sukno = mat as THREE.MeshStandardMaterial;
         sukno.color.set(0x0d6b32);
-        sukno.flatShading = false;  // force smooth normals (GLB v3 is all shade_smooth)
-        // UV tiling fix: GLB embeds a weave baseColorMap with repeat>1 — clamp to 1×1 tile
-        // to eliminate the moiré grid visible in orthographic top-down view.
-        if (sukno.map) {
-          sukno.map.wrapS = sukno.map.wrapT = THREE.ClampToEdgeWrapping;
-          sukno.map.repeat.set(1, 1);
-          sukno.map.anisotropy = 16;
-          sukno.map.needsUpdate = true;
-        }
+        sukno.flatShading = false;
         sukno.needsUpdate = true;
-        // If GLTFLoader emits non-indexed geometry, normals are per-triangle (faceted).
-        // mergeVertices collapses duplicate vertices so smooth normals can interpolate.
-        if (obj.geometry.index === null) {
-          obj.geometry = mergeVertices(obj.geometry);
-        }
+        // Felt mesh has split vertices (per-triangle layout) — normals are per-face even with
+        // flatShading=false. Fix: delete stale normals, weld by position, recompute smooth.
+        // Safe to call computeVertexNormals here because obj IS the Sukno mesh, not the whole table.
+        obj.geometry.deleteAttribute('normal');
+        obj.geometry = mergeVertices(obj.geometry);
+        obj.geometry.computeVertexNormals();
       }
     }
   });
