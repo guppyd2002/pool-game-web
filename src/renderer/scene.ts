@@ -6,7 +6,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
 
@@ -159,16 +158,16 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
     for (const mat of mats) {
       if (mat.name === 'Sukno') {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
-        const sukno = mat as THREE.MeshStandardMaterial;
-        sukno.color.set(0x0d6b32);
-        sukno.flatShading = false;
-        sukno.needsUpdate = true;
-        // Felt mesh has split vertices (per-triangle layout) — normals are per-face even with
-        // flatShading=false. Fix: delete stale normals, weld by position, recompute smooth.
-        // Safe to call computeVertexNormals here because obj IS the Sukno mesh, not the whole table.
-        obj.geometry.deleteAttribute('normal');
-        obj.geometry = mergeVertices(obj.geometry);
-        obj.geometry.computeVertexNormals();
+        // Unlit felt: eliminates facet-grid (lighting artifact on split-vertex mesh).
+        // color 0x0f7b3a → perceived luminance ≈ 83 (target); map:null drops the grey
+        // Cloth2 texture that was multiplying lit output down to luminance 19.
+        const unlit = new THREE.MeshBasicMaterial({ color: 0x0f7b3a });
+        if (Array.isArray(obj.material)) {
+          const idx = (obj.material as THREE.Material[]).indexOf(mat);
+          if (idx !== -1) (obj.material as THREE.Material[])[idx] = unlit;
+        } else {
+          obj.material = unlit;
+        }
       }
     }
   });
