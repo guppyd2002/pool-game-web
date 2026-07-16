@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
 
@@ -161,8 +162,13 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
         // GLB baseColor map is grey-scale weave detail; tint green (color × map = green felt)
         const sukno = mat as THREE.MeshStandardMaterial;
         sukno.color.set(0x0d6b32);
-        sukno.flatShading = false;  // GLB may embed flatShading; force smooth normals
+        sukno.flatShading = false;  // force smooth normals (GLB v3 is all shade_smooth)
         sukno.needsUpdate = true;
+        // If GLTFLoader emits non-indexed geometry, normals are per-triangle (faceted).
+        // mergeVertices collapses duplicate vertices so smooth normals can interpolate.
+        if (obj.geometry.index === null) {
+          obj.geometry = mergeVertices(obj.geometry);
+        }
       }
     }
   });
