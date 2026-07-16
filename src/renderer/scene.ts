@@ -144,10 +144,14 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   // GLB full-extent anchors (Blender mm ÷ 100 = Three.js unit).
   // GLB_SLAB_X: full felt slab width (2682.40mm) → felt edge aligns to RAIL_LONG_X.
   //   QA strict re-verify: felt edge vs physics wall = ±1.6mm (≤ ½px anti-alias). ✓
-  //   Rubber nose at ball-contact height (~1272mm, 69mm inside felt) is below the felt
-  //   surface — invisible from above. Rail cap top (~1370mm) protrudes above felt by 7mm,
-  //   visible from above as the cushion bumper, giving the correct pool-table look.
   // GLB_PLAY_Z: full felt slab depth (1512.58mm) → felt edge aligns to RAIL_BACK_Z. ✓
+  //
+  // Physics note: RAIL_LONG_X / RAIL_BACK_Z are BALL-CENTRE limits, not ball-surface limits.
+  // A resting ball's centre is at the wall; its surface extends BALL_RADIUS (~0.0285m) further.
+  // GLB cushion rubber nose at ~1.3005m = RAIL_LONG_X(1.2699) + BALL_RADIUS(0.0285) + 2.1mm;
+  // ball surface barely touches rubber at rest. The ~30mm "gap" between rubber nose and physics
+  // wall equals one ball radius — correct geometry, not a bug. Moving the nose inward would
+  // cause balls to visually penetrate the cushion rubber.
   const GLB_SLAB_X = 26.824;   // Three.js units (2682.40mm ÷ 100), long axis anchor
   const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), short axis anchor
 
