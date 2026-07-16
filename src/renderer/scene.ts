@@ -8,6 +8,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
+import { RAIL_LONG_X, PHYSICS_MULTIPLIER } from '../physics/constants';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -141,19 +142,16 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // GLB full-extent anchors (Blender mm ÷ 100 = Three.js unit).
-  // GLB_SLAB_X: full felt slab width (2682.40mm) → felt edge aligns to RAIL_LONG_X.
-  //   QA strict re-verify: felt edge vs physics wall = ±1.6mm (≤ ½px anti-alias). ✓
-  // GLB_PLAY_Z: full felt slab depth (1512.58mm) → felt edge aligns to RAIL_BACK_Z. ✓
+  // GLB local half-extents (Blender mm ÷ 100 = Three.js unit), measured via runtime probe.
+  // GLB_NOSE_X: cushion rubber inner face (nose) half-span from model centre — ball-contact line.
+  //   Probe at 380dcdb: world nose = 1.3005m / scaleX_slab(0.09468) → 13.736 Three.js local.
+  //   Scale so nose aligns to RAIL_LONG_X (physics wall) → eliminates 30mm visual gap. ✓
+  // GLB_PLAY_Z: felt slab Z half-extent; long-side rubber nose ≈ coincides with felt edge.
   //
-  // Physics note: RAIL_LONG_X / RAIL_BACK_Z are BALL-CENTRE limits, not ball-surface limits.
-  // A resting ball's centre is at the wall; its surface extends BALL_RADIUS (~0.0285m) further.
-  // GLB cushion rubber nose at ~1.3005m = RAIL_LONG_X(1.2699) + BALL_RADIUS(0.0285) + 2.1mm;
-  // ball surface barely touches rubber at rest. The ~30mm "gap" between rubber nose and physics
-  // wall equals one ball radius — correct geometry, not a bug. Moving the nose inward would
-  // cause balls to visually penetrate the cushion rubber.
-  const GLB_SLAB_X = 26.824;   // Three.js units (2682.40mm ÷ 100), long axis anchor
-  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), short axis anchor
+  // Physics: RAIL_LONG_X = cushion face / collider line (verified: challenges/012:270, plane=12699).
+  // Ball centre rests 1 radius inside: 1.2699 − 0.0285 = 1.2414m. Ball surface touches at 1.2699m.
+  const GLB_NOSE_X = 13.736;   // Three.js local — cushion nose half-span, short-side anchor
+  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), long-side anchor
 
   let rawFeltTopY = 0;
   model.traverse(obj => {
@@ -171,7 +169,8 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const scaleX = TABLE_W / GLB_SLAB_X;  // 2.54 / 26.824 ≈ 9.468e-2
+  const WALL_X = RAIL_LONG_X / PHYSICS_MULTIPLIER;  // 12699/10000 = 1.2699m — cushion face
+  const scaleX = WALL_X / GLB_NOSE_X;   // 1.2699 / 13.736 ≈ 9.245e-2 — nose → WALL_X
   const scaleZ = TABLE_H / GLB_PLAY_Z;  // 1.27 / 15.1258 ≈ 8.395e-2
   const scaleY = scaleX;                // height proportional to long axis
 
