@@ -138,36 +138,45 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // Measure raw (pre-transform) bounding box to compute scale factor.
-  // GLB may be in arbitrary FBX units; we fit the long horizontal dimension to TABLE_W.
-  const rawBox = new THREE.Box3().setFromObject(model);
-  const rawSize = new THREE.Vector3();
-  rawBox.getSize(rawSize);
-  const longHoriz = Math.max(rawSize.x, rawSize.z);
-  const tableScale = longHoriz > 0 ? TABLE_W / longHoriz : 1;
-
-  // Find the Sukno (felt/cloth) mesh center Y in raw space to anchor the play surface
-  // at scene Y=0, matching where physics places ball centres (TABLE_Y / PHYSICS_MULTIPLIER).
-  let rawFeltY = 0;
+  // Find Sukno (felt) mesh for precise scale and Y anchor.
+  // GLB aspect (felt ≈1.774:1) differs from physics TABLE_W:TABLE_H (2.00:1);
+  // we fit the felt LONG axis → TABLE_W.  Short axis will overhang slightly
+  // until 鼬 resolves which dimension is the Unity ground truth.
+  let feltLongExtent = 0;
+  let rawFeltTopY = 0;
   model.traverse(obj => {
     if (!(obj instanceof THREE.Mesh)) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const mat of mats) {
       if (mat.name === 'Sukno') {
         const b = new THREE.Box3().setFromObject(obj);
-        rawFeltY = (b.min.y + b.max.y) / 2;
+        const s = new THREE.Vector3();
+        b.getSize(s);
+        feltLongExtent = Math.max(s.x, s.z);
+        rawFeltTopY = b.max.y;   // top surface = ball rolling plane → scene Y=0
       }
     }
   });
 
+  // Fallback to full model long axis if Sukno not found
+  const rawBox = new THREE.Box3().setFromObject(model);
+  if (feltLongExtent === 0) {
+    const fs = new THREE.Vector3();
+    rawBox.getSize(fs);
+    feltLongExtent = Math.max(fs.x, fs.z);
+    rawFeltTopY = rawBox.max.y;
+  }
+
+  const tableScale = TABLE_W / feltLongExtent;
+
+  // Raw XZ center (鼬 measured offset X≈−3.58, Z≈0.50 raw units → <4 mm after scale)
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);
 
-  // Apply scale + center XZ at origin + felt surface at Y=0
   model.scale.setScalar(tableScale);
   model.position.set(
     -rawCenter.x * tableScale,
-    -rawFeltY * tableScale,
+    -rawFeltTopY * tableScale,   // felt top → scene Y=0
     -rawCenter.z * tableScale,
   );
 
