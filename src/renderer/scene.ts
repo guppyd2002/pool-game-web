@@ -142,14 +142,16 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // GLB local half-extents (Blender mm ÷ 100 = Three.js unit), measured via runtime probe.
-  // GLB_NOSE_X: short-side cushion rubber inner face (nose) — the ball-contact line.
-  //   Probe at 380dcdb: world NOSE_X = 1.3005m / scaleX_old(0.09468) = 13.736 local.
-  //   Scale so nose aligns to RAIL_LONG_X (physics wall) → eliminates 30mm visual gap.
-  // GLB_PLAY_Z: felt slab Z half-extent; on long sides the rubber nose ≈ coincides with
-  //   felt edge, so slab Z is the correct anchor (QA confirmed long sides flush).
-  const GLB_NOSE_X = 13.736;   // Three.js local units — cushion nose, short-side anchor
-  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), long-side anchor
+  // GLB measurements — 鼬's Blender probe at ball-contact height (feltTop − 13mm).
+  // Rail cap top (feltTop+7mm, X≈1370mm) is above ball contact — irrelevant for scale.
+  // True rubber nose at contact height: +X face = 1268.68mm, −X face = −1275.84mm.
+  //   Half-span avg = 1272.26mm → GLB_NOSE_X_HALF = 12.7226 (÷100 = Three.js unit).
+  //   Model X=0 is 3.58mm to the −X side of rubber nose centre → add +0.0358 offset
+  //   so both noses land at ±WALL_X symmetrically.
+  // GLB_PLAY_Z: felt slab Z half-extent; long-side rubber nose ≈ felt edge (unchanged).
+  const GLB_NOSE_X_HALF   = 12.7226;  // Three.js local — rubber nose avg half-span
+  const GLB_NOSE_X_OFFSET = 0.0358;   // Three.js local — recenter shift (+3.58mm ÷ 100)
+  const GLB_PLAY_Z        = 15.1258;  // Three.js units (1512.58mm ÷ 100), long-side anchor
 
   let rawFeltTopY = 0;
   model.traverse(obj => {
@@ -167,18 +169,18 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const WALL_X = RAIL_LONG_X / PHYSICS_MULTIPLIER;  // 1.2699m — physics ball-bounce line
-  const scaleX = WALL_X / GLB_NOSE_X;   // 1.2699 / 13.736 ≈ 9.245e-2 — nose → WALL_X
-  const scaleZ = TABLE_H / GLB_PLAY_Z;  // 1.27 / 15.1258 ≈ 8.395e-2
-  const scaleY = scaleX;                // height proportional to long axis
+  const WALL_X = RAIL_LONG_X / PHYSICS_MULTIPLIER;   // 1.2699m — physics wall (ball-bounce)
+  const scaleX = WALL_X / GLB_NOSE_X_HALF;           // 1.2699 / 12.7226 ≈ 9.982e-2
+  const scaleZ = TABLE_H / GLB_PLAY_Z;               // 1.27 / 15.1258 ≈ 8.395e-2
+  const scaleY = scaleX;                              // height follows long axis
 
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);
 
   model.scale.set(scaleX, scaleY, scaleZ);
   model.position.set(
-    -rawCenter.x * scaleX,
-    -rawFeltTopY * scaleY,   // felt top → scene Y=0
+    (-rawCenter.x + GLB_NOSE_X_OFFSET) * scaleX,  // bbox-centre + rubber-nose recenter
+    -rawFeltTopY * scaleY,                          // felt top → scene Y=0
     -rawCenter.z * scaleZ,
   );
 
