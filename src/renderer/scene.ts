@@ -138,12 +138,12 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // GLB playing-surface dimensions measured by 鼬 from upward top face.
-  // Full Sukno slab bounding-box X ≈ 2682 (includes apron); playing surface X = 2622.
-  // GLB felt aspect ≈1.773:1; physics TABLE_W:TABLE_H = 2.54:1.27 = 2.00:1.
-  // Non-uniform scale: X→TABLE_W, Z→TABLE_H so all four cushions align to physics extents.
-  const GLB_PLAY_X = 2622.00;  // raw GLB units, long axis → scene X
-  const GLB_PLAY_Z = 1512.58;  // raw GLB units, short axis → scene Z
+  // GLB dimensions — 鼬's mm measurements × 0.01 (Blender mm → Three.js unit).
+  // Slab X = 2682.40mm → 26.824 Three.js; aligns felt slab edge to RAIL_LONG_X after scale.
+  // Play Z = 1512.58mm → 15.1258 Three.js; aligns felt Z to RAIL_BACK_Z after scale.
+  // (Play X = 2622mm ≠ slab; short-side cushion nose sits ~31mm past WALL_X — inherent model gap.)
+  const GLB_SLAB_X = 26.824;   // Three.js units (2682.40mm ÷ 100), long axis anchor
+  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), short axis anchor
 
   let rawFeltTopY = 0;
   model.traverse(obj => {
@@ -161,8 +161,8 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const scaleX = TABLE_W / GLB_PLAY_X;  // 2.54 / 2622.00 ≈ 9.687e-4
-  const scaleZ = TABLE_H / GLB_PLAY_Z;  // 1.27 / 1512.58 ≈ 8.395e-4
+  const scaleX = TABLE_W / GLB_SLAB_X;  // 2.54 / 26.824 ≈ 9.468e-2
+  const scaleZ = TABLE_H / GLB_PLAY_Z;  // 1.27 / 15.1258 ≈ 8.395e-2
   const scaleY = scaleX;                // height proportional to long axis
 
   const rawCenter = new THREE.Vector3();
