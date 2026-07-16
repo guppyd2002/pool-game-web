@@ -54,7 +54,7 @@ import * as THREE from 'three';
 // ─── Initialize scene + physics ───────────────────────────────────────────────
 
 const container = document.getElementById('app')!;
-const scene = createScene(container);
+const scene = await createScene(container);
 const space = createPoolTable();
 const physics = createBallPoolPhysics(space, scene);
 

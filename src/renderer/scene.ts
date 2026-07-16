@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -12,9 +13,6 @@ import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 // Table dimensions (meters, standard 8-ball)
 const TABLE_W = 2.54;
 const TABLE_H = 1.27;
-const CUSHION_HEIGHT = 0.04;
-const CUSHION_WIDTH = 0.05;
-const RAIL_WIDTH = 0.08;
 const BALL_RADIUS = 0.028;
 
 // Ball colors: index 0=cue, 1-7=solids, 8=black, 9-15=stripes
@@ -77,7 +75,7 @@ export interface SceneAPI {
 
 // ─── Scene Creation ──────────────────────────────────────────────────────────
 
-export function createScene(container: HTMLElement): SceneAPI {
+export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   // Renderer
   // preserveDrawingBuffer: allows Playwright/pixel-sampling smoke tests to read canvas pixels
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -134,63 +132,56 @@ export function createScene(container: HTMLElement): SceneAPI {
   pointLight.position.set(0, 1.5, 0);
   scene.add(pointLight);
 
-  // ─── Table ───────────────────────────────────────────────────────────
+  // ─── Table (PoolTable.glb — Unity FBX source, Blender 4.2 re-export) ─────────
   const tableGroup = new THREE.Group();
 
-  // Felt surface (play area)
-  const feltGeo = new THREE.PlaneGeometry(TABLE_W, TABLE_H);
-  const feltMat = new THREE.MeshStandardMaterial({ color: 0x0d6b32, roughness: 0.9 });
-  const felt = new THREE.Mesh(feltGeo, feltMat);
-  felt.rotation.x = -Math.PI / 2;
-  felt.receiveShadow = true;
-  tableGroup.add(felt);
+  const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
+  const model = gltf.scene;
 
-  // Rail (outer frame)
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x5c3317, roughness: 0.6 });
-  const railY = CUSHION_HEIGHT / 2;
+  // Measure raw (pre-transform) bounding box to compute scale factor.
+  // GLB may be in arbitrary FBX units; we fit the long horizontal dimension to TABLE_W.
+  const rawBox = new THREE.Box3().setFromObject(model);
+  const rawSize = new THREE.Vector3();
+  rawBox.getSize(rawSize);
+  const longHoriz = Math.max(rawSize.x, rawSize.z);
+  const tableScale = longHoriz > 0 ? TABLE_W / longHoriz : 1;
 
-  // Long rails (left/right along Z)
-  const longRailGeo = new THREE.BoxGeometry(RAIL_WIDTH, CUSHION_HEIGHT, TABLE_H + RAIL_WIDTH * 2);
-  const railL = new THREE.Mesh(longRailGeo, railMat);
-  railL.position.set(-(TABLE_W / 2 + RAIL_WIDTH / 2), railY, 0);
-  railL.castShadow = true;
-  tableGroup.add(railL);
-  const railR = new THREE.Mesh(longRailGeo, railMat);
-  railR.position.set(TABLE_W / 2 + RAIL_WIDTH / 2, railY, 0);
-  railR.castShadow = true;
-  tableGroup.add(railR);
+  // Find the Sukno (felt/cloth) mesh center Y in raw space to anchor the play surface
+  // at scene Y=0, matching where physics places ball centres (TABLE_Y / PHYSICS_MULTIPLIER).
+  let rawFeltY = 0;
+  model.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      if (mat.name === 'Sukno') {
+        const b = new THREE.Box3().setFromObject(obj);
+        rawFeltY = (b.min.y + b.max.y) / 2;
+      }
+    }
+  });
 
-  // Short rails (top/bottom along X)
-  const shortRailGeo = new THREE.BoxGeometry(TABLE_W + RAIL_WIDTH * 2, CUSHION_HEIGHT, RAIL_WIDTH);
-  const railT = new THREE.Mesh(shortRailGeo, railMat);
-  railT.position.set(0, railY, -(TABLE_H / 2 + RAIL_WIDTH / 2));
-  railT.castShadow = true;
-  tableGroup.add(railT);
-  const railB = new THREE.Mesh(shortRailGeo, railMat);
-  railB.position.set(0, railY, TABLE_H / 2 + RAIL_WIDTH / 2);
-  railB.castShadow = true;
-  tableGroup.add(railB);
+  const rawCenter = new THREE.Vector3();
+  rawBox.getCenter(rawCenter);
 
-  // Cushions (green rubber on inner edge)
-  const cushionMat = new THREE.MeshStandardMaterial({ color: 0x0a5e2a, roughness: 0.7 });
-  // Left/right cushions
-  const cushionLongGeo = new THREE.BoxGeometry(CUSHION_WIDTH, CUSHION_HEIGHT, TABLE_H - 0.1);
-  const cL = new THREE.Mesh(cushionLongGeo, cushionMat);
-  cL.position.set(-(TABLE_W / 2 - CUSHION_WIDTH / 2), railY, 0);
-  tableGroup.add(cL);
-  const cR = new THREE.Mesh(cushionLongGeo, cushionMat);
-  cR.position.set(TABLE_W / 2 - CUSHION_WIDTH / 2, railY, 0);
-  tableGroup.add(cR);
-  // Top/bottom cushions
-  const cushionShortGeo = new THREE.BoxGeometry(TABLE_W - 0.1, CUSHION_HEIGHT, CUSHION_WIDTH);
-  const cT = new THREE.Mesh(cushionShortGeo, cushionMat);
-  cT.position.set(0, railY, -(TABLE_H / 2 - CUSHION_WIDTH / 2));
-  tableGroup.add(cT);
-  const cBt = new THREE.Mesh(cushionShortGeo, cushionMat);
-  cBt.position.set(0, railY, TABLE_H / 2 - CUSHION_WIDTH / 2);
-  tableGroup.add(cBt);
+  // Apply scale + center XZ at origin + felt surface at Y=0
+  model.scale.setScalar(tableScale);
+  model.position.set(
+    -rawCenter.x * tableScale,
+    -rawFeltY * tableScale,
+    -rawCenter.z * tableScale,
+  );
 
-  // Pocket holes — positions from POCKET_POSITIONS constants (same source as sim triggers)
+  model.traverse(obj => {
+    if (obj instanceof THREE.Mesh) {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    }
+  });
+
+  tableGroup.add(model);
+
+  // Pocket hole discs at sim POCKET_POSITIONS — visual reference for ball-sink animations.
+  // Positions are derived from physics constants so they always align with the sim triggers.
   createPocketMeshes(tableGroup);
 
   scene.add(tableGroup);
