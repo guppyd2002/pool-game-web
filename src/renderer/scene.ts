@@ -161,7 +161,10 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
         // Unlit felt: eliminates facet-grid (lighting artifact on split-vertex mesh).
         // color 0x0f7b3a → perceived luminance ≈ 83 (target); map:null drops the grey
         // Cloth2 texture that was multiplying lit output down to luminance 19.
-        const unlit = new THREE.MeshBasicMaterial({ color: 0x0f7b3a });
+        const unlit = new THREE.MeshBasicMaterial({
+          color: 0x0f7b3a,
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+        });
         if (Array.isArray(obj.material)) {
           const idx = (obj.material as THREE.Material[]).indexOf(mat);
           if (idx !== -1) (obj.material as THREE.Material[])[idx] = unlit;
