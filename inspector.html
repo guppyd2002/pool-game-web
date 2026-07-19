@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pool Table Inspector</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0d1a; }
+      #canvas-container { width: 100%; height: 100%; }
+
+      /* HUD panel — top-left controls */
+      #hud {
+        position: fixed; top: 12px; left: 12px; z-index: 100;
+        display: flex; flex-direction: column; gap: 6px;
+        font-family: 'Courier New', monospace;
+      }
+      #hud h1 {
+        font-size: 13px; color: #aaa; font-weight: normal;
+        margin-bottom: 4px; letter-spacing: 1px;
+      }
+      button {
+        padding: 7px 12px; background: #1c1c2e; color: #888;
+        border: 1px solid #333; border-radius: 4px; cursor: pointer;
+        font-size: 12px; font-family: inherit; text-align: left;
+        transition: all 0.15s;
+      }
+      button:hover { border-color: #555; color: #ccc; }
+      button.active { background: #0a2e14; border-color: #1a6b30; color: #4dff88; }
+      button#btn-reset { color: #aaa; border-color: #444; }
+      button#btn-reset:hover { color: #fff; background: #2a2a3e; }
+
+      /* Legend */
+      #legend {
+        position: fixed; top: 12px; right: 12px; z-index: 100;
+        font-family: 'Courier New', monospace; font-size: 11px;
+        background: rgba(10,10,20,0.85); border: 1px solid #333;
+        border-radius: 4px; padding: 10px 14px; color: #888;
+        line-height: 1.8;
+      }
+      #legend .row { display: flex; align-items: center; gap: 8px; }
+      .swatch { width: 24px; height: 3px; display: inline-block; border-radius: 1px; }
+      .sw-yellow  { background: #ffff00; }
+      .sw-cyan    { background: #00ffff; }
+      .sw-magenta { background: #ff00ff; }
+      .sw-white   { background: #fff; border: 1px solid #555; height: 10px; width: 10px; border-radius: 50%; }
+
+      /* Bottom status bar */
+      #statusbar {
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+        background: rgba(10,10,20,0.9); border-top: 1px solid #2a2a3e;
+        padding: 6px 14px; display: flex; gap: 24px; align-items: center;
+        font-family: 'Courier New', monospace; font-size: 11px; color: #555;
+      }
+      #statusbar span { color: #778; }
+      #statusbar b { color: #aaa; }
+
+      /* Loading screen */
+      #loading {
+        position: fixed; inset: 0; z-index: 200;
+        background: #0d0d1a; color: #4dff88;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-family: 'Courier New', monospace; font-size: 14px; gap: 12px;
+      }
+      #loading .bar-wrap { width: 200px; height: 4px; background: #222; border-radius: 2px; }
+      #loading .bar { height: 100%; background: #4dff88; border-radius: 2px; width: 0; transition: width 0.3s; }
+    </style>
+  </head>
+  <body>
+    <div id="loading">
+      <div>Loading GLB…</div>
+      <div class="bar-wrap"><div class="bar" id="load-bar"></div></div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="hud">
+      <h1>POOL TABLE INSPECTOR</h1>
+      <button id="btn-overlay" class="active">Physics Overlay: ON</button>
+      <button id="btn-grid"    class="active">Grid: ON</button>
+      <button id="btn-axes"    class="active">Axes: ON</button>
+      <button id="btn-topdown">View: Perspective</button>
+      <button id="btn-reset">Reset Camera</button>
+    </div>
+
+    <div id="legend">
+      <div class="row"><span class="swatch sw-yellow"></span>Play boundary X=±1.2699m Z=±0.6349m</div>
+      <div class="row"><span class="swatch sw-cyan"></span>Jaw / rail cushion colliders</div>
+      <div class="row"><span class="swatch sw-magenta"></span>Pocket trigger circles (R=0.045m)</div>
+      <div class="row"><span class="swatch sw-white"></span>Reference ball (R=0.0285m)</div>
+    </div>
+
+    <div id="statusbar">
+      <span>Physics ground-truth:</span>
+      <b>RAIL_LONG_X = 12699 → ±1.2699 m</b>
+      <b>RAIL_BACK_Z = 6349 → ±0.6349 m</b>
+      <b>BALL_RADIUS = 285 → 0.0285 m</b>
+      <span style="margin-left:auto">Left-drag: rotate &nbsp;|&nbsp; Right-drag: pan &nbsp;|&nbsp; Scroll: zoom</span>
+    </div>
+
+    <script type="module" src="/src/inspector.ts"></script>
+  </body>
+</html>
