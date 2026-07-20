@@ -212,6 +212,16 @@ async function main(): Promise<void> {
     }
   });
 
+  // PocketChute interior — render both sides so accidentally-flipped exterior faces
+  // don't produce transparent holes when viewing the table from outside.
+  model.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      if (mat.name === 'PocketChute') (mat as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+    }
+  });
+
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
   const rawCenter = new THREE.Vector3();
