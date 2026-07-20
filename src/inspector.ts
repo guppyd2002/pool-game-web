@@ -31,9 +31,9 @@ function toM(v: number): number {
   return v / PHYSICS_MULTIPLIER;
 }
 
-// ─── GLB scale — uniform, mirrors scene.ts ────────────────────────────────────
-// Chief-architect directive 2026-07-20: uniform 0.09469 confirmed by QA render
-// (long rail +4mm, pocket centred). Must stay in sync with scene.ts.
+// ─── GLB scale — uniform 0.01, mirrors scene.ts ──────────────────────────────
+// TurboSquid 9ft regulation model (cm units, Y-up). Scale 0.01 = cm→m.
+// Must stay in sync with scene.ts.
 
 const TABLE_W = 2.54;    // metres — standard 8-ball table width (same as scene.ts)
 const TABLE_H = 1.27;    // metres — standard 8-ball table height
@@ -188,66 +188,26 @@ async function main(): Promise<void> {
   });
   const model = gltf.scene;
 
-  // Apply Sukno (felt) material fix — unlit green, same as scene.ts shipped state.
-  // Reason: lit MeshStandardMaterial on split-vertex mesh shows facet grid.
-  // Color 0x0f7b3a = perceived luminance ≈ 83 (Rec.601 target); map:null removes
-  // the grey Cloth2 texture that compressed lit luminance from 83 down to 19.
-  let rawFeltTopY = 0;
-  model.traverse(obj => {
-    if (!(obj instanceof THREE.Mesh)) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    for (const mat of mats) {
-      if (mat.name === 'Sukno') {
-        rawFeltTopY = Math.max(rawFeltTopY, new THREE.Box3().setFromObject(obj).max.y);
-        const unlit = new THREE.MeshBasicMaterial({ color: 0x0f7b3a });
-        if (Array.isArray(obj.material)) {
-          const idx = (obj.material as THREE.Material[]).indexOf(mat);
-          if (idx !== -1) (obj.material as THREE.Material[])[idx] = unlit;
-        } else {
-          obj.material = unlit;
-        }
-      }
-    }
-  });
-
-  // PocketChute — pure black rubber, Phong shading (CEO spec). DoubleSide prevents
-  // transparent holes if any exterior panel face was accidentally flipped by the Blender fix.
-  const pocketChutePhong = new THREE.MeshPhongMaterial({
-    color:     0x000000,
-    shininess: 20,
-    specular:  new THREE.Color(0x111111),
-    side:      THREE.DoubleSide,
-  });
-  pocketChutePhong.name = 'PocketChute';
-  model.traverse(obj => {
-    if (!(obj instanceof THREE.Mesh)) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    const replaced = mats.map(m => m.name === 'PocketChute' ? pocketChutePhong : m);
-    if (replaced.some((m, i) => m !== mats[i])) {
-      obj.material = Array.isArray(obj.material) ? replaced as THREE.Material[] : replaced[0];
-    }
-  });
-
-  const rawBox = new THREE.Box3().setFromObject(model);
-  if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
-  const rawCenter = new THREE.Vector3();
-  rawBox.getCenter(rawCenter);
-
-  // GLB scale — uniform, must match scene.ts (QA render confirmed 2026-07-20).
-  const scaleX = 0.09469;  // uniform: TABLE_W / GLB_SLAB_X ≈ 9.469e-2
-  const scaleY = scaleX;
-  const scaleZ = scaleX;
-
-  model.scale.set(scaleX, scaleY, scaleZ);
-  model.position.set(
-    -rawCenter.x * scaleX,
-    -rawFeltTopY * scaleY,  // felt top → scene Y=0
-    -rawCenter.z * scaleX,
-  );
-
+  // Single PBR material (commercial_pool_table_mat) — preserve GLTFLoader output as-is.
   model.traverse(obj => {
     if (obj instanceof THREE.Mesh) { obj.castShadow = true; obj.receiveShadow = true; }
   });
+
+  const rawBox = new THREE.Box3().setFromObject(model);
+  // Rail tops protrude 5.09mm above felt — anchor felt at scene Y=0.
+  const rawFeltTopY = rawBox.max.y - 0.509;
+  const rawCenter = new THREE.Vector3();
+  rawBox.getCenter(rawCenter);
+
+  // GLB scale — uniform, must match scene.ts. TurboSquid 9ft, cm units → 0.01 = m.
+  const scaleU = 0.01;
+
+  model.scale.set(scaleU, scaleU, scaleU);
+  model.position.set(
+    -rawCenter.x * scaleU,
+    -rawFeltTopY * scaleU,  // felt top → scene Y=0
+    -rawCenter.z * scaleU,
+  );
 
   scene.add(model);
 

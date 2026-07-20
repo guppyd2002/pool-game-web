@@ -135,67 +135,37 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   pointLight.position.set(0, 1.5, 0);
   scene.add(pointLight);
 
-  // ─── Table (PoolTable.glb — Unity FBX source, Blender 4.2 re-export) ─────────
+  // ─── Table (PoolTable.glb — TurboSquid 9ft regulation, Blender pack, Y-up, cm) ──
   const tableGroup = new THREE.Group();
 
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // GLB scale: uniform 0.09469 confirmed by QA render (long rail +4mm ≈ flush,
-  // pocket centred). TABLE_W / GLB_SLAB_X (26.824) — chief directive 2026-07-20.
-  // PocketChute — pure black rubber, Phong shading (CEO spec). DoubleSide prevents
-  // transparent holes from any accidentally-flipped exterior panel face.
-  const pocketChutePhong = new THREE.MeshPhongMaterial({
-    color:     0x000000,
-    shininess: 20,
-    specular:  new THREE.Color(0x111111),
-    side:      THREE.DoubleSide,
-  });
-  pocketChutePhong.name = 'PocketChute';
-
-  let rawFeltTopY = 0;
-  model.traverse(obj => {
-    if (!(obj instanceof THREE.Mesh)) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    const replaced: THREE.Material[] = mats.map(mat => {
-      if (mat.name === 'Sukno') {
-        rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
-        // Unlit felt: eliminates facet-grid (lighting artifact on split-vertex mesh).
-        // color 0x0f7b3a → perceived luminance ≈ 83 (target); map:null drops the grey
-        // Cloth2 texture that was multiplying lit output down to luminance 19.
-        return new THREE.MeshBasicMaterial({ color: 0x0f7b3a });
-      }
-      if (mat.name === 'PocketChute') return pocketChutePhong;
-      return mat;
-    });
-    if (replaced.some((m, i) => m !== mats[i])) {
-      obj.material = Array.isArray(obj.material) ? replaced : replaced[0];
-    }
-  });
-
-  const rawBox = new THREE.Box3().setFromObject(model);
-  if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
-
-  const scaleX = 0.09469;  // uniform: TABLE_W / GLB_SLAB_X (26.824) — QA render confirmed 2026-07-20
-  const scaleY = scaleX;
-  const scaleZ = scaleX;
-
-  const rawCenter = new THREE.Vector3();
-  rawBox.getCenter(rawCenter);
-
-  model.scale.set(scaleX, scaleY, scaleZ);
-  model.position.set(
-    -rawCenter.x * scaleX,
-    -rawFeltTopY * scaleY,   // felt top → scene Y=0
-    -rawCenter.z * scaleX,
-  );
-
+  // Single PBR material (commercial_pool_table_mat) — preserve GLTFLoader output as-is.
   model.traverse(obj => {
     if (obj instanceof THREE.Mesh) {
       obj.castShadow = true;
       obj.receiveShadow = true;
     }
   });
+
+  const rawBox = new THREE.Box3().setFromObject(model);
+  // Rail tops protrude 5.09mm above felt (cushion rubber height, measured 83.734 − 83.225 cm).
+  // Anchor felt at scene Y=0 so balls at Y=BALL_RADIUS sit correctly on the playing surface.
+  const rawFeltTopY = rawBox.max.y - 0.509;
+
+  // Scale = 0.01: cm → m. Regulation 9ft cushion nose-to-nose = 254×127 cm → 2.54×1.27 m ≡ physics.
+  const scaleU = 0.01;
+
+  const rawCenter = new THREE.Vector3();
+  rawBox.getCenter(rawCenter);
+
+  model.scale.set(scaleU, scaleU, scaleU);
+  model.position.set(
+    -rawCenter.x * scaleU,
+    -rawFeltTopY * scaleU,   // felt top → scene Y=0
+    -rawCenter.z * scaleU,
+  );
 
   tableGroup.add(model);
 
