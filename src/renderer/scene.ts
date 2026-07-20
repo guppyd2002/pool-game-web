@@ -141,12 +141,8 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // GLB full-extent anchors (Blender mm ÷ 100 = Three.js unit).
-  // Uniform scale: GLB = FBX × 0.815 (uniform shrink in Blender pipeline).
-  // Correct scale = Unity felt half / GLB felt half = 1.481 / 13.412 = 0.11042.
-  // This makes web GLB world-size = Unity mesh world-size; Unity mesh is confirmed
-  // aligned with physics (佛朗基: cushion on rail, pocket near trigger) → we follow.
-  // Felt naturally overhangs rails ~211mm per side (same as Unity). GLB_PLAY_Z reference only.
+  // GLB scale: uniform 0.09469 confirmed by QA render (long rail +4mm ≈ flush,
+  // pocket centred). TABLE_W / GLB_SLAB_X (26.824) — chief directive 2026-07-20.
   // PocketChute — pure black rubber, Phong shading (CEO spec). DoubleSide prevents
   // transparent holes from any accidentally-flipped exterior panel face.
   const pocketChutePhong = new THREE.MeshPhongMaterial({
@@ -180,7 +176,7 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const scaleX = 0.11042;  // Unity felt half (1.481m) / GLB felt half (13.412) — chief directive 2026-07-20
+  const scaleX = 0.09469;  // uniform: TABLE_W / GLB_SLAB_X (26.824) — QA render confirmed 2026-07-20
   const scaleY = scaleX;
   const scaleZ = scaleX;
 

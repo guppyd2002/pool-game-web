@@ -31,14 +31,12 @@ function toM(v: number): number {
   return v / PHYSICS_MULTIPLIER;
 }
 
-// ─── GLB scale — FROZEN, mirrors scene.ts ─────────────────────────────────────
-// Source: scene.ts (commit d43ce79). Chief-architect directive: never recalculate.
-// Anchor: felt-slab long edge aligns to RAIL_LONG_X (physics wall ±1.2699 m).
+// ─── GLB scale — uniform, mirrors scene.ts ────────────────────────────────────
+// Chief-architect directive 2026-07-20: uniform 0.09469 confirmed by QA render
+// (long rail +4mm, pocket centred). Must stay in sync with scene.ts.
 
 const TABLE_W = 2.54;    // metres — standard 8-ball table width (same as scene.ts)
 const TABLE_H = 1.27;    // metres — standard 8-ball table height
-const GLB_SLAB_X = 26.824;   // Three.js units (2682.40 mm ÷ 100), long axis anchor
-const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58 mm ÷ 100), short axis anchor
 
 // ─── Inspector overlay (boundary rect + pocket circles + reference ball) ───────
 
@@ -235,16 +233,16 @@ async function main(): Promise<void> {
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);
 
-  // GLB scale — FROZEN, must match scene.ts. scaleX = TABLE_W / GLB_SLAB_X.
-  const scaleX = TABLE_W / GLB_SLAB_X;  // ≈ 9.468e-2
-  const scaleZ = TABLE_H / GLB_PLAY_Z;  // ≈ 8.395e-2
-  const scaleY = scaleX;                // Y proportional to long axis
+  // GLB scale — uniform, must match scene.ts (QA render confirmed 2026-07-20).
+  const scaleX = 0.09469;  // uniform: TABLE_W / GLB_SLAB_X ≈ 9.469e-2
+  const scaleY = scaleX;
+  const scaleZ = scaleX;
 
   model.scale.set(scaleX, scaleY, scaleZ);
   model.position.set(
     -rawCenter.x * scaleX,
     -rawFeltTopY * scaleY,  // felt top → scene Y=0
-    -rawCenter.z * scaleZ,
+    -rawCenter.z * scaleX,
   );
 
   model.traverse(obj => {
