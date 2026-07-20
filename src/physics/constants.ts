@@ -55,6 +55,9 @@ export const RAIL_SHORT_RADIUS  = 5630;   // scale/2
 
 /** Corner pocket jaw cushions (angled ±45°) — all 4 corners, 2 jaws each = 8 total */
 // LineColliderPocket 0-7 in Game.unity; A=arm along z-axis, B=arm along x-axis.
+// Unity source values — reverted 2026-07-21: +161/+191 shift (6139eb1) was wrong;
+// 鼬 fan-sweep re-measure shows jaws already align within ~3-10mm of visible jaw.
+// The shift created a real 25mm dead zone. Pocket triggers (±13110/±6740) are separate and correct.
 export const CORNER_A_X = 12075;  export const CORNER_A_Z = 6551;
 export const CORNER_B_X = 12901;  export const CORNER_B_Z = 5723;
 export const CORNER_A_SCALE_X = 570;  export const CORNER_A_RADIUS = 285;
