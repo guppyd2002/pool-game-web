@@ -212,13 +212,21 @@ async function main(): Promise<void> {
     }
   });
 
-  // PocketChute interior — render both sides so accidentally-flipped exterior faces
-  // don't produce transparent holes when viewing the table from outside.
+  // PocketChute — pure black rubber, Phong shading (CEO spec). DoubleSide prevents
+  // transparent holes if any exterior panel face was accidentally flipped by the Blender fix.
+  const pocketChutePhong = new THREE.MeshPhongMaterial({
+    color:     0x000000,
+    shininess: 10,
+    specular:  new THREE.Color(0x111111),
+    side:      THREE.DoubleSide,
+  });
+  pocketChutePhong.name = 'PocketChute';
   model.traverse(obj => {
     if (!(obj instanceof THREE.Mesh)) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    for (const mat of mats) {
-      if (mat.name === 'PocketChute') (mat as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+    const replaced = mats.map(m => m.name === 'PocketChute' ? pocketChutePhong : m);
+    if (replaced.some((m, i) => m !== mats[i])) {
+      obj.material = Array.isArray(obj.material) ? replaced as THREE.Material[] : replaced[0];
     }
   });
 

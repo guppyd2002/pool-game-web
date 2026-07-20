@@ -151,24 +151,33 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const GLB_SLAB_X = 26.824;   // Three.js units (2682.40mm ÷ 100), long axis anchor
   const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100), short axis anchor
 
+  // PocketChute — pure black rubber, Phong shading (CEO spec). DoubleSide prevents
+  // transparent holes from any accidentally-flipped exterior panel face.
+  const pocketChutePhong = new THREE.MeshPhongMaterial({
+    color:     0x000000,
+    shininess: 10,
+    specular:  new THREE.Color(0x111111),
+    side:      THREE.DoubleSide,
+  });
+  pocketChutePhong.name = 'PocketChute';
+
   let rawFeltTopY = 0;
   model.traverse(obj => {
     if (!(obj instanceof THREE.Mesh)) return;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    for (const mat of mats) {
+    const replaced: THREE.Material[] = mats.map(mat => {
       if (mat.name === 'Sukno') {
         rawFeltTopY = new THREE.Box3().setFromObject(obj).max.y;
         // Unlit felt: eliminates facet-grid (lighting artifact on split-vertex mesh).
         // color 0x0f7b3a → perceived luminance ≈ 83 (target); map:null drops the grey
         // Cloth2 texture that was multiplying lit output down to luminance 19.
-        const unlit = new THREE.MeshBasicMaterial({ color: 0x0f7b3a });
-        if (Array.isArray(obj.material)) {
-          const idx = (obj.material as THREE.Material[]).indexOf(mat);
-          if (idx !== -1) (obj.material as THREE.Material[])[idx] = unlit;
-        } else {
-          obj.material = unlit;
-        }
+        return new THREE.MeshBasicMaterial({ color: 0x0f7b3a });
       }
+      if (mat.name === 'PocketChute') return pocketChutePhong;
+      return mat;
+    });
+    if (replaced.some((m, i) => m !== mats[i])) {
+      obj.material = Array.isArray(obj.material) ? replaced : replaced[0];
     }
   });
 
