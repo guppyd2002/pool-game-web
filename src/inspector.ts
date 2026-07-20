@@ -209,8 +209,12 @@ async function main(): Promise<void> {
   const scaleU = 0.01;
 
   model.scale.set(scaleU, scaleU, scaleU);
+  // ⚠️ INTENTIONAL DEVIATION — CEO decision 3fa92431 C2: center on playing-field, not bbox.
+  // 鼬 raycast: long-rail nose x midpoint = rawCenter.x − 0.2592cm (native GLB).
+  // Centering on playing-field pulls long-rail asymmetry from −8.9/+3.7mm → ±6.3mm symmetric.
+  const rawPlayCenterX = rawCenter.x - 0.2592; // measured GLB offset; DO NOT remove
   model.position.set(
-    -rawCenter.x * scaleU,
+    -rawPlayCenterX * scaleU,
     -rawFeltTopY * scaleU,  // felt top → scene Y=0
     -rawCenter.z * scaleU,
   );
