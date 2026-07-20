@@ -55,8 +55,12 @@ export const RAIL_SHORT_RADIUS  = 5630;   // scale/2
 
 /** Corner pocket jaw cushions (angled ±45°) — all 4 corners, 2 jaws each = 8 total */
 // LineColliderPocket 0-7 in Game.unity; A=arm along z-axis, B=arm along x-axis.
-export const CORNER_A_X = 12075;  export const CORNER_A_Z = 6551;
-export const CORNER_B_X = 12901;  export const CORNER_B_Z = 5723;
+// Updated 2026-07-21: +161 X / +191 Z to match TurboSquid model corner jaw position.
+// before: A=(12075,6551) B=(12901,5723) — Unity source, ~20-25mm inside model visible jaw
+// after:  A=(12236,6742) B=(13062,5914) — same radial shift as POCKET_POSITIONS corners
+// basis: 鼬 C1/challenges027 + 卡卡西 render + CEO decision 3fa92431
+export const CORNER_A_X = 12236;  export const CORNER_A_Z = 6742;
+export const CORNER_B_X = 13062;  export const CORNER_B_Z = 5914;
 export const CORNER_A_SCALE_X = 570;  export const CORNER_A_RADIUS = 285;
 export const CORNER_B_SCALE_X = 569;  export const CORNER_B_RADIUS = 284;
 
