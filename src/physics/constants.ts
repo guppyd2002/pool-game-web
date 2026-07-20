@@ -84,15 +84,17 @@ export const POCKET_RADIUS = 450;
 
 /**
  * 6 pocket trigger positions: [x, z] pairs.
- * Source: KinematicTrigger transforms in _Game/Scenes/Game.unity.
- * unityTrue: corner=(±12949,±6549), side=(0,±7129), radius=450.
- * Previous port had (±12875,±6510)/(0,±7100) — zero Unity source (fabricated), now corrected.
+ * Corner pockets updated 2026-07-21 to match TurboSquid 9ft model visual geometry:
+ *   before: (±12949,±6549) — Unity source, but ~25mm inside model's visible pocket
+ *   after:  (±13110,±6740) — CEO decision 3fa92431 "physics follows model";
+ *           basis: 卡卡西 1px=1mm render + geometric measurement (radial +25mm)
+ * Side pockets / RAIL / POCKET_RADIUS unchanged (render ≤2mm noise, not adjusted).
  */
 export const POCKET_POSITIONS: [number, number][] = [
-  [ 12949,  6549],
-  [ 12949, -6549],
-  [-12949,  6549],
-  [-12949, -6549],
+  [ 13110,  6740],
+  [ 13110, -6740],
+  [-13110,  6740],
+  [-13110, -6740],
   [     0,  7129],
   [     0, -7129],
 ];
