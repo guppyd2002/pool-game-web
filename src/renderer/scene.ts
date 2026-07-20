@@ -142,13 +142,11 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const model = gltf.scene;
 
   // GLB full-extent anchors (Blender mm ÷ 100 = Three.js unit).
-  // Uniform scale: single factor matches Unity lossyScale (0.09 uniform).
-  // GLB_SLAB_X anchors the long axis; Z gets same factor → art 1.77:1 overruns
-  // physics 2:1 by ~8cm on each Z side, but pocket ring alignment improves to 2–4mm.
-  // GLB_PLAY_Z kept for reference only; no longer drives scaleZ.
-  const GLB_SLAB_X = 26.824;   // Three.js units (2682.40mm ÷ 100), long axis anchor
-  const GLB_PLAY_Z = 15.1258;  // Three.js units (1512.58mm ÷ 100) — reference only (art 1.77:1)
-
+  // Uniform scale: GLB = FBX × 0.815 (uniform shrink in Blender pipeline).
+  // Correct scale = Unity felt half / GLB felt half = 1.481 / 13.412 = 0.11042.
+  // This makes web GLB world-size = Unity mesh world-size; Unity mesh is confirmed
+  // aligned with physics (佛朗基: cushion on rail, pocket near trigger) → we follow.
+  // Felt naturally overhangs rails ~211mm per side (same as Unity). GLB_PLAY_Z reference only.
   // PocketChute — pure black rubber, Phong shading (CEO spec). DoubleSide prevents
   // transparent holes from any accidentally-flipped exterior panel face.
   const pocketChutePhong = new THREE.MeshPhongMaterial({
@@ -182,9 +180,9 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const rawBox = new THREE.Box3().setFromObject(model);
   if (rawFeltTopY === 0) rawFeltTopY = rawBox.max.y;
 
-  const scaleX = TABLE_W / GLB_SLAB_X;  // 2.54 / 26.824 ≈ 9.468e-2
+  const scaleX = 0.11042;  // Unity felt half (1.481m) / GLB felt half (13.412) — chief directive 2026-07-20
   const scaleY = scaleX;
-  const scaleZ = scaleX;               // uniform — art 1.77:1 vs physics 2:1 residual is inherent
+  const scaleZ = scaleX;
 
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);

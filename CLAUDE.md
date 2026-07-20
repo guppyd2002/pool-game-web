@@ -53,7 +53,7 @@ A faithful port of the C# `CalculableMechanics` engine from `_Game/Scenes/Game.u
 ### Renderer layer (`src/renderer/`)
 
 - `scene.ts` — creates the Three.js scene, loads `public/PoolTable.glb`, exposes `SceneAPI`.
-- **GLB model scale — uniform (chief architect directive 2026-07-20):** `GLB_SLAB_X = 26.824`, `scaleX = scaleY = scaleZ = TABLE_W / GLB_SLAB_X ≈ 9.468e-2`. Single uniform factor matching Unity lossyScale 0.09. Art 1.77:1 vs physics 2:1 → inherent ~28mm residual on Z (same as Unity). Do not change without explicit directive from the chief architect.
+- **GLB model scale — uniform (chief architect directive 2026-07-20):** `scaleX = scaleY = scaleZ = 0.11042`. Derived from Unity felt half (1.481m) / GLB felt half (13.412) — makes web GLB world-size equal Unity mesh world-size. Unity mesh confirmed aligned with physics (佛朗基: cushion on rail, pocket near trigger). Felt overhangs rails ~211mm per side (same as Unity). Do not change without explicit directive from the chief architect.
 - **Sukno (felt) material:** `MeshBasicMaterial` (unlit) with `color: 0x0f7b3a`, `polygonOffset: true/factor:-1/units:-1`, `map: null` (Cloth2 grey texture dropped — it compressed luminance from 83 to 19). Target luminance ≈ 83 (Rec.601). `polygonOffset` is present but was proven ineffective against the felt-to-cushion seam lines (mesh gap, not coplanar Z-fighting).
 - **Debug collider overlay** (`debug-colliders.ts`): cyan `LineSegments`, `visible = false` by default. Only exposed via `scene.toggleColliders()` / `window.__poolDebug.toggleColliders()`. Never auto-enables in production.
 - `pocket-visuals.ts` — black disc meshes at `POCKET_POSITIONS / PHYSICS_MULTIPLIER`, Y=0.001 to avoid Z-fighting with the felt.
