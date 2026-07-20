@@ -163,7 +163,11 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
 
   model.scale.set(scaleU, scaleU, scaleU);
   model.position.set(
-    -rawCenter.x * scaleU,
+    // ⚠️ INTENTIONAL DEVIATION — CEO decision 3fa92431 C2: bbox center → playing-field center.
+    // Model bbox center is offset −2.6mm in X (asymmetric logo/basket). +0.0026 recenters on
+    // the actual playing field, pulling long-rail asymmetry from −8.9/+3.7mm to ±6.3mm symmetric.
+    // DO NOT revert to plain −rawCenter.x * scaleU. Z is symmetric; unchanged.
+    -rawCenter.x * scaleU + 0.0026,
     -rawFeltTopY * scaleU,   // felt top → scene Y=0
     -rawCenter.z * scaleU,
   );
