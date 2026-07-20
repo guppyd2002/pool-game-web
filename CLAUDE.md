@@ -54,7 +54,7 @@ A faithful port of the C# `CalculableMechanics` engine from `_Game/Scenes/Game.u
 
 - `scene.ts` — creates the Three.js scene, loads `public/PoolTable.glb`, exposes `SceneAPI`.
 - **GLB model:** TurboSquid "Professional Billiards Table 9ft Green" — single mesh `commercial_pool_table`, single PBR material with 3×4K textures (baseColor/normal/ORM). Blender-packed to Y-up GLB, cm units, baked transforms. No material overrides — GLTFLoader output used as-is.
-- **GLB model scale — uniform 0.01 (cm→m):** `scaleU = 0.01` in both `scene.ts` and `inspector.ts`. Regulation 9ft cushion nose-to-nose = 254×127 cm → 2.54×1.27 m = physics constants exactly. Felt surface anchored to scene Y=0 via `rawBox.max.y − 0.509` (5.09mm cushion-rubber protrusion above felt). Do not change scale without explicit chief-architect directive.
+- **GLB model scale — uniform 0.01 (cm→m):** `scaleU = 0.01` in both `scene.ts` and `inspector.ts`. Regulation 9ft cushion nose-to-nose = 254×127 cm → 2.54×1.27 m = physics constants exactly. Felt surface anchored to scene Y=0 via `rawBox.max.y − 5.15` (rail top rawY≈83.73cm − felt rawY≈78.58cm = 51.5mm = 5.15cm in native model units). Do not change scale without explicit chief-architect directive.
 - **No Sukno/PocketChute material overrides** — old single-material fixes (unlit green felt, black rubber chute) are removed; new model has regulation PBR materials baked in.
 - **Debug collider overlay** (`debug-colliders.ts`): cyan `LineSegments`, `visible = false` by default. Only exposed via `scene.toggleColliders()` / `window.__poolDebug.toggleColliders()`. Never auto-enables in production.
 - `pocket-visuals.ts` — black disc meshes at `POCKET_POSITIONS / PHYSICS_MULTIPLIER`, Y=0.001 to avoid Z-fighting with the felt.

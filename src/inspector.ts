@@ -76,29 +76,26 @@ function createInspectorOverlay(): THREE.Group {
   boundaryLine.renderOrder = 1001; // above cyan detail lines (renderOrder=999)
   group.add(boundaryLine);
 
-  // ── Pocket circles: trigger (magenta 45mm) + capture (orange 73.5mm) ────────
-  // Physics capture check (cm-rigidbody.ts:600): sqrDist ≤ (ball.radius+trigger.radius)²
-  // True capture radius = BALL_RADIUS(285) + POCKET_RADIUS(450) = 735 units = 73.5mm.
-  // Inner magenta = trigger radius (POCKET_RADIUS 45mm, reference only).
-  // Outer orange  = TRUE ball-capture boundary (73.5mm) — use this for QA alignment.
-  const pocketR       = toM(POCKET_RADIUS);                 // 0.045 m — trigger
-  const captureR      = toM(BALL_RADIUS + POCKET_RADIUS);   // 0.0735 m — true capture
-  const triggerMat = new THREE.LineBasicMaterial({ color: 0xff00ff, depthTest: false }); // magenta
-  const captureMat = new THREE.LineBasicMaterial({ color: 0xff6600, depthTest: false }); // orange
-  const SEGS = 32;
+  // ── Pocket trigger circles (magenta) ─────────────────────────────────────────
+  const pocketR = toM(POCKET_RADIUS); // 0.045 m
+  const pocketMat = new THREE.LineBasicMaterial({ color: 0xff00ff, depthTest: false });
   for (const [px, pz] of POCKET_POSITIONS) {
     const cx = toM(px);
     const cz = toM(pz);
-    for (const [r, mat] of [[pocketR, triggerMat], [captureR, captureMat]] as const) {
-      const pts: THREE.Vector3[] = [];
-      for (let i = 0; i <= SEGS; i++) {
-        const angle = (i / SEGS) * Math.PI * 2;
-        pts.push(new THREE.Vector3(cx + Math.cos(angle) * r, Y_LINE, cz + Math.sin(angle) * r));
-      }
-      const circle = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat);
-      circle.renderOrder = 1001;
-      group.add(circle);
+    const SEGS = 32;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= SEGS; i++) {
+      const angle = (i / SEGS) * Math.PI * 2;
+      pts.push(new THREE.Vector3(
+        cx + Math.cos(angle) * pocketR,
+        Y_LINE,
+        cz + Math.sin(angle) * pocketR,
+      ));
     }
+    const circleGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    const circle = new THREE.Line(circleGeo, pocketMat.clone());
+    circle.renderOrder = 1001;
+    group.add(circle);
   }
 
   // ── Reference ball — white sphere ─────────────────────────────────────────────
@@ -197,8 +194,8 @@ async function main(): Promise<void> {
   });
 
   const rawBox = new THREE.Box3().setFromObject(model);
-  // Rail tops protrude 5.09mm above felt — anchor felt at scene Y=0.
-  const rawFeltTopY = rawBox.max.y - 0.509;
+  // Rail tops protrude 51.5mm above felt (5.15cm). Measured: rail top rawY≈83.73cm, felt rawY≈78.58cm.
+  const rawFeltTopY = rawBox.max.y - 5.15;
   const rawCenter = new THREE.Vector3();
   rawBox.getCenter(rawCenter);
 

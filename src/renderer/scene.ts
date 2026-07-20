@@ -150,9 +150,9 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   });
 
   const rawBox = new THREE.Box3().setFromObject(model);
-  // Rail tops protrude 5.09mm above felt (cushion rubber height, measured 83.734 − 83.225 cm).
+  // Rail tops protrude 51.5mm above felt (5.15cm). Measured: rail top rawY≈83.73cm, felt rawY≈78.58cm.
   // Anchor felt at scene Y=0 so balls at Y=BALL_RADIUS sit correctly on the playing surface.
-  const rawFeltTopY = rawBox.max.y - 0.509;
+  const rawFeltTopY = rawBox.max.y - 5.15;
 
   // Scale = 0.01: cm → m. Regulation 9ft cushion nose-to-nose = 254×127 cm → 2.54×1.27 m ≡ physics.
   const scaleU = 0.01;
