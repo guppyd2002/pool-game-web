@@ -150,8 +150,9 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   });
 
   const rawBox = new THREE.Box3().setFromObject(model);
+  // ⚠️ INTENTIONAL DEVIATION from Unity source — CEO decision 3fa92431 "physics follows model".
   // Rail tops protrude 51.5mm above felt (5.15cm). Measured: rail top rawY≈83.73cm, felt rawY≈78.58cm.
-  // Anchor felt at scene Y=0 so balls at Y=BALL_RADIUS sit correctly on the playing surface.
+  // DO NOT revert to 0.509 (was wrong by ×10 — caused 46mm ball float, C4 bug).
   const rawFeltTopY = rawBox.max.y - 5.15;
 
   // Scale = 0.01: cm → m. Regulation 9ft cushion nose-to-nose = 254×127 cm → 2.54×1.27 m ≡ physics.
