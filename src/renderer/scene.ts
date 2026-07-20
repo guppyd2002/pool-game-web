@@ -155,7 +155,7 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   // transparent holes from any accidentally-flipped exterior panel face.
   const pocketChutePhong = new THREE.MeshPhongMaterial({
     color:     0x000000,
-    shininess: 10,
+    shininess: 20,
     specular:  new THREE.Color(0x111111),
     side:      THREE.DoubleSide,
   });

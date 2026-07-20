@@ -216,7 +216,7 @@ async function main(): Promise<void> {
   // transparent holes if any exterior panel face was accidentally flipped by the Blender fix.
   const pocketChutePhong = new THREE.MeshPhongMaterial({
     color:     0x000000,
-    shininess: 10,
+    shininess: 20,
     specular:  new THREE.Color(0x111111),
     side:      THREE.DoubleSide,
   });
