@@ -185,23 +185,33 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   scene.add(colliderDebug);
 
   // ─── Balls ───────────────────────────────────────────────────────────
+  // Standard 8-ball visual convention:
+  //   Solid (1-7):  entire ball = BALL_COLORS[i]
+  //   Stripe (9-15): white body + wide coloured band (BALL_COLORS[i])
+  //   Cue (0): white; 8-ball: black — both use BALL_COLORS[i] unchanged.
   const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 16);
   const balls: THREE.Mesh[] = [];
 
   for (let i = 0; i < 16; i++) {
+    // Stripe balls (9-15): white body so the colour band is clearly distinct from solids.
+    // Solid balls and special balls (0 cue, 8 eight-ball): full colour body.
     const isStripe = i >= 9;
+    const bodyColor = isStripe ? 0xffffff : BALL_COLORS[i];
     const mat = new THREE.MeshStandardMaterial({
-      color: BALL_COLORS[i],
+      color: bodyColor,
       roughness: 0.3,
       metalness: 0.1,
     });
     const ball = new THREE.Mesh(ballGeo, mat);
     ball.castShadow = true;
 
-    // Add stripe band for balls 9-15
     if (isStripe) {
-      const bandGeo = new THREE.CylinderGeometry(BALL_RADIUS * 1.01, BALL_RADIUS * 1.01, BALL_RADIUS * 0.8, 16, 1, true);
-      const bandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+      // Colour band: BALL_COLORS[i] on a white body = standard stripe appearance.
+      // Height R×1.0 and radius R×1.005 (slightly proud of sphere to avoid z-fighting).
+      const bandGeo = new THREE.CylinderGeometry(
+        BALL_RADIUS * 1.005, BALL_RADIUS * 1.005, BALL_RADIUS * 1.0, 16, 1, true,
+      );
+      const bandMat = new THREE.MeshStandardMaterial({ color: BALL_COLORS[i], roughness: 0.3 });
       const band = new THREE.Mesh(bandGeo, bandMat);
       ball.add(band);
     }
