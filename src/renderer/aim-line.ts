@@ -49,6 +49,15 @@ export function computeAimLinePoints(
 }
 
 // ─── Three.js wrapper (browser) ───────────────────────────────────────────────
+// Uses Line2 (fat-line addon) so linewidth > 1 works on WebGL (standard
+// THREE.LineBasicMaterial ignores linewidth due to the WebGL spec limit of 1px).
+
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+
+/** Aim line width in CSS pixels (applies on all WebGL devices including mobile). */
+const AIM_LINE_WIDTH = 2.5;
 
 export interface AimLineVisual {
   /** Refresh the line from current CueController state. Pass null to hide. */
@@ -57,21 +66,45 @@ export interface AimLineVisual {
 }
 
 export function createAimLine(scene: THREE.Scene): AimLineVisual {
-  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.7, transparent: true });
-  const geo = new THREE.BufferGeometry();
-  const line = new THREE.Line(geo, mat);
+  const mat = new LineMaterial({
+    color: 0xffffff,
+    opacity: 0.75,
+    transparent: true,
+    linewidth: AIM_LINE_WIDTH,
+    // resolution must match the renderer pixel size for correct width
+    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+  });
+
+  const geo = new LineGeometry();
+  // LineGeometry requires at least 2 points; initialise with a degenerate pair.
+  geo.setPositions([0, 0, 0, 0, 0, 0]);
+
+  const line = new Line2(geo, mat);
+  line.computeLineDistances();
+  line.visible = false;
   scene.add(line);
+
+  // Keep LineMaterial resolution in sync so line width stays physically correct.
+  function _onResize(): void {
+    mat.resolution.set(window.innerWidth, window.innerHeight);
+  }
+  window.addEventListener('resize', _onResize);
 
   return {
     update(cueBallPos: CmVector, hit: AimHit | null): void {
-      if (!hit) {
-        geo.setFromPoints([]);
+      const pts = hit ? computeAimLinePoints(cueBallPos, hit) : [];
+      if (pts.length < 2) {
+        line.visible = false;
         return;
       }
-      geo.setFromPoints(computeAimLinePoints(cueBallPos, hit));
+      // LineGeometry.setPositions expects a flat [x,y,z, x,y,z, …] array.
+      geo.setPositions(pts.flatMap(p => [p.x, p.y, p.z]));
+      line.computeLineDistances();
+      line.visible = true;
     },
 
     dispose(): void {
+      window.removeEventListener('resize', _onResize);
       scene.remove(line);
       geo.dispose();
       mat.dispose();
