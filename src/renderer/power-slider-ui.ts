@@ -26,8 +26,12 @@ export interface PowerSliderUI {
 /** Height of the draggable track in CSS pixels. Landscape spec: 240dp. */
 const TRACK_H = 240;
 
-/** Width of the draggable track in CSS pixels. Landscape spec: 48dp. */
-const TRACK_W = 48;
+/**
+ * Width of the draggable track in CSS pixels.
+ * 80dp is the minimum recommended touch-target width (Material / HIG guidelines).
+ * Previous 48dp was too narrow for reliable single-finger interaction on mobile.
+ */
+const TRACK_W = 80;
 
 export function createPowerSliderUI(
   container: HTMLElement,
