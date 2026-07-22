@@ -192,8 +192,9 @@ export function createPowerSliderUI(
     },
 
     reset(): void {
+      // slider.reset() restores defaultForce (0.5 in UX mode); sync visual to match.
       slider.reset();
-      syncVisual(0);
+      syncVisual(slider.force);
     },
 
     dispose(): void {
