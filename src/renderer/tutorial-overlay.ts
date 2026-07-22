@@ -5,8 +5,9 @@
  * Step 2: Fine-adjust bar (optional, can skip).
  * Step 3: Pull power bar down, release to shoot.
  *
- * Each step shows a highlight pill + dismiss arrow. Skips automatically on
- * the relevant interaction. Disappears after step 3 is completed.
+ * Each step shows a highlight pill with an ✕ close button.
+ * Advances automatically on the relevant interaction.
+ * Disappears after 3 shots or when the player taps ✕.
  */
 
 export interface TutorialOverlay {
@@ -27,19 +28,36 @@ export function createTutorialOverlay(container: HTMLElement): TutorialOverlay {
   let _step: Step = 'done';
   let _shotCount = 0;
 
+  // Outer row: text + close button side-by-side.
   const pill = document.createElement('div');
   pill.style.cssText = [
-    'position:absolute', 'bottom:60px', 'left:50%', 'transform:translateX(-50%)',
+    'position:absolute', 'bottom:72px', 'left:50%', 'transform:translateX(-50%)',
     'background:rgba(0,0,0,0.82)', 'color:#fff',
-    'padding:8px 20px', 'border-radius:20px',
+    'padding:8px 14px 8px 20px', 'border-radius:20px',
     'font-family:sans-serif', 'font-size:13px',
-    'pointer-events:none', 'z-index:150',
-    'text-align:center', 'white-space:nowrap',
+    'pointer-events:auto',            // allow close button tap
+    'z-index:150',
+    'display:none',
+    'align-items:center', 'gap:12px', 'white-space:nowrap',
     'border:1px solid rgba(255,255,255,0.2)',
     'transition:opacity 0.3s',
   ].join(';');
-  pill.style.display = 'none';
   container.appendChild(pill);
+
+  const textEl = document.createElement('span');
+  textEl.style.pointerEvents = 'none';
+  pill.appendChild(textEl);
+
+  // Close (✕) button — visible target for "dismiss tutorial".
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = [
+    'background:none', 'border:none', 'color:rgba(255,255,255,0.6)',
+    'font-size:14px', 'cursor:pointer', 'padding:0 4px',
+    'line-height:1', 'pointer-events:auto',
+  ].join(';');
+  closeBtn.setAttribute('aria-label', 'Dismiss tutorial');
+  pill.appendChild(closeBtn);
 
   const STEPS: Record<Exclude<Step, 'done'>, string> = {
     1: '👆 Tap the table to aim',
@@ -48,8 +66,8 @@ export function createTutorialOverlay(container: HTMLElement): TutorialOverlay {
   };
 
   function _show(step: Exclude<Step, 'done'>): void {
-    pill.textContent = STEPS[step];
-    pill.style.display = 'block';
+    textEl.textContent = STEPS[step];
+    pill.style.display = 'flex';
     pill.style.opacity = '1';
   }
 
@@ -57,6 +75,12 @@ export function createTutorialOverlay(container: HTMLElement): TutorialOverlay {
     pill.style.opacity = '0';
     setTimeout(() => { pill.style.display = 'none'; }, 300);
   }
+
+  // Close button dismisses tutorial entirely.
+  closeBtn.addEventListener('click', () => {
+    _step = 'done';
+    _hide();
+  });
 
   return {
     start(): void {
@@ -95,7 +119,7 @@ export function createTutorialOverlay(container: HTMLElement): TutorialOverlay {
     },
 
     dispose(): void {
-      container.removeChild(pill);
+      if (pill.parentNode) pill.parentNode.removeChild(pill);
     },
   };
 }
