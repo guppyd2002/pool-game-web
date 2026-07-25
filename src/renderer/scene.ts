@@ -6,8 +6,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
+import { makeBallMaterial } from './ball-materials';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -16,25 +18,7 @@ const TABLE_W = 2.54;
 const TABLE_H = 1.27;
 const BALL_RADIUS = 0.028;
 
-// Ball colors: index 0=cue, 1-7=solids, 8=black, 9-15=stripes
-const BALL_COLORS: number[] = [
-  0xffffff, // 0: cue (white)
-  0xffd700, // 1: yellow
-  0x0000cc, // 2: blue
-  0xcc0000, // 3: red
-  0x800080, // 4: purple
-  0xff6600, // 5: orange
-  0x006600, // 6: green
-  0x8b4513, // 7: brown/maroon
-  0x000000, // 8: black
-  0xffd700, // 9: yellow stripe
-  0x0000cc, // 10: blue stripe
-  0xcc0000, // 11: red stripe
-  0x800080, // 12: purple stripe
-  0xff6600, // 13: orange stripe
-  0x006600, // 14: green stripe
-  0x8b4513, // 15: brown stripe
-];
+// Ball colors moved to ball-materials.ts (WPA regulation set, CEO-approved).
 
 // Ortho top-view frustum: table half-extents + 15% margin.
 // Camera sits at (0,5,0) looking straight down, up=(0,0,-1) to avoid gimbal lock.
@@ -91,6 +75,11 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   // Scene
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);
+
+  // Environment map for clearcoat reflections on PBR ball materials.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
 
   // Perspective camera — 45° overhead view (default / play mode)
   const aspect = (container.clientWidth || window.innerWidth) / (container.clientHeight || window.innerHeight);
@@ -185,37 +174,17 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   scene.add(colliderDebug);
 
   // ─── Balls ───────────────────────────────────────────────────────────
-  // Standard 8-ball visual convention:
-  //   Solid (1-7):  entire ball = BALL_COLORS[i]
-  //   Stripe (9-15): white body + wide coloured band (BALL_COLORS[i])
-  //   Cue (0): white; 8-ball: black — both use BALL_COLORS[i] unchanged.
-  const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 24, 16);
+  // SDF fragment shader (CEO bake-off Method C) via makeBallMaterial():
+  //   Cue (0): plain white PBR, no injection.
+  //   Solid (1-7, 8): per-ball color + two white-disc+number patches at ±Z poles.
+  //   Stripe (9-15): white body + narrow equatorial color band + equatorial number patches.
+  // Sphere segments 48×32 — smooth enough for closeup PBR without being excessive.
+  const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 48, 32);
   const balls: THREE.Mesh[] = [];
 
   for (let i = 0; i < 16; i++) {
-    // Stripe balls (9-15): white body so the colour band is clearly distinct from solids.
-    // Solid balls and special balls (0 cue, 8 eight-ball): full colour body.
-    const isStripe = i >= 9;
-    const bodyColor = isStripe ? 0xffffff : BALL_COLORS[i];
-    const mat = new THREE.MeshStandardMaterial({
-      color: bodyColor,
-      roughness: 0.3,
-      metalness: 0.1,
-    });
-    const ball = new THREE.Mesh(ballGeo, mat);
+    const ball = new THREE.Mesh(ballGeo, makeBallMaterial(i));
     ball.castShadow = true;
-
-    if (isStripe) {
-      // Colour band: BALL_COLORS[i] on a white body = standard stripe appearance.
-      // Height R×1.0 and radius R×1.005 (slightly proud of sphere to avoid z-fighting).
-      const bandGeo = new THREE.CylinderGeometry(
-        BALL_RADIUS * 1.005, BALL_RADIUS * 1.005, BALL_RADIUS * 1.0, 16, 1, true,
-      );
-      const bandMat = new THREE.MeshStandardMaterial({ color: BALL_COLORS[i], roughness: 0.3 });
-      const band = new THREE.Mesh(bandGeo, bandMat);
-      ball.add(band);
-    }
-
     balls.push(ball);
     scene.add(ball);
   }
