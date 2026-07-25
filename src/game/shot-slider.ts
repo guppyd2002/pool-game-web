@@ -27,6 +27,12 @@ export interface ShotSliderOptions {
   isAutoShot?: boolean;
   /** C# minForce = 0.05: minimum force to fire. Default 0.05. */
   minForce?: number;
+  /**
+   * Force fraction shown at the start of each turn (after reset()).
+   * Default 0 (C# faithful). Set to 0.5 for better new-player UX (player
+   * can fire immediately at half power without having to drag first).
+   */
+  defaultForce?: number;
 }
 
 export interface ShotSlider {
@@ -69,6 +75,7 @@ export interface ShotSlider {
 }
 
 export function createShotSlider(opts: ShotSliderOptions = {}): ShotSlider {
+  const _defaultForce = Math.max(0, Math.min(1, opts.defaultForce ?? 0));
   let _force = 0;
   let _isSelected = false;
   const _minForce = opts.minForce ?? MIN_FORCE_DEFAULT;
@@ -119,8 +126,9 @@ export function createShotSlider(opts: ShotSliderOptions = {}): ShotSlider {
     },
 
     reset(): void {
-      // C# ResetShot: just zeros, no callbacks
-      _force = 0;
+      // C# ResetShot: zero selection, no callbacks.
+      // Force starts at defaultForce (0 when not configured = C# parity; 0.5 for UX mode).
+      _force = _defaultForce;
       _isSelected = false;
     },
   };

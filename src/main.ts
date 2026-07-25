@@ -54,7 +54,7 @@ import * as THREE from 'three';
 // ─── Initialize scene + physics ───────────────────────────────────────────────
 
 const container = document.getElementById('app')!;
-const scene = createScene(container);
+const scene = await createScene(container);
 const space = createPoolTable();
 const physics = createBallPoolPhysics(space, scene);
 
@@ -157,6 +157,9 @@ const adapter = createCueAdapter({
 
 const shotSlider = createShotSlider({
   isAutoShot: true,
+  // UX: new players see 50% power at turn start so the first shot isn't a no-op.
+  // Physics-faithful: force is clamped 0-1 at fire time; C# parity unaffected.
+  defaultForce: 0.5,
   // C-2 mutex (b): power charging locks both aim drag AND fine-adjust bar.
   // Extends existing onStartControl→adapter.disable pattern to cover fine-adjust.
   onStartControl: () => {
@@ -579,4 +582,5 @@ window.addEventListener('beforeunload', () => {
   scene: scene.scene,
   gameSession,
   cue,  // exposes getAimState() for overlay hitTest guard smoke test
+  toggleColliders: () => scene.toggleColliders?.(),  // show/hide physics boundary overlay
 };

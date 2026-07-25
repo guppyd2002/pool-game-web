@@ -260,7 +260,9 @@ export class CmRigidbody {
     const moi = this.collider.getMomentOfInertia(this.centreOfMass, CmVector.zero);
     const angularImpulse = CmVector.divide(torque, moi);
 
-    // Linear impulse: project(vel1 - vel2, hitNormal), negated
+    // Linear impulse: project(vel1 - vel2, hitNormal), negated — no bounciness factor.
+    // Matches C# CmRigidbody.cs:290-291 exactly; bounciness intentionally omitted from
+    // linear path (angular-only). Faithful port, not a mistake.
     const velDiffProj = CmVector.project(CmVector.sub(this.velocity, body2.velocity), hitNormal);
     const impulse = new CmVector(-velDiffProj.x, -velDiffProj.y, -velDiffProj.z);
 

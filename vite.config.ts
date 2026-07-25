@@ -1,7 +1,17 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
+import path from 'path';
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      // Multi-page: main game + standalone inspector tool
+      input: {
+        main:      path.resolve(__dirname, 'index.html'),
+        inspector: path.resolve(__dirname, 'inspector.html'),
+      },
+    },
+  },
   test: {
     globals: false,
     environment: 'node',

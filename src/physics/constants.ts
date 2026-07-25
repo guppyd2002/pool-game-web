@@ -55,6 +55,8 @@ export const RAIL_SHORT_RADIUS  = 5630;   // scale/2
 
 /** Corner pocket jaw cushions (angled ±45°) — all 4 corners, 2 jaws each = 8 total */
 // LineColliderPocket 0-7 in Game.unity; A=arm along z-axis, B=arm along x-axis.
+// Jaws at Unity original values — aligned to model visible jaw ~3mm (卡卡西 + 鼬 dual audit).
+// No deviation needed: only POCKET_POSITIONS trigger requires a shift (see below).
 export const CORNER_A_X = 12075;  export const CORNER_A_Z = 6551;
 export const CORNER_B_X = 12901;  export const CORNER_B_Z = 5723;
 export const CORNER_A_SCALE_X = 570;  export const CORNER_A_RADIUS = 285;
@@ -84,15 +86,17 @@ export const POCKET_RADIUS = 450;
 
 /**
  * 6 pocket trigger positions: [x, z] pairs.
- * Source: KinematicTrigger transforms in _Game/Scenes/Game.unity.
- * unityTrue: corner=(±12949,±6549), side=(0,±7129), radius=450.
- * Previous port had (±12875,±6510)/(0,±7100) — zero Unity source (fabricated), now corrected.
+ * Corner pockets updated 2026-07-21 to match TurboSquid 9ft model visual geometry:
+ *   before: (±12949,±6549) — Unity source, but ~25mm inside model's visible pocket
+ *   after:  (±13110,±6740) — CEO decision 3fa92431 "physics follows model";
+ *           basis: 卡卡西 1px=1mm render + geometric measurement (radial +25mm)
+ * Side pockets / RAIL / POCKET_RADIUS unchanged (render ≤2mm noise, not adjusted).
  */
 export const POCKET_POSITIONS: [number, number][] = [
-  [ 12949,  6549],
-  [ 12949, -6549],
-  [-12949,  6549],
-  [-12949, -6549],
+  [ 13110,  6740],
+  [ 13110, -6740],
+  [-13110,  6740],
+  [-13110, -6740],
   [     0,  7129],
   [     0, -7129],
 ];

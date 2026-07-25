@@ -1,8 +1,8 @@
 /**
- * B4 — TurnPrompt: clear turn-change instruction overlay.
+ * B4 — TurnPrompt: turn-change player indicator.
  *
- * Shows "Player N's turn — drag the cue ball to aim" on turn change.
- * Fades out when the player starts their first drag (dismiss() called from onAimUpdate).
+ * Shows "Player N's turn" briefly (auto-fades after 2 s or on first interaction).
+ * No action instructions — tutorial-overlay handles those to avoid conflicting text.
  */
 
 export interface TurnPrompt {
@@ -12,15 +12,18 @@ export interface TurnPrompt {
   dispose(): void;
 }
 
+/** Auto-dismiss delay in ms — long enough to read, short enough not to block view. */
+const AUTO_DISMISS_MS = 2000;
+
 export function createTurnPrompt(container: HTMLElement): TurnPrompt {
   const el = document.createElement('div');
   el.style.cssText = [
-    'position:absolute', 'left:50%', 'top:38%',
-    'transform:translate(-50%,-50%)',
-    'background:rgba(10,10,26,0.82)',
+    'position:absolute', 'left:50%', 'top:12%',
+    'transform:translateX(-50%)',
+    'background:rgba(10,10,26,0.78)',
     'color:#fff', 'font-family:sans-serif',
-    'font-size:17px', 'font-weight:600',
-    'padding:16px 32px', 'border-radius:12px',
+    'font-size:15px', 'font-weight:600',
+    'padding:8px 24px', 'border-radius:20px',
     'border:1px solid rgba(255,255,255,0.15)',
     'text-align:center', 'pointer-events:none',
     'transition:opacity 0.35s',
@@ -30,8 +33,10 @@ export function createTurnPrompt(container: HTMLElement): TurnPrompt {
   container.appendChild(el);
 
   let _hideTimer = 0;
+  let _autoTimer = 0;
 
   function _fadeOut(): void {
+    clearTimeout(_autoTimer);
     el.style.opacity = '0';
     _hideTimer = window.setTimeout(() => { el.style.display = 'none'; }, 380);
   }
@@ -39,15 +44,17 @@ export function createTurnPrompt(container: HTMLElement): TurnPrompt {
   return {
     show(playerIndex, ballInHand) {
       clearTimeout(_hideTimer);
-      const player = `Player ${playerIndex + 1}`;
-      const action = ballInHand ? 'Click to place cue ball' : 'Drag the cue ball to aim';
-      el.innerHTML = [
-        `<div style="font-size:14px;opacity:0.65;margin-bottom:4px">${player}'s turn</div>`,
-        `<div style="font-size:16px">${action}</div>`,
-      ].join('');
+      clearTimeout(_autoTimer);
+      // Only show player label — no action text (tutorial-overlay handles instructions).
+      const label = ballInHand
+        ? `Player ${playerIndex + 1}'s turn — place cue ball`
+        : `Player ${playerIndex + 1}'s turn`;
+      el.textContent = label;
       el.style.display = 'block';
       el.offsetHeight;  // force reflow so transition plays
       el.style.opacity = '1';
+      // Auto-dismiss so it doesn't linger on top of the tutorial overlay.
+      _autoTimer = window.setTimeout(_fadeOut, AUTO_DISMISS_MS);
     },
 
     dismiss() {
@@ -57,6 +64,7 @@ export function createTurnPrompt(container: HTMLElement): TurnPrompt {
 
     dispose() {
       clearTimeout(_hideTimer);
+      clearTimeout(_autoTimer);
       if (el.parentNode) el.parentNode.removeChild(el);
     },
   };
