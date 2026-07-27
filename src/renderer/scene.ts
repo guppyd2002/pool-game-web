@@ -189,6 +189,14 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
     scene.add(ball);
   }
 
+  // ─── Per-ball last-rendered position for rolling rotation ───────────
+  // Null until the ball's first updateBallPosition call; avoids spurious
+  // rotation from the arbitrary gap between initial placement and first replay.
+  const _ballPrevPos: (THREE.Vector3 | null)[] = Array.from({ length: 16 }, () => null);
+  // Pre-allocated temporaries — reused every frame to avoid GC pressure.
+  const _rotAxis = new THREE.Vector3();
+  const _rotDq   = new THREE.Quaternion();
+
   // ─── Initial ball positions (standard rack) ────────────────────────
   // Cue ball at left 1/4
   balls[0].position.set(-TABLE_W / 4, BALL_RADIUS, 0);
@@ -235,7 +243,26 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
     balls,
     table: tableGroup,
     updateBallPosition(id: number, x: number, y: number, z: number) {
-      if (balls[id]) balls[id].position.set(x, y, z);
+      const mesh = balls[id];
+      if (!mesh) return;
+      // Rolling rotation from position delta (no-slip: arc = R·θ).
+      // Only horizontal displacement (XZ plane) drives rolling; Y is vertical.
+      // axis = normalize(Δz, 0, −Δx) — perpendicular to direction of motion in XZ.
+      const prev = _ballPrevPos[id];
+      if (prev !== null) {
+        const dx = x - prev.x;
+        const dz = z - prev.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist > 1e-6) {
+          _rotAxis.set(dz / dist, 0, -dx / dist);
+          _rotDq.setFromAxisAngle(_rotAxis, dist / BALL_RADIUS);
+          mesh.quaternion.premultiply(_rotDq);
+        }
+        prev.set(x, y, z);
+      } else {
+        _ballPrevPos[id] = new THREE.Vector3(x, y, z);
+      }
+      mesh.position.set(x, y, z);
     },
     hideBall(id: number) {
       const mesh = balls[id];
