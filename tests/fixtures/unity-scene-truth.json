@@ -390,7 +390,7 @@
 
   "pockets": {
     "_src": "Assets/_Game/Scenes/Game.unity — KinematicTrigger MonoBehaviour serialized trigger.position+radius",
-    "_note": "Port positions corrected to unityTrue in geometry truth-up (2026-06-22). Previous (±12875,±6510)/(0,±7100) had zero Unity source; now removed.",
+    "_note": "unityTruePositions = Game.unity KinematicTrigger (geometry truth-up 2026-06-22). portActualPositions = CEO decision 3fa92431 'physics follows model' (2026-07-21): corner radial +25mm to TurboSquid 9ft model. Side pockets unchanged. Previous fabricated (±12875,±6510)/(0,±7100) removed.",
     "radius": { "fixed": 450, "_src": "Assets/_Game/Scenes/Game.unity:35597 — trigger.radius" },
     "unityTruePositions": [
       { "id": 0, "label": "footRightCorner", "x":  12949, "y": 285, "z": -6549, "_src": "build scene:35593" },
@@ -401,12 +401,14 @@
       { "id": 5, "label": "footSide",        "x":      0, "y": 285, "z": -7129, "_src": "build scene:21209" }
     ],
     "portActualPositions": {
-      "note": "constants.ts POCKET_POSITIONS — now matches unityTrue (corrected 2026-06-22).",
+      "note": "constants.ts POCKET_POSITIONS + tools/golden-vector-runner MakePockets — CEO 3fa92431. Corners = unityTrue radial +25mm (√(161²+191²)≈250 units); sides = unityTrue.",
+      "decision": "3fa92431",
+      "basis": "卡卡西 1px=1mm render measure + geometric radial +25mm from Unity trigger centers",
       "values": [
-        { "id": 0, "x":  12949, "z":  6549 },
-        { "id": 1, "x":  12949, "z": -6549 },
-        { "id": 2, "x": -12949, "z":  6549 },
-        { "id": 3, "x": -12949, "z": -6549 },
+        { "id": 0, "x":  13110, "z":  6740 },
+        { "id": 1, "x":  13110, "z": -6740 },
+        { "id": 2, "x": -13110, "z":  6740 },
+        { "id": 3, "x": -13110, "z": -6740 },
         { "id": 4, "x":      0, "z":  7129 },
         { "id": 5, "x":      0, "z": -7129 }
       ]
@@ -506,6 +508,16 @@
   },
 
   "knownDiscrepancies": [
+    {
+      "id": "cornerPocketShift",
+      "field": "pockets.portActualPositions[0-3] / constants.ts POCKET_POSITIONS corners",
+      "unityTrue": "(±12949,±6549)",
+      "currentPort": "(±13110,±6740)",
+      "delta": "+161 X / +191 Z per corner (radial ≈ +25mm outward)",
+      "status": "intentional-decided",
+      "reason": "CEO decision 3fa92431 'physics follows model' (2026-07-21): Unity trigger centers sit ~25mm inside TurboSquid 9ft model visible pocket mouths. Port shifts corner triggers outward so balls pocket where the model shows holes. Side pockets / radius unchanged.",
+      "parityLockBehavior": "Assert portActual (±13110,±6740); keep unityTruePositions as lineage. C# golden-vector-runner MakePockets must match portActual (not unityTrue)."
+    },
     {
       "id": "railY",
       "field": "tableGeometry.colliders[1-18].position.y",

@@ -157,12 +157,16 @@ static List<ICmCollider> MakeTable(CmMaterial cloth, CmMaterial rail)
 }
 
 // --- pocket triggers (6 pockets) ---
-// unityTrue: corner=(±12949,±6549) side=(0,±7129), radius=450 — from KinematicTrigger in Game.unity
+// Port actual (CEO decision 3fa92431 "physics follows model"):
+//   corner=(±13110,±6740) — radial +25mm from Unity KinematicTrigger (±12949,±6549)
+//   side=(0,±7129) unchanged; radius=450.
+// Unity source retained as ground-truth lineage in tests/fixtures/unity-scene-truth.json
+// (unityTruePositions vs portActualPositions). TS constants.ts POCKET_POSITIONS must match.
 static List<CmKinematicTrigger> MakePockets()
 {
     long[,] pos = {
-        {  12949, BALL_Y,  6549 }, {  12949, BALL_Y, -6549 },
-        { -12949, BALL_Y,  6549 }, { -12949, BALL_Y, -6549 },
+        {  13110, BALL_Y,  6740 }, {  13110, BALL_Y, -6740 },
+        { -13110, BALL_Y,  6740 }, { -13110, BALL_Y, -6740 },
         {      0, BALL_Y,  7129 }, {      0, BALL_Y, -7129 }
     };
     var list = new List<CmKinematicTrigger>();
@@ -335,15 +339,16 @@ var results = new List<GoldenVector>();
         0,0,30000,  0,0,0));
 }
 
-// GV-11: Target ball into corner pocket 0 (x=+12875 z=+6510)
+// GV-11: Target ball into corner pocket 0 (x=+13110 z=+6740) — port actual 3fa92431
 //   3-4-5 triangle geometry: b0->b1 distance = 2000 (collision at step 2, before b1 deactivates)
 //   impulse (18000,0,24000) magnitude=30000 along same 3:4 slope as b0->b1 (head-on shot)
-//   b1 at (11975,5310) continues in (3,4) direction to pocket 0 at (12875,6510) — rails not hit
+//   b1 at (12210,5540) continues in (3,4) direction to pocket 0 at (13110,6740) — rails not hit
+//   (shifted +235x/+230z from pre-3fa92431 layout so path still aims at pocket center)
 {
-    var b0 = MakeBody(0, MakeBall(10775, BALL_Y, 3710, BALL_MAT));
-    var b1 = MakeBody(1, MakeBall(11975, BALL_Y, 5310, BALL_MAT));
+    var b0 = MakeBody(0, MakeBall(11010, BALL_Y, 3940, BALL_MAT));
+    var b1 = MakeBody(1, MakeBall(12210, BALL_Y, 5540, BALL_MAT));
     results.Add(RunShot("GV-11",
-        "Target ball into corner pocket 0 (+x,+z) at (12949,6549): b0 hits b1 at 53deg (3:4 slope), b1 pockets",
+        "Target ball into corner pocket 0 (+x,+z) at (13110,6740): b0 hits b1 at 53deg (3:4 slope), b1 pockets",
         new List<CmRigidbody>{b0, b1}, colls, pockets, space,
         18000,0,24000,  0,0,0));
 }

@@ -3,11 +3,17 @@
  *
  * Verifies that the shipped game (table-setup.ts) and test harnesses (golden-vector.test.ts)
  * both use the authoritative constants from physics/constants.ts, which are sourced from
- * Game.unity. Any divergence is a false-confidence failure: "11/11 GV pass" would mean
- * "tests pass on wrong config, real game diverges from C# golden vectors."
+ * Game.unity + CEO-locked portActual deviations. Any divergence is a false-confidence
+ * failure: "11/11 GV pass" would mean "tests pass on wrong config, real game diverges
+ * from C# golden vectors."
+ *
+ * Pocket corners: not a tautology of constants.ts — locked against
+ * tests/fixtures/unity-scene-truth.json (portActualPositions + knownDiscrepancies.cornerPocketShift).
  *
  * RED before G9: table-setup used BALL_MASS=10000 (MULTIPLIER). GREEN after: 1700.
  */
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, it, expect } from 'vitest';
 import { CmVector } from '../../physics/cm-vector';
 import {
@@ -24,6 +30,20 @@ import {
   PHYSICS_MULTIPLIER, MIN_TS, MAX_TS, PRECISION, MIN_SQR_VELOCITY, C_COUNT,
 } from '../../physics/constants';
 import { createPoolTable } from '../../game/table-setup';
+
+/** Ground-truth artifact: Unity lineage + CEO portActual (not derived from constants.ts). */
+const SCENE_TRUTH = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../tests/fixtures/unity-scene-truth.json'), 'utf-8'),
+) as {
+  pockets: {
+    unityTruePositions: Array<{ id: number; x: number; z: number }>;
+    portActualPositions: {
+      decision: string;
+      values: Array<{ id: number; x: number; z: number }>;
+    };
+  };
+  knownDiscrepancies: Array<{ id: string; status: string; currentPort: string; unityTrue: string }>;
+};
 
 describe('G9: physics constants — single source of truth', () => {
   it('authoritative BALL_MASS == 1700 (Game.unity 0.17 kg × 10000)', () => {
@@ -186,26 +206,57 @@ describe('G9: pocket geometry — POCKET_RADIUS and all 6 POCKET_POSITIONS', () 
     expect(POCKET_POSITIONS).toHaveLength(6);
   });
 
-  // Corner pockets (4): unityTrue from KinematicTrigger in _Game/Scenes/Game.unity
-  // Previous (±12875,±6510) was fabricated (zero Unity source); corrected to unityTrue.
-  it('POCKET_POSITIONS[0] == [12949,  6549] (corner +x +z — unityTrue)', () => {
-    expect(POCKET_POSITIONS[0]).toEqual([12949,  6549]);
+  // Corner pockets (4): portActual per CEO decision 3fa92431 "physics follows model".
+  // Lineage: Unity KinematicTrigger was (±12949,±6549); radial +25mm → (±13110,±6740)
+  // to match TurboSquid 9ft model visible pocket centers (卡卡西 1px=1mm render measure).
+  // Ground-truth trace: tests/fixtures/unity-scene-truth.json
+  //   pockets.unityTruePositions vs pockets.portActualPositions + knownDiscrepancies.cornerPocketShift.
+  // NOT a tautology snapshot of constants.ts — these are the CEO-locked portActual numbers.
+  it('POCKET_POSITIONS[0] == [13110,  6740] (corner +x +z — portActual 3fa92431)', () => {
+    expect(POCKET_POSITIONS[0]).toEqual([13110,  6740]);
   });
-  it('POCKET_POSITIONS[1] == [12949, -6549] (corner +x -z — unityTrue)', () => {
-    expect(POCKET_POSITIONS[1]).toEqual([12949, -6549]);
+  it('POCKET_POSITIONS[1] == [13110, -6740] (corner +x -z — portActual 3fa92431)', () => {
+    expect(POCKET_POSITIONS[1]).toEqual([13110, -6740]);
   });
-  it('POCKET_POSITIONS[2] == [-12949,  6549] (corner -x +z — unityTrue)', () => {
-    expect(POCKET_POSITIONS[2]).toEqual([-12949,  6549]);
+  it('POCKET_POSITIONS[2] == [-13110,  6740] (corner -x +z — portActual 3fa92431)', () => {
+    expect(POCKET_POSITIONS[2]).toEqual([-13110,  6740]);
   });
-  it('POCKET_POSITIONS[3] == [-12949, -6549] (corner -x -z — unityTrue)', () => {
-    expect(POCKET_POSITIONS[3]).toEqual([-12949, -6549]);
+  it('POCKET_POSITIONS[3] == [-13110, -6740] (corner -x -z — portActual 3fa92431)', () => {
+    expect(POCKET_POSITIONS[3]).toEqual([-13110, -6740]);
   });
-  // Side pockets (2): unityTrue from KinematicTrigger; previous (0,±7100) was fabricated.
+  // Side pockets (2): still unityTrue from KinematicTrigger; previous (0,±7100) was fabricated.
   it('POCKET_POSITIONS[4] == [0, 7129] (side +z — unityTrue)', () => {
     expect(POCKET_POSITIONS[4]).toEqual([0, 7129]);
   });
   it('POCKET_POSITIONS[5] == [0, -7129] (side -z — unityTrue)', () => {
     expect(POCKET_POSITIONS[5]).toEqual([0, -7129]);
+  });
+
+  // Non-tautology lock: constants.ts must equal the ground-truth artifact's portActual,
+  // and must NOT silently drift back to Unity-true corners.
+  it('POCKET_POSITIONS matches unity-scene-truth.json portActualPositions (ground-truth, not self-snapshot)', () => {
+    const port = SCENE_TRUTH.pockets.portActualPositions;
+    expect(port.decision).toBe('3fa92431');
+    expect(port.values).toHaveLength(6);
+    for (let i = 0; i < 6; i++) {
+      expect(POCKET_POSITIONS[i]).toEqual([port.values[i].x, port.values[i].z]);
+    }
+  });
+
+  it('unityTrue corner lineage preserved as (±12949,±6549) — documents intentional deviation', () => {
+    // Index mapping in unityTruePositions uses labels (foot/head), not the same order as
+    // POCKET_POSITIONS; assert the set of |x|,|z| corner pairs remains Unity source.
+    const corners = SCENE_TRUTH.pockets.unityTruePositions.filter((p) => p.x !== 0);
+    expect(corners).toHaveLength(4);
+    for (const c of corners) {
+      expect(Math.abs(c.x)).toBe(12949);
+      expect(Math.abs(c.z)).toBe(6549);
+    }
+    const disc = SCENE_TRUTH.knownDiscrepancies.find((d) => d.id === 'cornerPocketShift');
+    expect(disc).toBeDefined();
+    expect(disc!.status).toBe('intentional-decided');
+    expect(disc!.currentPort).toContain('13110');
+    expect(disc!.unityTrue).toContain('12949');
   });
 });
 
