@@ -19,7 +19,7 @@
         right: max(4px, env(safe-area-inset-right, 0px)) !important;
       }
 
-      /* SP-Harden-3: short landscape — shrink chrome so HUD/power don't crush felt */
+      /* SP-Harden-3 / 3b: short landscape — shrink chrome; enlarge side legends */
       @media screen and (orientation: landscape) and (max-height: 440px) {
         .power-slider-overlay {
           transform: translateY(-50%) scale(0.82) !important;
@@ -28,6 +28,11 @@
         .spin-disc-overlay {
           transform: translateY(-50%) scale(0.82) !important;
           transform-origin: left center !important;
+        }
+        /* Counter scale-down: keep POWER/SPIN readable at 390px height */
+        .hud-side-label {
+          font-size: 14px !important;
+          letter-spacing: 2px !important;
         }
         #player-ball-hud {
           padding-top: 2px !important;

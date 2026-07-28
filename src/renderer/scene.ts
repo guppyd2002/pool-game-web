@@ -10,6 +10,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
 import { makeBallMaterial } from './ball-materials';
+import { getPlayView } from './camera-tween';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -84,11 +85,14 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
 
-  // Perspective camera — 45° overhead view (default / play mode)
-  const aspect = (container.clientWidth || window.innerWidth) / (container.clientHeight || window.innerHeight);
-  const camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 50);
-  camera.position.set(0, 2.5, 1.8);
-  camera.lookAt(0, 0, 0);
+  // Perspective camera — play view (SP-Harden-3b: short-landscape pulls back)
+  const initW = container.clientWidth || window.innerWidth;
+  const initH = container.clientHeight || window.innerHeight;
+  const aspect = initW / Math.max(1, initH);
+  const initView = getPlayView(initW, initH);
+  const camera = new THREE.PerspectiveCamera(initView.fov, aspect, 0.1, 50);
+  camera.position.set(...initView.pose.position);
+  camera.lookAt(...initView.pose.lookAt);
 
   // Orthographic camera — strict top-down view for 'T' mode
   // up=(0,0,-1): -Z is screen-up, avoids degenerate lookAt along -Y with default up=(0,1,0).
@@ -224,9 +228,20 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const onResize = () => {
     const w = container.clientWidth || window.innerWidth;
     const h = container.clientHeight || window.innerHeight;
-    const asp = w / h;
-    // Update perspective camera aspect
+    const asp = w / Math.max(1, h);
+    // SP-Harden-3b: reframe perspective play view on short landscape so corners
+    // aren't clipped by top HUD / bottom pill (only when not mid-orbit away from play).
+    const view = getPlayView(w, h);
+    camera.fov = view.fov;
     camera.aspect = asp;
+    // Re-apply play pose only when orbit target is still table centre (user hasn't
+    // panned away). Avoid fighting free orbit exploration.
+    const tgt = controls.target;
+    if (Math.hypot(tgt.x, tgt.z) < 0.15) {
+      camera.position.set(...view.pose.position);
+      camera.lookAt(...view.pose.lookAt);
+      controls.target.set(0, 0, 0);
+    }
     camera.updateProjectionMatrix();
     // Update ortho frustum so table still fills view after resize
     const [l, r, t, b] = orthoFrustum(asp);

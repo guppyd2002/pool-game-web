@@ -17,11 +17,43 @@ export const POSE_OVERVIEW: CameraPose = {
   lookAt: [0, 0, 0],
 };
 
-/** In-game — standard table view matching scene.ts camera init. */
+/** In-game — desktop / tall viewport table view (matches historical scene.ts init). */
 export const POSE_TABLE: CameraPose = {
   position: [0, 2.5, 1.8],
   lookAt: [0, 0, 0],
 };
+
+/**
+ * SP-Harden-3b: short-landscape play pose — pull back so all 6 pockets stay in
+ * the visible band between top HUD (~56px) and bottom tutorial pill on ~390px height.
+ * Used by scene.ts + start-game tween when viewport is short/wide.
+ */
+export const POSE_TABLE_MOBILE: CameraPose = {
+  position: [0, 3.65, 2.55],
+  lookAt: [0, 0, 0],
+};
+
+/** FOV (deg) paired with POSE_TABLE / POSE_TABLE_MOBILE. */
+export const FOV_TABLE = 50;
+export const FOV_TABLE_MOBILE = 44;
+
+/**
+ * Pick play pose + FOV for current viewport.
+ * Short landscape (e.g. iPhone 844×390): mobile pose. Otherwise desktop.
+ */
+export function getPlayView(
+  viewportW: number,
+  viewportH: number,
+): { pose: CameraPose; fov: number } {
+  const aspect = viewportW / Math.max(1, viewportH);
+  // 390–440px height landscape phones; also wide aspect with short height.
+  const shortLandscape =
+    viewportH <= 440 || (aspect >= 1.85 && viewportH <= 520);
+  if (shortLandscape) {
+    return { pose: POSE_TABLE_MOBILE, fov: FOV_TABLE_MOBILE };
+  }
+  return { pose: POSE_TABLE, fov: FOV_TABLE };
+}
 
 // POSE_TOP removed: 'T' key now uses scene.setOrthoTop() — strict OrthographicCamera
 // looking straight down. No perspective hack needed (z=0.3 gimbal workaround gone).

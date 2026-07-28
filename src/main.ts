@@ -45,7 +45,7 @@ import { createBallTrail } from './game/ball-trail';
 import { createReasonBanner } from './renderer/reason-banner';
 import { createGameOverUI } from './renderer/game-over-ui';
 import { REASON_MESSAGES } from './game/game-play-reason';
-import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
+import { createCameraTween, POSE_OVERVIEW, getPlayView } from './renderer/camera-tween';
 import { createTurnPrompt } from './renderer/turn-prompt';
 import { createHudBar } from './renderer/hud-bar';
 import { createPlayerBallHud } from './renderer/player-ball-hud';
@@ -379,7 +379,13 @@ function _toggleView(): void {
     scene.setOrthoTop(true);
   } else {
     scene.setOrthoTop(false);
-    cameraTween.tweenTo(POSE_TABLE, 0);
+    // SP-Harden-3b: restore viewport-aware play pose (not fixed desktop pose).
+    const vw = container.clientWidth || window.innerWidth;
+    const vh = container.clientHeight || window.innerHeight;
+    const { pose, fov } = getPlayView(vw, vh);
+    scene.camera.fov = fov;
+    scene.camera.updateProjectionMatrix();
+    cameraTween.tweenTo(pose, 0);
   }
   hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
 }

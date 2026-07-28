@@ -59,9 +59,10 @@ export function createPowerSliderUI(
 
   // Explicit legend — Kakashi smoke: unlabeled right strip was mistaken for spin.
   const label = document.createElement('div');
+  label.className = 'hud-side-label';
   label.textContent = 'POWER';
   label.style.cssText = [
-    'color:rgba(255,255,255,0.85)', 'font-size:10px', 'font-family:sans-serif',
+    'color:rgba(255,255,255,0.92)', 'font-size:11px', 'font-family:sans-serif',
     'font-weight:bold', 'letter-spacing:1.5px', 'pointer-events:none',
     'text-shadow:0 1px 3px rgba(0,0,0,0.9)',
   ].join(';');
