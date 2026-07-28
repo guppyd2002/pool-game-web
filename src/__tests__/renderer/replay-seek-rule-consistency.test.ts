@@ -321,9 +321,12 @@ function playShots(session: IGameSession, physics: IBallPoolPhysics, shots: Reco
 
 // ─── Tests ─────────────────────────────────────────────────────────────────────
 
-// Deterministic game that actually REACHES game-over (~24 shots) — needed so the
+// Deterministic game that actually REACHES game-over — needed so the
 // playAgain path has a real GameOver to reset from, and gives ample seek endpoints.
-const SEED = 10000, RANK0 = 7, RANK1 = 7, RANK_LAST = 10;
+// SP-Harden-7b: SEED=10000 under rank 7v7 no longer ends after 3fa92431 pocket shift
+// (cap-hit 200). Probed completers include 100(~24 shots), 1000, 12345, … Keep ranks;
+// only reconcile seed to ground truth (same method as SP-Harden-7). Do not hack AI.
+const SEED = 100, RANK0 = 7, RANK1 = 7, RANK_LAST = 10;
 function genGame(): { shots: RecordedShot[]; ended: boolean } {
   return generateGame(SEED, RANK0, RANK1, RANK_LAST);
 }
