@@ -13,6 +13,9 @@ import {
   nearestPocketAlongTarget,
   SEPARATION_LINE_DEFAULT_LENGTH,
   POCKET_HIGHLIGHT_RADIUS,
+  ASSIST_COLOR_LEGAL,
+  ASSIST_COLOR_OUTLINE,
+  GHOST_FILL_OPACITY,
 } from '../../renderer/ghost-ball';
 import { BALL_RADIUS, BALL_Y, POCKET_POSITIONS } from '../../physics/constants';
 import { MULTIPLIER } from '../../physics/fixed-math';
@@ -210,6 +213,20 @@ describe('SEPARATION_LINE_DEFAULT_LENGTH — Unity lineDistance', () => {
   it('equals Unity CueCalculateManager.lineDistance = 0.25m (SP-Harden-5)', () => {
     // Was incorrectly 0.8 (3.2× too long). Spec + visual-spec-audit.
     expect(SEPARATION_LINE_DEFAULT_LENGTH).toBe(0.25);
+  });
+});
+
+describe('SP-Harden-8 ghost contrast', () => {
+  it('legal fill is not pure white (readable on light object balls)', () => {
+    expect(ASSIST_COLOR_LEGAL).not.toBe(0xffffff);
+  });
+
+  it('dark outline colour is near-black', () => {
+    expect(ASSIST_COLOR_OUTLINE).toBeLessThan(0x222222);
+  });
+
+  it('fill opacity is stronger than the old 0.45 blend-away value', () => {
+    expect(GHOST_FILL_OPACITY).toBeGreaterThan(0.45);
   });
 });
 

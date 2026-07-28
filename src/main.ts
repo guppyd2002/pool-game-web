@@ -313,7 +313,8 @@ loadReplayInput.addEventListener('change', () => {
     powerSliderUI.element.style.display = 'none';  // M-1: no power bar during replay
     fineAdjustBar.element.style.display = 'none';
     spinDiscUI.element.style.display = 'none';
-    replayHUD.start(gameSession, physics, scene, shots);
+    // SP-Harden-8: keep 7-slot HUD in sync during replay (no aim-driven refresh).
+    replayHUD.start(gameSession, physics, scene, shots, _refreshBallHud);
   };
   reader.readAsText(file);
   // Reset so the same file can be re-loaded
@@ -470,7 +471,11 @@ if (_demoConfig) {
     gameSeed: _demoConfig.seed,
   };
   const { driver: _recDriver, record: _recRecord } = createRecordDriver(_recConfig);
-  gameSession.onShotFired = (s) => _recDriver.onShotFired(s);
+  // SP-Harden-8: refresh group HUD after every settled shot (AI demo has no aim events).
+  gameSession.onShotFired = (s) => {
+    _refreshBallHud();
+    _recDriver.onShotFired(s);
+  };
 
   // Override onGameEnded to finalize recording and expose download button
   const _prevDemoGameEnded = gameSession.onGameEnded;
@@ -496,6 +501,7 @@ if (_demoConfig) {
   _inTopView = true;
   scene.setOrthoTop(true);
   gameSession.startNewGame();
+  _refreshBallHud(); // open-table empty rows at demo start
 } else {
   // Normal HotSeat mode: human-controlled turn changes
   gameSession.onTurnChanged = (playerIndex, isBallInHand) => {

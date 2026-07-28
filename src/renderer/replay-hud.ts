@@ -29,12 +29,15 @@ export interface ReplayHUD {
   /**
    * Enter replay mode. Resets the session to initial state and begins in paused state.
    * Overrides session.onTurnChanged — caller must not set it after calling start().
+   * @param onTurnRefresh Optional SP-Harden-8 hook: refresh external HUD (e.g. 7-slot
+   *   ball row) after each turn / seek settles — demo/replay have no aim-driven refresh.
    */
   start(
     session: IGameSession,
     physics: IBallPoolPhysics,
     scene: SceneAPI,
     shots: RecordedShot[],
+    onTurnRefresh?: () => void,
   ): void;
   dispose(): void;
 }
@@ -240,7 +243,7 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
   return {
     get element() { return el; },
 
-    start(session, physics, scene, shots): void {
+    start(session, physics, scene, shots, onTurnRefresh): void {
       _session = session;
       _physics = physics;
       _scene = scene;
@@ -253,7 +256,9 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
 
       // Wire onTurnChanged: update UI and schedule next shot if playing.
       // Must be set BEFORE _seekTo(0) restores it.
+      // SP-Harden-8: also refresh group HUD (no human aim events in replay).
       session.onTurnChanged = (_pi, _bih) => {
+        onTurnRefresh?.();
         _updateUI();
         if (_playing && _nextIdx < _shots.length) _scheduleNext();
       };
@@ -261,6 +266,7 @@ export function createReplayHUD(container: HTMLElement): ReplayHUD {
       // Reset to initial rack in paused mode.  _seekTo suppresses callbacks during
       // startNewGame so the turn-change handler doesn't fire prematurely.
       _seekTo(0);
+      onTurnRefresh?.(); // initial empty / open-table row after seek-0
     },
 
     dispose(): void {

@@ -29,12 +29,22 @@ import type { CmVector } from '../physics/cm-vector';
  */
 export const SEPARATION_LINE_DEFAULT_LENGTH = 0.25;
 
-/** Ghost / assist line colours — Unity white legal / red illegal. */
-export const ASSIST_COLOR_LEGAL   = 0xffffff;
+/**
+ * Ghost / assist line colours.
+ * SP-Harden-8: legal was pure white 0xffffff @ opacity 0.45 — blends into light
+ * object balls. Use cool cyan fill + dark shell outline for stack contrast.
+ */
+export const ASSIST_COLOR_LEGAL   = 0x7ec8ff; // cyan-white (readable on yellow/cream balls)
 export const ASSIST_COLOR_ILLEGAL = 0xff3333;
+/** Dark outline shell so ghost silhouette pops on any ball colour. */
+export const ASSIST_COLOR_OUTLINE = 0x0a0a12;
 
 /** Fat-line width (CSS px) so target line-of-centers is visible on mobile. */
 const ASSIST_LINE_WIDTH = 3.0;
+/** Ghost fill opacity (was 0.45 pure white — too faint in ball stacks). */
+export const GHOST_FILL_OPACITY = 0.55;
+/** Slightly larger than R so the outline reads as a rim, not a second ball. */
+const GHOST_OUTLINE_SCALE = 1.08;
 
 const M = MULTIPLIER;
 const R = BALL_RADIUS / M;  // 0.0285m
@@ -170,17 +180,30 @@ function _makeFatLine(color: number): { line: Line2; geo: LineGeometry; mat: Lin
 }
 
 export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
-  // Ghost sphere mesh (semi-transparent silhouette at contact point)
+  // Ghost fill (cyan-white) + dark back-face outline for contrast in light ball stacks.
   const sphereGeo = new THREE.SphereGeometry(R, 16, 12);
   const sphereMat = new THREE.MeshBasicMaterial({
     color: ASSIST_COLOR_LEGAL,
     transparent: true,
-    opacity: 0.45,
+    opacity: GHOST_FILL_OPACITY,
     depthWrite: false,
   });
   const sphere = new THREE.Mesh(sphereGeo, sphereMat);
   sphere.visible = false;
   scene.add(sphere);
+
+  // Outline shell: slightly larger, rendered from inside so only the rim shows.
+  const outlineGeo = new THREE.SphereGeometry(R * GHOST_OUTLINE_SCALE, 16, 12);
+  const outlineMat = new THREE.MeshBasicMaterial({
+    color: ASSIST_COLOR_OUTLINE,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+  const outline = new THREE.Mesh(outlineGeo, outlineMat);
+  outline.visible = false;
+  scene.add(outline);
 
   // Two fat Line2 arms: cue-deflect + target line-of-centers
   const deflect = _makeFatLine(ASSIST_COLOR_LEGAL);
@@ -197,7 +220,7 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
   const pocketMat = new THREE.MeshBasicMaterial({
     color: ASSIST_COLOR_LEGAL,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.65,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
@@ -209,6 +232,8 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
   function _setColor(legal: boolean): void {
     const c = legal ? ASSIST_COLOR_LEGAL : ASSIST_COLOR_ILLEGAL;
     sphereMat.color.setHex(c);
+    // Outline stays near-black for both states (rim reads on red fill too).
+    outlineMat.color.setHex(ASSIST_COLOR_OUTLINE);
     deflect.mat.color.setHex(c);
     target.mat.color.setHex(c);
     pocketMat.color.setHex(c);
@@ -225,6 +250,7 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
     update(cueBallPos: CmVector, hit: AimHit | null, powerFraction = 1, isLegal = true): void {
       if (!hit || hit.hitType === 'none') {
         sphere.visible = false;
+        outline.visible = false;
         deflect.line.visible = false;
         target.line.visible = false;
         pocketRing.visible = false;
@@ -235,8 +261,10 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
 
       const g = ghostCenter(hit);
       sphere.position.set(g.x, g.y, g.z);
+      outline.position.set(g.x, g.y, g.z);
       // Show ghost for both ball and cushion hits (Unity hitSphere always at contact)
       sphere.visible = true;
+      outline.visible = true;
 
       const linePts = computeSeparationLines(
         cueBallPos, hit,
@@ -280,11 +308,14 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
     dispose(): void {
       window.removeEventListener('resize', _onResize);
       scene.remove(sphere);
+      scene.remove(outline);
       scene.remove(deflect.line);
       scene.remove(target.line);
       scene.remove(pocketRing);
       sphereGeo.dispose();
       sphereMat.dispose();
+      outlineGeo.dispose();
+      outlineMat.dispose();
       deflect.geo.dispose();
       deflect.mat.dispose();
       target.geo.dispose();
