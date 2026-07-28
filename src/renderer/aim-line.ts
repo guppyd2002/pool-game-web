@@ -1,12 +1,11 @@
 /**
- * P1-T02: AimLine — visualises the predictAimLine result in Three.js.
+ * P1-T02 / SP-Harden-9: AimLine — cue-ball primary aim/travel guide (Unity hitLineBase).
  *
- * Pure functions (testable in Node):
- *   toWorld(v)             — CmVector Fixed → THREE.Vector3 float
- *   computeAimLinePoints() — CmVector + AimHit → polyline points
+ * CEO feedback (SP-Harden-9 fix): the TEMP slider must control THIS line (cue → aim
+ * direction, extendable past contact), NOT post-contact ghost separation arms
+ * (lineDistance / line-of-centers). Those stay at SEPARATION_LINE_DEFAULT_LENGTH.
  *
- * Three.js wrapper (browser only):
- *   createAimLine(scene)   — creates/updates/disposes the THREE.Line object
+ * Pure helpers are unit-tested; Three.js Line2 wrapper is browser-only.
  */
 
 import * as THREE from 'three';
@@ -21,46 +20,81 @@ export function toWorld(v: CmVector): THREE.Vector3 {
 }
 
 /**
- * Compute the polyline points for the aim line (Unity base line).
+ * Default length (m) of the cue aim/travel guide along aim direction @ full display.
+ * Not Unity lineDistance (0.25 = post-contact arms). Table long axis is 2.54 m;
+ * 1.5 m is a useful default so the guide extends past typical first contact.
+ */
+export const DEFAULT_CUE_AIM_GUIDE_LENGTH_M = 1.5;
+
+/** Live cue aim-guide length (meters). Mutable for TEMP CEO slider. */
+let _cueAimGuideLengthM = DEFAULT_CUE_AIM_GUIDE_LENGTH_M;
+
+export function getCueAimGuideLengthM(): number {
+  return _cueAimGuideLengthM;
+}
+
+/** Set cue aim-guide length in meters (clamped 0.10–3.00). Returns applied value. */
+export function setCueAimGuideLengthM(m: number): number {
+  _cueAimGuideLengthM = Math.max(0.1, Math.min(3.0, m));
+  return _cueAimGuideLengthM;
+}
+
+/**
+ * Compute polyline for the cue primary aim guide (hitLineBase family).
  *
- * Returns:
- *   'none'             → [cueBallPos, hitPoint]
- *   'ball'             → [cueBallPos, ghostCenter]  (母球→ghost 前緣, not contact point)
- *   'cushion' (normal) → [cueBallPos, hitPoint, bounce]
- *
- * Bounce length default = Unity lineDistance 0.25 (was 0.5 — SP-Harden-5).
- * Ball branch ends at ghost so base line meets the separation T at ghost center.
+ * Ball / none: [cue, cue + aimDir * guideLength] — length is independent of
+ * first-contact distance so CEO can pull the guide past the object ball.
+ * Cushion: [cue, contact, bounceEnd] — bounce segment uses bounceLength.
  */
 export function computeAimLinePoints(
   cueBallPos: CmVector,
   hit: AimHit,
+  guideLength: number = _cueAimGuideLengthM,
   bounceLength = 0.25,
 ): THREE.Vector3[] {
   const from = toWorld(cueBallPos);
 
-  // Ball hit: base line ends at ghost center (Point + Normal*R), not contact point.
+  // Aim direction: toward ghost (ball) or contact point (cushion/none).
+  let aimTarget: THREE.Vector3;
   if (hit.hitType === 'ball') {
     const g = ghostCenter(hit);
-    return [from, new THREE.Vector3(g.x, g.y, g.z)];
+    aimTarget = new THREE.Vector3(g.x, g.y, g.z);
+  } else {
+    aimTarget = toWorld(hit.point);
   }
 
-  const to = toWorld(hit.point);
+  const dir = new THREE.Vector3(
+    aimTarget.x - from.x,
+    0,
+    aimTarget.z - from.z,
+  );
+  const dlen = dir.length();
+  if (dlen < 1e-9) {
+    return [from, from.clone()];
+  }
+  dir.multiplyScalar(1 / dlen);
+
+  const guideEnd = from.clone().add(dir.clone().multiplyScalar(guideLength));
 
   if (hit.hitType === 'cushion') {
-    const norm = toWorld(hit.normal).normalize();
-    if (norm.lengthSq() > 0) {
-      const inc = to.clone().sub(from).normalize();
-      const ref = inc.reflect(norm);
+    const to = toWorld(hit.point);
+    const norm = toWorld(hit.normal);
+    norm.y = 0;
+    if (norm.lengthSq() > 1e-12) {
+      norm.normalize();
+      // Bounce from contact along optical reflection of aim dir.
+      const inc = dir.clone();
+      const ref = inc.clone().reflect(norm);
       return [from, to, to.clone().add(ref.multiplyScalar(bounceLength))];
     }
+    return [from, to];
   }
 
-  return [from, to];
+  // Ball / open-path: extendable guide (may pass through / past contact).
+  return [from, guideEnd];
 }
 
 // ─── Three.js wrapper (browser) ───────────────────────────────────────────────
-// Uses Line2 (fat-line addon) so linewidth > 1 works on WebGL (standard
-// THREE.LineBasicMaterial ignores linewidth due to the WebGL spec limit of 1px).
 
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
@@ -69,8 +103,8 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 /** Aim line width in CSS pixels (applies on all WebGL devices including mobile). */
 const AIM_LINE_WIDTH = 2.5;
 
-/** Unity legal white / illegal red for base aim line (SP-Harden-5). */
-const AIM_COLOR_LEGAL   = 0xffffff;
+/** Legal cyan-blue guide (CEO "blue line"); illegal red. */
+const AIM_COLOR_LEGAL   = 0x4db8ff;
 const AIM_COLOR_ILLEGAL = 0xff3333;
 
 export interface AimLineVisual {
@@ -85,15 +119,13 @@ export interface AimLineVisual {
 export function createAimLine(scene: THREE.Scene): AimLineVisual {
   const mat = new LineMaterial({
     color: AIM_COLOR_LEGAL,
-    opacity: 0.85,
+    opacity: 0.95,
     transparent: true,
     linewidth: AIM_LINE_WIDTH,
-    // resolution must match the renderer pixel size for correct width
     resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
   });
 
   const geo = new LineGeometry();
-  // LineGeometry requires at least 2 points; initialise with a degenerate pair.
   geo.setPositions([0, 0, 0, 0, 0, 0]);
 
   const line = new Line2(geo, mat);
@@ -101,7 +133,6 @@ export function createAimLine(scene: THREE.Scene): AimLineVisual {
   line.visible = false;
   scene.add(line);
 
-  // Keep LineMaterial resolution in sync so line width stays physically correct.
   function _onResize(): void {
     mat.resolution.set(window.innerWidth, window.innerHeight);
   }
@@ -115,7 +146,6 @@ export function createAimLine(scene: THREE.Scene): AimLineVisual {
         return;
       }
       mat.color.setHex(isLegal ? AIM_COLOR_LEGAL : AIM_COLOR_ILLEGAL);
-      // LineGeometry.setPositions expects a flat [x,y,z, x,y,z, …] array.
       geo.setPositions(pts.flatMap(p => [p.x, p.y, p.z]));
       line.computeLineDistances();
       line.visible = true;

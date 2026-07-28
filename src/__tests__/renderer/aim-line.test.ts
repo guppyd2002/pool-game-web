@@ -81,33 +81,48 @@ describe("computeAimLinePoints — hitType 'none'", () => {
     expect(pts[0].z).toBeCloseTo(0, 6);
   });
 
-  it('second point is hit.point converted to world', () => {
+  it('second point is guideLength along aim dir (not hard-locked to hit.point)', () => {
     const hit = makeHit('none', 120000, BALL_Y, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit);
-    expect(pts[1].x).toBeCloseTo(12, 6);  // 120000 / 10000
+    const pts = computeAimLinePoints(CUE_POS, hit, 1.5);
+    // hit is at x=12 but guide ends at 1.5 m along +x
+    expect(pts[1].x).toBeCloseTo(1.5, 4);
     expect(pts[1].z).toBeCloseTo(0, 6);
   });
 });
 
 // ─── computeAimLinePoints — 'ball' ────────────────────────────────────────────
 
-describe("computeAimLinePoints — hitType 'ball' (base line → ghost)", () => {
+describe("computeAimLinePoints — hitType 'ball' (cue aim guide, extendable)", () => {
   it('returns exactly 2 points (no reflection for ball hit)', () => {
-    const hit = makeHit('ball', 50000, BALL_Y, 0);
-    expect(computeAimLinePoints(CUE_POS, hit)).toHaveLength(2);
+    const hit = makeHit('ball', 50000, BALL_Y, 0, -MULTIPLIER, 0, 0);
+    expect(computeAimLinePoints(CUE_POS, hit, 1.0)).toHaveLength(2);
   });
 
-  it('line goes from cue ball to ghost center (Point + Normal*R), not bare contact', () => {
-    // Contact at x=0.5-R, normal -x → ghost at 0.5-2R (SP-Harden-5 base line)
+  it('extends along aim dir by guideLength (can pass ghost/contact) — SP-Harden-9', () => {
+    // Ghost along +x; guideLength 1.0 m → end at x≈1.0 regardless of ghost distance
     const R = 285 / MULTIPLIER;
     const hit = makeHit(
       'ball',
       Math.round((0.5 - R) * MULTIPLIER), BALL_Y, 0,
       -MULTIPLIER, 0, 0,
     );
-    const pts = computeAimLinePoints(CUE_POS, hit);
+    const pts = computeAimLinePoints(CUE_POS, hit, 1.0);
     expect(pts[0].x).toBeCloseTo(0, 6);
-    expect(pts[1].x).toBeCloseTo(0.5 - 2 * R, 4);
+    expect(pts[1].x).toBeCloseTo(1.0, 4);
+    expect(pts[1].z).toBeCloseTo(0, 4);
+  });
+
+  it('longer guideLength extends further past contact', () => {
+    const R = 285 / MULTIPLIER;
+    const hit = makeHit(
+      'ball',
+      Math.round((0.5 - R) * MULTIPLIER), BALL_Y, 0,
+      -MULTIPLIER, 0, 0,
+    );
+    const short = computeAimLinePoints(CUE_POS, hit, 0.5);
+    const long = computeAimLinePoints(CUE_POS, hit, 2.0);
+    expect(long[1].x).toBeGreaterThan(short[1].x);
+    expect(long[1].x).toBeCloseTo(2.0, 4);
   });
 });
 
@@ -144,18 +159,19 @@ describe("computeAimLinePoints — hitType 'cushion'", () => {
     expect(bounceDir.z).toBeGreaterThan(0); // z preserved
   });
 
-  it('bounceLength controls the length of the reflection segment', () => {
+  it('bounceLength (4th arg) controls the length of the reflection segment', () => {
     const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const pts05 = computeAimLinePoints(CUE_POS, hit, 0.5);
-    const pts10 = computeAimLinePoints(CUE_POS, hit, 1.0);
+    const pts05 = computeAimLinePoints(CUE_POS, hit, 1.5, 0.5);
+    const pts10 = computeAimLinePoints(CUE_POS, hit, 1.5, 1.0);
     const len05 = pts05[2].distanceTo(pts05[1]);
     const len10 = pts10[2].distanceTo(pts10[1]);
     expect(len10).toBeCloseTo(len05 * 2, 4);
   });
 
-  it('default bounceLength equals Unity lineDistance 0.25m (SP-Harden-5)', () => {
+  it('default bounceLength is 0.25m on cushion reflection segment', () => {
     const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit);  // default bounceLength=0.25
+    // guideLength unused for cushion bounce arm; bounce defaults 0.25
+    const pts = computeAimLinePoints(CUE_POS, hit, 1.5);
     const len = pts[2].distanceTo(pts[1]);
     expect(len).toBeCloseTo(0.25, 4);
   });

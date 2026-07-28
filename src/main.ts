@@ -22,7 +22,8 @@ import { createCueAdapter } from './game/cue-adapter';
 import { createAimLine } from './renderer/aim-line';
 import { createPowerBar } from './renderer/power-bar';
 import { createCueMesh } from './renderer/cue-mesh';
-import { createGhostBall, getAimLineDistanceM, setAimLineDistanceM } from './renderer/ghost-ball';
+import { createGhostBall } from './renderer/ghost-ball';
+import { getCueAimGuideLengthM, setCueAimGuideLengthM } from './renderer/aim-line';
 import { createAimLengthDebugUI } from './renderer/aim-length-debug-ui';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
@@ -634,7 +635,7 @@ window.addEventListener('beforeunload', () => {
   gameSession,
   cue,  // exposes getAimState() for overlay hitTest guard smoke test
   toggleColliders: () => scene.toggleColliders?.(),  // show/hide physics boundary overlay
-  // SP-Harden-9 TEMP — CEO live-tunes aim assist length
-  getAimLineDistanceM,
-  setAimLineDistanceM,
+  // SP-Harden-9 TEMP — CEO live-tunes CUE aim guide (blue line) length
+  getCueAimGuideLengthM,
+  setCueAimGuideLengthM,
 };
