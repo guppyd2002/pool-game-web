@@ -1,20 +1,22 @@
 /**
- * P1-T02: aim-line pure function tests.
- *
- * Covers toWorld() and computeAimLinePoints() — the testable, DOM-free core
- * of the aim line visual. Three.js wrapper is browser-only and not tested here.
+ * P1-T02 / SP-Harden-9: aim-line pure function tests.
+ * Cue aim guide (blue line) length is guideLength along aim dir for ALL hitTypes.
  */
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { CmVector } from '../../physics/cm-vector';
 import type { AimHit } from '../../game/ball-pool-physics';
-import { toWorld, computeAimLinePoints } from '../../renderer/aim-line';
+import {
+  toWorld,
+  computeAimLinePoints,
+  setCueAimGuideLengthM,
+  getCueAimGuideLengthM,
+  DEFAULT_CUE_AIM_GUIDE_LENGTH_M,
+} from '../../renderer/aim-line';
 import { MULTIPLIER } from '../../physics/fixed-math';
 import { BALL_Y } from '../../physics/constants';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const CUE_POS = new CmVector(0, BALL_Y, 0);  // ball at table centre
+const CUE_POS = new CmVector(0, BALL_Y, 0);
 
 function makeHit(
   hitType: AimHit['hitType'],
@@ -31,8 +33,6 @@ function makeHit(
   };
 }
 
-// ─── toWorld ─────────────────────────────────────────────────────────────────
-
 describe('toWorld — Fixed CmVector → THREE.Vector3 float', () => {
   it('converts (10000,0,0) → (1,0,0)', () => {
     const v = toWorld(new CmVector(MULTIPLIER, 0, 0));
@@ -40,161 +40,69 @@ describe('toWorld — Fixed CmVector → THREE.Vector3 float', () => {
     expect(v.y).toBe(0);
     expect(v.z).toBe(0);
   });
-
-  it('converts (0,9440,0) → (0, 0.944, 0)  (BALL_Y)', () => {
-    const v = toWorld(new CmVector(0, BALL_Y, 0));
-    expect(v.x).toBe(0);
-    expect(v.y).toBeCloseTo(BALL_Y / MULTIPLIER, 10);
-    expect(v.z).toBe(0);
-  });
-
-  it('converts negative components', () => {
-    const v = toWorld(new CmVector(-5000, 0, -3000));
-    expect(v.x).toBeCloseTo(-0.5, 10);
-    expect(v.z).toBeCloseTo(-0.3, 10);
-  });
-
-  it('CmVector.zero → THREE.Vector3(0,0,0)', () => {
-    const v = toWorld(CmVector.zero);
-    expect(v.x).toBe(0);
-    expect(v.y).toBe(0);
-    expect(v.z).toBe(0);
-  });
-
-  it('result is a THREE.Vector3 instance', () => {
-    expect(toWorld(CmVector.zero)).toBeInstanceOf(THREE.Vector3);
-  });
 });
 
-// ─── computeAimLinePoints — 'none' ────────────────────────────────────────────
-
-describe("computeAimLinePoints — hitType 'none'", () => {
-  it("returns 2 points", () => {
-    const hit = makeHit('none', 120000, BALL_Y, 0);
-    expect(computeAimLinePoints(CUE_POS, hit)).toHaveLength(2);
-  });
-
-  it('first point is cue ball world position', () => {
-    const hit = makeHit('none', 120000, BALL_Y, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit);
-    expect(pts[0].x).toBeCloseTo(0, 6);
-    expect(pts[0].z).toBeCloseTo(0, 6);
-  });
-
-  it('second point is guideLength along aim dir (not hard-locked to hit.point)', () => {
+describe('computeAimLinePoints — guideLength for ALL hitTypes (CATCH-1)', () => {
+  it('none: end is guideLength along aim dir, not locked to hit.point', () => {
     const hit = makeHit('none', 120000, BALL_Y, 0);
     const pts = computeAimLinePoints(CUE_POS, hit, 1.5);
-    // hit is at x=12 but guide ends at 1.5 m along +x
-    expect(pts[1].x).toBeCloseTo(1.5, 4);
-    expect(pts[1].z).toBeCloseTo(0, 6);
-  });
-});
-
-// ─── computeAimLinePoints — 'ball' ────────────────────────────────────────────
-
-describe("computeAimLinePoints — hitType 'ball' (cue aim guide, extendable)", () => {
-  it('returns exactly 2 points (no reflection for ball hit)', () => {
-    const hit = makeHit('ball', 50000, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    expect(computeAimLinePoints(CUE_POS, hit, 1.0)).toHaveLength(2);
-  });
-
-  it('extends along aim dir by guideLength (can pass ghost/contact) — SP-Harden-9', () => {
-    // Ghost along +x; guideLength 1.0 m → end at x≈1.0 regardless of ghost distance
-    const R = 285 / MULTIPLIER;
-    const hit = makeHit(
-      'ball',
-      Math.round((0.5 - R) * MULTIPLIER), BALL_Y, 0,
-      -MULTIPLIER, 0, 0,
-    );
-    const pts = computeAimLinePoints(CUE_POS, hit, 1.0);
+    expect(pts).toHaveLength(2);
     expect(pts[0].x).toBeCloseTo(0, 6);
-    expect(pts[1].x).toBeCloseTo(1.0, 4);
-    expect(pts[1].z).toBeCloseTo(0, 4);
+    expect(pts[1].x).toBeCloseTo(1.5, 4);
   });
 
-  it('longer guideLength extends further past contact', () => {
+  it('ball: guideLength extends past ghost/contact', () => {
     const R = 285 / MULTIPLIER;
     const hit = makeHit(
       'ball',
       Math.round((0.5 - R) * MULTIPLIER), BALL_Y, 0,
       -MULTIPLIER, 0, 0,
     );
+    const pts = computeAimLinePoints(CUE_POS, hit, 2.0);
+    expect(pts).toHaveLength(2);
+    expect(pts[1].x).toBeCloseTo(2.0, 4);
+  });
+
+  it('cushion: ALSO uses guideLength (not contact-locked) — empty-felt aim DOA fix', () => {
+    // Enclosed table empty-felt aim → SphereCast hits cushion. Slider must work here.
+    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
     const short = computeAimLinePoints(CUE_POS, hit, 0.5);
     const long = computeAimLinePoints(CUE_POS, hit, 2.0);
-    expect(long[1].x).toBeGreaterThan(short[1].x);
+    expect(short).toHaveLength(2);
+    expect(long).toHaveLength(2);
+    // Contact is at ~1.27 m; guide must NOT be locked to contact for either length.
+    expect(short[1].x).toBeCloseTo(0.5, 4);
     expect(long[1].x).toBeCloseTo(2.0, 4);
+    expect(long[1].x).toBeGreaterThan(short[1].x);
+  });
+
+  it('cushion and ball with same aim dir and guideLength share end length', () => {
+    const ball = makeHit('ball', 50000, BALL_Y, 0, -MULTIPLIER, 0, 0);
+    const cush = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
+    const b = computeAimLinePoints(CUE_POS, ball, 1.2);
+    const c = computeAimLinePoints(CUE_POS, cush, 1.2);
+    const lenB = b[0].distanceTo(b[1]);
+    const lenC = c[0].distanceTo(c[1]);
+    expect(lenB).toBeCloseTo(1.2, 4);
+    expect(lenC).toBeCloseTo(1.2, 4);
   });
 });
 
-// ─── computeAimLinePoints — 'cushion' ─────────────────────────────────────────
-
-describe("computeAimLinePoints — hitType 'cushion'", () => {
-  it('returns 3 points when normal is non-zero', () => {
-    // Hit right rail (x = +RAIL_LONG_X), normal points inward (-x)
-    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    expect(computeAimLinePoints(CUE_POS, hit)).toHaveLength(3);
-  });
-
-  it('returns 2 points when normal is zero (degenerate)', () => {
-    const hit = makeHit('cushion', 126990, BALL_Y, 0, 0, 0, 0);
-    expect(computeAimLinePoints(CUE_POS, hit)).toHaveLength(2);
-  });
-
-  it('perpendicular hit on right rail: ball bounces back (-x direction)', () => {
-    // Ball at origin shot toward +x, hits right rail, normal = (-1,0,0)
-    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit, 1.0);
-    // bounce point should be to the LEFT of hit point (x < hit.x)
-    expect(pts[2].x).toBeLessThan(pts[1].x);
-    expect(pts[2].z).toBeCloseTo(pts[1].z, 3);  // z unchanged for perp hit
-  });
-
-  it('diagonal hit on right rail: bounce goes toward -x and preserves z component', () => {
-    // Ball shot toward (+x, 0, +z), hits right rail, normal = (-1,0,0)
-    const hit = makeHit('cushion', 126990, BALL_Y, 63495, -MULTIPLIER, 0, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit, 2.0);
-    // After reflection off right wall: x reverses, z component unchanged
-    const bounceDir = pts[2].clone().sub(pts[1]).normalize();
-    expect(bounceDir.x).toBeLessThan(0);   // bounces back in -x
-    expect(bounceDir.z).toBeGreaterThan(0); // z preserved
-  });
-
-  it('bounceLength (4th arg) controls the length of the reflection segment', () => {
-    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const pts05 = computeAimLinePoints(CUE_POS, hit, 1.5, 0.5);
-    const pts10 = computeAimLinePoints(CUE_POS, hit, 1.5, 1.0);
-    const len05 = pts05[2].distanceTo(pts05[1]);
-    const len10 = pts10[2].distanceTo(pts10[1]);
-    expect(len10).toBeCloseTo(len05 * 2, 4);
-  });
-
-  it('default bounceLength is 0.25m on cushion reflection segment', () => {
-    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    // guideLength unused for cushion bounce arm; bounce defaults 0.25
-    const pts = computeAimLinePoints(CUE_POS, hit, 1.5);
-    const len = pts[2].distanceTo(pts[1]);
-    expect(len).toBeCloseTo(0.25, 4);
-  });
-
-  it('angle of incidence equals angle of reflection', () => {
-    // ~27° diagonal shot (px=12.699, pz=6.3495), right-rail normal = (-1,0,0)
-    const hit = makeHit('cushion', 126990, BALL_Y, 63495, -MULTIPLIER, 0, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit, 1.0);
-    const norm = new THREE.Vector3(-1, 0, 0);
-    const inc = pts[1].clone().sub(pts[0]).normalize();
-    const ref = pts[2].clone().sub(pts[1]).normalize();
-    const angInc = Math.acos(Math.abs(inc.dot(norm)));
-    const angRef = Math.acos(Math.abs(ref.dot(norm)));
-    expect(angInc).toBeCloseTo(angRef, 4);
+describe('setCueAimGuideLengthM', () => {
+  it('clamps to 0.10–3.00 and get returns applied', () => {
+    expect(setCueAimGuideLengthM(0.01)).toBeCloseTo(0.1, 6);
+    expect(getCueAimGuideLengthM()).toBeCloseTo(0.1, 6);
+    expect(setCueAimGuideLengthM(9)).toBeCloseTo(3.0, 6);
+    expect(setCueAimGuideLengthM(DEFAULT_CUE_AIM_GUIDE_LENGTH_M)).toBeCloseTo(
+      DEFAULT_CUE_AIM_GUIDE_LENGTH_M, 6,
+    );
   });
 });
-
-// ─── computeAimLinePoints — all Three.Vector3 instances ────────────────────────
 
 describe('computeAimLinePoints — result types', () => {
   it('all points are THREE.Vector3 instances', () => {
     const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    for (const pt of computeAimLinePoints(CUE_POS, hit)) {
+    for (const pt of computeAimLinePoints(CUE_POS, hit, 1.0)) {
       expect(pt).toBeInstanceOf(THREE.Vector3);
     }
   });

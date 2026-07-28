@@ -42,15 +42,19 @@ export function setCueAimGuideLengthM(m: number): number {
 /**
  * Compute polyline for the cue primary aim guide (hitLineBase family).
  *
- * Ball / none: [cue, cue + aimDir * guideLength] — length is independent of
- * first-contact distance so CEO can pull the guide past the object ball.
- * Cushion: [cue, contact, bounceEnd] — bounce segment uses bounceLength.
+ * SP-Harden-9 CATCH-1 (斑 gate): ALL hitTypes — ball / cushion / none — use the
+ * same rule: [cue, cue + aimDir * guideLength]. Enclosed-table empty-felt aims
+ * always hit a cushion first; ignoring guideLength there made the CEO slider a no-op.
+ *
+ * Length is independent of first-contact distance (may pass through / past contact).
+ * Post-contact separation arms (ghost-ball lineDistance 0.25) are a different line.
+ * bounceLength retained in signature for API compat but unused on the primary guide.
  */
 export function computeAimLinePoints(
   cueBallPos: CmVector,
   hit: AimHit,
   guideLength: number = _cueAimGuideLengthM,
-  bounceLength = 0.25,
+  _bounceLength = 0.25,
 ): THREE.Vector3[] {
   const from = toWorld(cueBallPos);
 
@@ -74,23 +78,8 @@ export function computeAimLinePoints(
   }
   dir.multiplyScalar(1 / dlen);
 
+  // Same for ball / cushion / none: fixed-length pointer along shot direction.
   const guideEnd = from.clone().add(dir.clone().multiplyScalar(guideLength));
-
-  if (hit.hitType === 'cushion') {
-    const to = toWorld(hit.point);
-    const norm = toWorld(hit.normal);
-    norm.y = 0;
-    if (norm.lengthSq() > 1e-12) {
-      norm.normalize();
-      // Bounce from contact along optical reflection of aim dir.
-      const inc = dir.clone();
-      const ref = inc.clone().reflect(norm);
-      return [from, to, to.clone().add(ref.multiplyScalar(bounceLength))];
-    }
-    return [from, to];
-  }
-
-  // Ball / open-path: extendable guide (may pass through / past contact).
   return [from, guideEnd];
 }
 
