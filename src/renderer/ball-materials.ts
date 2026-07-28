@@ -98,6 +98,7 @@ const FRAG_UNIFORMS = `
   uniform float     uBandHalf;
   uniform float     uNumHalf;
   uniform vec4      uAtlasRect;
+  uniform vec3      uSoftWhite; // number-disc / stripe-body base (SP-Harden-4 exposure)
 
   // Gnomonic projection → atlas alpha for one number-circle patch.
   float glyphA(vec3 dir, vec3 axis) {
@@ -118,11 +119,13 @@ const FRAG_UNIFORMS = `
 `;
 
 // Injected after #include <color_fragment> — overwrites diffuseColor.rgb.
+// White disc / stripe body use uSoftWhite so specular cannot stack with near-pure
+// white and wash out the number glyph (SP-Harden-4). Value from BALL_WHITE_RGB.
 const FRAG_COLOR_INJECT = `
   {
     vec3 dir = normalize(vObjPos);
-    // Base body color: white for stripes, ball color for solids.
-    vec3 col = (uIsStripe == 1) ? vec3(0.988, 0.988, 0.968) : uColor;
+    // Base body color: soft white for stripes, ball color for solids.
+    vec3 col = (uIsStripe == 1) ? uSoftWhite : uColor;
     // Stripe band: narrow colored latitude ring around equator (large white poles).
     if (uIsStripe == 1) {
       float bandAng = acos(clamp(dir.y, -1.0, 1.0));
@@ -130,14 +133,14 @@ const FRAG_COLOR_INJECT = `
       float inBand = 1.0 - smoothstep(uBandHalf - bw, uBandHalf + bw, abs(bandAng - 1.5707963));
       col = mix(col, uColor, inBand);
     }
-    // Two number-circle patches: white disc backing + black glyph.
+    // Two number-circle patches: soft-white disc backing + dark glyph.
     for (int p = 0; p < 2; p++) {
       vec3 ax   = (p == 0) ? uAxis0 : uAxis1;
       float ang = acos(clamp(dot(dir, ax), -1.0, 1.0));
       float aw  = fwidth(ang) + 1e-4;
       float inCap = 1.0 - smoothstep(uCapAngle - aw, uCapAngle + aw, ang);
       if (inCap > 0.001) {
-        col = mix(col, vec3(0.988, 0.988, 0.968), inCap);
+        col = mix(col, uSoftWhite, inCap);
         float ga = glyphA(dir, ax);
         col = mix(col, vec3(0.067), ga * inCap);
       }
@@ -147,19 +150,45 @@ const FRAG_COLOR_INJECT = `
 `;
 
 // ── Public factory ────────────────────────────────────────────────────────────
-const GLOSS_PARAMS = {
-  roughness:           0.08,
-  metalness:           0.0,
-  clearcoat:           1.0,
-  clearcoatRoughness:  0.03,
-};
+/**
+ * Phenolic resin gloss — exposure tuned for number legibility (SP-Harden-4).
+ *
+ * CEO 真機 2026-07-28: clearcoat 1.0 / roughness 0.08 過鏡面，正面 specular 洗白球號。
+ * Spec: digital-twin architecture/features/aim-assist-and-group-hud-spec.md §項目1.
+ * 不改 SDF 佈局；只降環境反射峰值 + 略抬 roughness，保留樹脂光澤。
+ * 終判權威 = CEO 真機目視（非 headless）。
+ */
+export const BALL_GLOSS = {
+  /** Base coat roughness — slightly higher than pure mirror to cut hot-spot. */
+  roughness:          0.14,
+  metalness:          0.0,
+  /** Clearcoat strength — was 1.0 (full mirror); 0.55 keeps gloss without blow-out. */
+  clearcoat:          0.55,
+  /** Clearcoat micro-roughness — was 0.03 (razor specular); softens peak. */
+  clearcoatRoughness: 0.12,
+  /**
+   * Environment-map intensity for MeshPhysicalMaterial.
+   * RoomEnvironment PMREM + default 1.0 over-exposes front-facing numbers.
+   */
+  envMapIntensity:    0.50,
+} as const;
+
+/** White disc / stripe body base colour (was near-pure white 0.988 — stacked with specular). */
+export const BALL_WHITE_RGB: readonly [number, number, number] = [0.90, 0.90, 0.88];
 
 /**
  * Create a per-ball PBR material with SDF number/stripe shader injected.
  * Ball 0 (cue) returns plain white — no shader injection needed.
  */
 export function makeBallMaterial(num: number): THREE.MeshPhysicalMaterial {
-  const mat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, ...GLOSS_PARAMS });
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    roughness:          BALL_GLOSS.roughness,
+    metalness:          BALL_GLOSS.metalness,
+    clearcoat:          BALL_GLOSS.clearcoat,
+    clearcoatRoughness: BALL_GLOSS.clearcoatRoughness,
+    envMapIntensity:    BALL_GLOSS.envMapIntensity,
+  });
   if (num === 0) return mat;
 
   const stripe = isStripe(num);
@@ -175,6 +204,10 @@ export function makeBallMaterial(num: number): THREE.MeshPhysicalMaterial {
     shader.uniforms['uBandHalf']  = { value: BAND_HALF };
     shader.uniforms['uNumHalf']   = { value: NUM_HALF };
     shader.uniforms['uAtlasRect'] = { value: atlasRect(num) };
+    // Soft off-white for number disc + stripe body (SP-Harden-4 exposure tune).
+    shader.uniforms['uSoftWhite'] = {
+      value: new THREE.Vector3(BALL_WHITE_RGB[0], BALL_WHITE_RGB[1], BALL_WHITE_RGB[2]),
+    };
 
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>',       `#include <common>\n${VERT_COMMON_INSERT}`)
