@@ -79,6 +79,8 @@ let _lastAimTime = 0;
 let _currentPowerFraction = 0;
 let _punchSavedAimDir: CmVector | null = null;
 let _punchSavedCueBallPos: CmVector | null = null;
+/** Injected after gameSession is built — Unity IsAllowableTargetBall for red/white assist. */
+let _isAllowableBall: (id: number) => boolean = () => true;
 
 /**
  * Refresh all aim-line visuals using the current power fraction and CUE-002
@@ -94,12 +96,17 @@ function _updateAimVisuals(): void {
   // F-A: use nominal 0.5 force when power bar idle so aim line always shows
   // during aim drag. When power bar held, use real fraction (M-2 bit-exact).
   const _previewForce = _currentPowerFraction > 0 ? _currentPowerFraction : 0.5;
-  // F-B: suppress aim line during simulation (shot just fired) so it doesn't
-  // persist through the entire ball-motion replay and into the next turn.
+  // F-B / SP-Harden-5: suppress assist while simulating (Unity InShot gate).
   const hit = physics.isSimulating ? null : cue.getAimHit(_previewForce);
   const power = _currentPowerFraction;
-  aimLine.update(cueBall.position, cue.aimLineVisible ? hit : null);
-  ghostBall.update(cueBall.position, cue.aimLineVisible ? hit : null, power);
+  const show = cue.aimLineVisible ? hit : null;
+  // Legal white / illegal red — Unity SetIsAllowableTargetBall on first-hit ball.
+  let isLegal = true;
+  if (show && show.hitType === 'ball' && show.ballId != null) {
+    isLegal = _isAllowableBall(show.ballId);
+  }
+  aimLine.update(cueBall.position, show, isLegal);
+  ghostBall.update(cueBall.position, show, power, isLegal);
   powerBar.update(power);  // small overlay power indicator
 
   const aimDir = hit
@@ -259,6 +266,8 @@ const replayDriver = createReplayDriver();
 const gameSession = createBallPool8Session({
   physics, cue, scene, replayDriver, trail,
 });
+// SP-Harden-5: wire group-aware allowable for ghost/aim legal colour.
+_isAllowableBall = (id) => gameSession.getAllowableFn()(id);
 
 // ─── GAME-002: main menu UI ────────────────────────────────────────────────────
 

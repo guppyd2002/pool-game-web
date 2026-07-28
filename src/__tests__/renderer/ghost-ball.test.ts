@@ -7,8 +7,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import { CmVector } from '../../physics/cm-vector';
-import { ghostCenter, computeSeparationLines, SEPARATION_LINE_DEFAULT_LENGTH } from '../../renderer/ghost-ball';
-import { BALL_RADIUS, BALL_Y } from '../../physics/constants';
+import {
+  ghostCenter,
+  computeSeparationLines,
+  nearestPocketAlongTarget,
+  SEPARATION_LINE_DEFAULT_LENGTH,
+  POCKET_HIGHLIGHT_RADIUS,
+} from '../../renderer/ghost-ball';
+import { BALL_RADIUS, BALL_Y, POCKET_POSITIONS } from '../../physics/constants';
 import { MULTIPLIER } from '../../physics/fixed-math';
 import type { AimHit } from '../../game/ball-pool-physics';
 
@@ -200,8 +206,32 @@ describe('computeSeparationLines — tangential shot (kk ≈ 0)', () => {
   });
 });
 
-describe('SEPARATION_LINE_DEFAULT_LENGTH', () => {
-  it('is positive', () => {
-    expect(SEPARATION_LINE_DEFAULT_LENGTH).toBeGreaterThan(0);
+describe('SEPARATION_LINE_DEFAULT_LENGTH — Unity lineDistance', () => {
+  it('equals Unity CueCalculateManager.lineDistance = 0.25m (SP-Harden-5)', () => {
+    // Was incorrectly 0.8 (3.2× too long). Spec + visual-spec-audit.
+    expect(SEPARATION_LINE_DEFAULT_LENGTH).toBe(0.25);
+  });
+});
+
+// ─── nearestPocketAlongTarget (SP-Harden-5 pocket highlight) ─────────────────
+
+describe('nearestPocketAlongTarget', () => {
+  it('returns pocket when endpoint is within 2R of a corner pocket', () => {
+    // Corner +x +z portActual (13110, 6740) → world metres
+    const px = POCKET_POSITIONS[0][0] / MULTIPLIER;
+    const pz = POCKET_POSITIONS[0][1] / MULTIPLIER;
+    const hit = nearestPocketAlongTarget({ x: px + 0.01, z: pz - 0.01 });
+    expect(hit).not.toBeNull();
+    expect(hit!.pocketIndex).toBe(0);
+    expect(hit!.x).toBeCloseTo(px, 5);
+    expect(hit!.z).toBeCloseTo(pz, 5);
+  });
+
+  it('returns null when endpoint is far from all pockets', () => {
+    expect(nearestPocketAlongTarget({ x: 0, z: 0 })).toBeNull();
+  });
+
+  it('POCKET_HIGHLIGHT_RADIUS equals 2 * ball radius (Unity pocketRadius)', () => {
+    expect(POCKET_HIGHLIGHT_RADIUS).toBeCloseTo(2 * (BALL_RADIUS / MULTIPLIER), 10);
   });
 });

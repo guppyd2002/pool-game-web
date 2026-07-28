@@ -1,25 +1,46 @@
 /**
- * CUE-010: Ghost ball sphere + separation prediction lines.
+ * CUE-010 / SP-Harden-5: Ghost ball + separation prediction lines + pocket highlight.
  *
  * C# source: CueCalculateManager.DrawShotLinesAndSphere
  *   hitSphere.position = Point + Normal * ballRadius  ← ghost ball center
  *   hitLine (4 pts)    = [ghost, deflect_end, ghost, target_end]  ← separation lines
+ *   pocket highlight when target path endpoint within pocketRadius of a pocket
  *
- * Pure helpers (ghostCenter, computeSeparationLines) are exported for unit testing.
- * Three.js wrapper (GhostBallVisual) is browser-only.
+ * Pure helpers (ghostCenter, computeSeparationLines, nearestPocketAlongTarget)
+ * are exported for unit testing. Three.js wrapper is browser-only.
+ *
+ * Spec: digital-twin architecture/features/aim-assist-and-group-hud-spec.md §2
+ * Unity constants: lineDistance=0.25, pocketRadius=2R, legal white / illegal red.
  */
 
 import * as THREE from 'three';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { MULTIPLIER } from '../physics/fixed-math';
-import { BALL_RADIUS } from '../physics/constants';
+import { BALL_RADIUS, POCKET_POSITIONS } from '../physics/constants';
 import type { AimHit } from '../game/ball-pool-physics';
 import type { CmVector } from '../physics/cm-vector';
 
-/** Separation line length (meters) when power = 1. Matches C# lineDistance = 0.8. */
-export const SEPARATION_LINE_DEFAULT_LENGTH = 0.8;
+/**
+ * Separation line budget (meters) when power = 1.
+ * Unity CueCalculateManager.lineDistance = 0.25 (cLineDistance = energy01 * lineDistance).
+ * Was incorrectly 0.8 (3.2× too long) — SP-Harden-5 parity fix.
+ */
+export const SEPARATION_LINE_DEFAULT_LENGTH = 0.25;
+
+/** Ghost / assist line colours — Unity white legal / red illegal. */
+export const ASSIST_COLOR_LEGAL   = 0xffffff;
+export const ASSIST_COLOR_ILLEGAL = 0xff3333;
+
+/** Fat-line width (CSS px) so target line-of-centers is visible on mobile. */
+const ASSIST_LINE_WIDTH = 3.0;
 
 const M = MULTIPLIER;
 const R = BALL_RADIUS / M;  // 0.0285m
+
+/** Unity pocket highlight radius ≈ 2R (ball diameter). */
+export const POCKET_HIGHLIGHT_RADIUS = 2 * R;
 
 /** World-space ghost ball center (cue ball center at contact moment). */
 export function ghostCenter(hit: AimHit): { x: number; y: number; z: number } {
@@ -34,13 +55,18 @@ export function ghostCenter(hit: AimHit): { x: number; y: number; z: number } {
 
 /**
  * Compute 4 world-space points for ball-hit separation lines.
- * Returns null for non-ball hits (cushion lines handled by existing aim-line reflection).
+ * Returns null for non-ball hits (cushion lines handled by aim-line reflection).
  *
  * Layout: [ghost, cue_deflect_end, ghost, target_end]
  * Matches C# CueCalculateManager.DrawShotLinesAndSphere (HitType.Ball branch):
- *   kk = Dot(direction2, direction)
- *   s_deflect = Clamp01(1.5 - 1.5*kk) * lineLength
- *   s_target  = Clamp01(1.5*kk) * lineLength + 2*r
+ *   direction  = normalize(ghost − cue)
+ *   direction2 = normalize(point − ghost)  (= −normal toward target center)
+ *   direction1 = normalize(direction − Project(direction, direction2))
+ *   kk         = Dot(direction2, direction)
+ *   s_deflect  = Clamp01(1.5 − 1.5*kk) * lineLength
+ *   s_target   = Clamp01(1.5*kk) * lineLength + 2*r
+ *
+ * Target ball line-of-centers = ghost → target direction (CEO: 「從目標延伸出去」).
  *
  * @param lineLength total line budget in meters (scale by powerFraction before calling)
  */
@@ -78,54 +104,138 @@ export function computeSeparationLines(
   const s2 = clamp01(1.5 * kk) * lineLength + 2 * R;
 
   return [
-    { x: g.x,                 y: g.y, z: g.z },                 // ghost (cue deflect start)
+    { x: g.x,                y: g.y, z: g.z },                 // ghost (cue deflect start)
     { x: g.x + s1 * dir1x,   y: g.y, z: g.z + s1 * dir1z },   // cue deflect end
-    { x: g.x,                 y: g.y, z: g.z },                 // ghost (target path start)
+    { x: g.x,                y: g.y, z: g.z },                 // ghost (target path start)
     { x: g.x + s2 * d2x,     y: g.y, z: g.z + s2 * d2z },     // target ball end
   ];
+}
+
+/**
+ * If the target-path endpoint lies within pocketRadius of a pocket centre,
+ * return that pocket in world metres (for highlight). Else null.
+ * Unity: pocketRadius = 2R, path endpoint = ghost + s_target * direction2.
+ */
+export function nearestPocketAlongTarget(
+  targetEnd: { x: number; z: number },
+  pocketRadius = POCKET_HIGHLIGHT_RADIUS,
+): { x: number; y: number; z: number; pocketIndex: number } | null {
+  let best: { x: number; y: number; z: number; pocketIndex: number } | null = null;
+  let bestD2 = pocketRadius * pocketRadius;
+  for (let i = 0; i < POCKET_POSITIONS.length; i++) {
+    const px = POCKET_POSITIONS[i][0] / M;
+    const pz = POCKET_POSITIONS[i][1] / M;
+    const dx = targetEnd.x - px;
+    const dz = targetEnd.z - pz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 <= bestD2) {
+      bestD2 = d2;
+      best = { x: px, y: 0.002, z: pz, pocketIndex: i };
+    }
+  }
+  return best;
 }
 
 // ─── Three.js wrapper (browser-only, not unit-tested) ────────────────────────
 
 export interface GhostBallVisual {
   /**
-   * Refresh ghost sphere + separation lines from current aim state.
-   * Pass null to hide. powerFraction scales line length.
+   * Refresh ghost sphere + separation lines + pocket highlight.
+   * Pass null hit to hide. powerFraction scales line length (Unity energy01).
+   * isLegal=false → red (illegal target); true/omit → white.
    */
-  update(cueBallPos: CmVector, hit: AimHit | null, powerFraction?: number): void;
+  update(
+    cueBallPos: CmVector,
+    hit: AimHit | null,
+    powerFraction?: number,
+    isLegal?: boolean,
+  ): void;
   dispose(): void;
 }
 
-export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
-  // Ghost sphere mesh (semi-transparent cue ball silhouette at contact point)
-  const sphereGeo = new THREE.SphereGeometry(R, 12, 8);
-  const sphereMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
+function _makeFatLine(color: number): { line: Line2; geo: LineGeometry; mat: LineMaterial } {
+  const mat = new LineMaterial({
+    color,
+    opacity: 0.9,
     transparent: true,
-    opacity: 0.35,
+    linewidth: ASSIST_LINE_WIDTH,
+    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+  });
+  const geo = new LineGeometry();
+  geo.setPositions([0, 0, 0, 0, 0, 0]);
+  const line = new Line2(geo, mat);
+  line.computeLineDistances();
+  line.visible = false;
+  return { line, geo, mat };
+}
+
+export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
+  // Ghost sphere mesh (semi-transparent silhouette at contact point)
+  const sphereGeo = new THREE.SphereGeometry(R, 16, 12);
+  const sphereMat = new THREE.MeshBasicMaterial({
+    color: ASSIST_COLOR_LEGAL,
+    transparent: true,
+    opacity: 0.45,
     depthWrite: false,
   });
   const sphere = new THREE.Mesh(sphereGeo, sphereMat);
   sphere.visible = false;
   scene.add(sphere);
 
-  // Separation lines (2 lines drawn as a single 4-point LineSegments — [pt0,pt1] + [pt2,pt3])
-  const lineGeo = new THREE.BufferGeometry();
-  const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.6, transparent: true });
-  const lineObj = new THREE.LineSegments(lineGeo, lineMat);
-  lineObj.visible = false;
-  scene.add(lineObj);
+  // Two fat Line2 arms: cue-deflect + target line-of-centers
+  const deflect = _makeFatLine(ASSIST_COLOR_LEGAL);
+  const target  = _makeFatLine(ASSIST_COLOR_LEGAL);
+  scene.add(deflect.line);
+  scene.add(target.line);
+
+  // Pocket highlight disc (flat ring at felt)
+  const pocketGeo = new THREE.RingGeometry(
+    POCKET_HIGHLIGHT_RADIUS * 0.55,
+    POCKET_HIGHLIGHT_RADIUS,
+    32,
+  );
+  const pocketMat = new THREE.MeshBasicMaterial({
+    color: ASSIST_COLOR_LEGAL,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const pocketRing = new THREE.Mesh(pocketGeo, pocketMat);
+  pocketRing.rotation.x = -Math.PI / 2;
+  pocketRing.visible = false;
+  scene.add(pocketRing);
+
+  function _setColor(legal: boolean): void {
+    const c = legal ? ASSIST_COLOR_LEGAL : ASSIST_COLOR_ILLEGAL;
+    sphereMat.color.setHex(c);
+    deflect.mat.color.setHex(c);
+    target.mat.color.setHex(c);
+    pocketMat.color.setHex(c);
+  }
+
+  function _onResize(): void {
+    const w = window.innerWidth, h = window.innerHeight;
+    deflect.mat.resolution.set(w, h);
+    target.mat.resolution.set(w, h);
+  }
+  window.addEventListener('resize', _onResize);
 
   return {
-    update(cueBallPos: CmVector, hit: AimHit | null, powerFraction = 1): void {
+    update(cueBallPos: CmVector, hit: AimHit | null, powerFraction = 1, isLegal = true): void {
       if (!hit || hit.hitType === 'none') {
         sphere.visible = false;
-        lineObj.visible = false;
+        deflect.line.visible = false;
+        target.line.visible = false;
+        pocketRing.visible = false;
         return;
       }
 
+      _setColor(isLegal);
+
       const g = ghostCenter(hit);
       sphere.position.set(g.x, g.y, g.z);
+      // Show ghost for both ball and cushion hits (Unity hitSphere always at contact)
       sphere.visible = true;
 
       const linePts = computeSeparationLines(
@@ -133,21 +243,54 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
         SEPARATION_LINE_DEFAULT_LENGTH * Math.max(0, Math.min(1, powerFraction)),
       );
       if (linePts) {
-        lineGeo.setFromPoints(linePts.map(p => new THREE.Vector3(p.x, p.y, p.z)));
-        lineObj.visible = true;
+        // Arm 1: cue deflection [ghost → deflect_end]
+        deflect.geo.setPositions([
+          linePts[0].x, linePts[0].y, linePts[0].z,
+          linePts[1].x, linePts[1].y, linePts[1].z,
+        ]);
+        deflect.line.computeLineDistances();
+        // Hide zero-length deflect arm on head-on shots
+        const dLen = Math.hypot(linePts[1].x - linePts[0].x, linePts[1].z - linePts[0].z);
+        deflect.line.visible = dLen > 1e-4;
+
+        // Arm 2: target line-of-centers [ghost → target_end] — CEO key visual
+        target.geo.setPositions([
+          linePts[2].x, linePts[2].y, linePts[2].z,
+          linePts[3].x, linePts[3].y, linePts[3].z,
+        ]);
+        target.line.computeLineDistances();
+        target.line.visible = true;
+
+        // Pocket highlight when target path points into a pocket
+        const pk = nearestPocketAlongTarget(linePts[3]);
+        if (pk) {
+          pocketRing.position.set(pk.x, pk.y, pk.z);
+          pocketRing.visible = true;
+        } else {
+          pocketRing.visible = false;
+        }
       } else {
-        lineGeo.setFromPoints([]);
-        lineObj.visible = false;
+        // Cushion / non-ball: no separation arms
+        deflect.line.visible = false;
+        target.line.visible = false;
+        pocketRing.visible = false;
       }
     },
 
     dispose(): void {
+      window.removeEventListener('resize', _onResize);
       scene.remove(sphere);
-      scene.remove(lineObj);
+      scene.remove(deflect.line);
+      scene.remove(target.line);
+      scene.remove(pocketRing);
       sphereGeo.dispose();
       sphereMat.dispose();
-      lineGeo.dispose();
-      lineMat.dispose();
+      deflect.geo.dispose();
+      deflect.mat.dispose();
+      target.geo.dispose();
+      target.mat.dispose();
+      pocketGeo.dispose();
+      pocketMat.dispose();
     },
   };
 }

@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { MULTIPLIER } from '../physics/fixed-math';
 import { CmVector } from '../physics/cm-vector';
 import type { AimHit } from '../game/ball-pool-physics';
+import { ghostCenter } from './ghost-ball';
 
 /** Convert a Fixed-point CmVector to a Three.js world-space Vector3. */
 export function toWorld(v: CmVector): THREE.Vector3 {
@@ -20,21 +21,30 @@ export function toWorld(v: CmVector): THREE.Vector3 {
 }
 
 /**
- * Compute the polyline points for the aim line.
+ * Compute the polyline points for the aim line (Unity base line).
  *
  * Returns:
- *   'none' / 'ball'    → [cueBallPos, hitPoint]        (straight line)
- *   'cushion' (normal) → [cueBallPos, hitPoint, bounce] (bounce line appended)
+ *   'none'             → [cueBallPos, hitPoint]
+ *   'ball'             → [cueBallPos, ghostCenter]  (母球→ghost 前緣, not contact point)
+ *   'cushion' (normal) → [cueBallPos, hitPoint, bounce]
  *
- * The bounce line uses optical reflection: r = d - 2·(d·n)·n.
+ * Bounce length default = Unity lineDistance 0.25 (was 0.5 — SP-Harden-5).
+ * Ball branch ends at ghost so base line meets the separation T at ghost center.
  */
 export function computeAimLinePoints(
   cueBallPos: CmVector,
   hit: AimHit,
-  bounceLength = 0.5,
+  bounceLength = 0.25,
 ): THREE.Vector3[] {
   const from = toWorld(cueBallPos);
-  const to   = toWorld(hit.point);
+
+  // Ball hit: base line ends at ghost center (Point + Normal*R), not contact point.
+  if (hit.hitType === 'ball') {
+    const g = ghostCenter(hit);
+    return [from, new THREE.Vector3(g.x, g.y, g.z)];
+  }
+
+  const to = toWorld(hit.point);
 
   if (hit.hitType === 'cushion') {
     const norm = toWorld(hit.normal).normalize();
@@ -59,16 +69,23 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 /** Aim line width in CSS pixels (applies on all WebGL devices including mobile). */
 const AIM_LINE_WIDTH = 2.5;
 
+/** Unity legal white / illegal red for base aim line (SP-Harden-5). */
+const AIM_COLOR_LEGAL   = 0xffffff;
+const AIM_COLOR_ILLEGAL = 0xff3333;
+
 export interface AimLineVisual {
-  /** Refresh the line from current CueController state. Pass null to hide. */
-  update(cueBallPos: CmVector, hit: AimHit | null): void;
+  /**
+   * Refresh the line from current CueController state. Pass null to hide.
+   * isLegal=false paints red (illegal first-ball target).
+   */
+  update(cueBallPos: CmVector, hit: AimHit | null, isLegal?: boolean): void;
   dispose(): void;
 }
 
 export function createAimLine(scene: THREE.Scene): AimLineVisual {
   const mat = new LineMaterial({
-    color: 0xffffff,
-    opacity: 0.75,
+    color: AIM_COLOR_LEGAL,
+    opacity: 0.85,
     transparent: true,
     linewidth: AIM_LINE_WIDTH,
     // resolution must match the renderer pixel size for correct width
@@ -91,12 +108,13 @@ export function createAimLine(scene: THREE.Scene): AimLineVisual {
   window.addEventListener('resize', _onResize);
 
   return {
-    update(cueBallPos: CmVector, hit: AimHit | null): void {
+    update(cueBallPos: CmVector, hit: AimHit | null, isLegal = true): void {
       const pts = hit ? computeAimLinePoints(cueBallPos, hit) : [];
       if (pts.length < 2) {
         line.visible = false;
         return;
       }
+      mat.color.setHex(isLegal ? AIM_COLOR_LEGAL : AIM_COLOR_ILLEGAL);
       // LineGeometry.setPositions expects a flat [x,y,z, x,y,z, …] array.
       geo.setPositions(pts.flatMap(p => [p.x, p.y, p.z]));
       line.computeLineDistances();

@@ -91,17 +91,23 @@ describe("computeAimLinePoints — hitType 'none'", () => {
 
 // ─── computeAimLinePoints — 'ball' ────────────────────────────────────────────
 
-describe("computeAimLinePoints — hitType 'ball'", () => {
+describe("computeAimLinePoints — hitType 'ball' (base line → ghost)", () => {
   it('returns exactly 2 points (no reflection for ball hit)', () => {
     const hit = makeHit('ball', 50000, BALL_Y, 0);
     expect(computeAimLinePoints(CUE_POS, hit)).toHaveLength(2);
   });
 
-  it('line goes from cue ball to hit ball contact point', () => {
-    const hit = makeHit('ball', 50000, BALL_Y, 0);
+  it('line goes from cue ball to ghost center (Point + Normal*R), not bare contact', () => {
+    // Contact at x=0.5-R, normal -x → ghost at 0.5-2R (SP-Harden-5 base line)
+    const R = 285 / MULTIPLIER;
+    const hit = makeHit(
+      'ball',
+      Math.round((0.5 - R) * MULTIPLIER), BALL_Y, 0,
+      -MULTIPLIER, 0, 0,
+    );
     const pts = computeAimLinePoints(CUE_POS, hit);
     expect(pts[0].x).toBeCloseTo(0, 6);
-    expect(pts[1].x).toBeCloseTo(5, 6);  // 50000 / 10000
+    expect(pts[1].x).toBeCloseTo(0.5 - 2 * R, 4);
   });
 });
 
@@ -147,11 +153,11 @@ describe("computeAimLinePoints — hitType 'cushion'", () => {
     expect(len10).toBeCloseTo(len05 * 2, 4);
   });
 
-  it('default bounceLength (0.5) produces bounce segment ~0.5 world units long', () => {
+  it('default bounceLength equals Unity lineDistance 0.25m (SP-Harden-5)', () => {
     const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit);  // default bounceLength=0.5
+    const pts = computeAimLinePoints(CUE_POS, hit);  // default bounceLength=0.25
     const len = pts[2].distanceTo(pts[1]);
-    expect(len).toBeCloseTo(0.5, 4);
+    expect(len).toBeCloseTo(0.25, 4);
   });
 
   it('angle of incidence equals angle of reflection', () => {
