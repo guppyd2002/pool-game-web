@@ -22,7 +22,8 @@ import { createCueAdapter } from './game/cue-adapter';
 import { createAimLine } from './renderer/aim-line';
 import { createPowerBar } from './renderer/power-bar';
 import { createCueMesh } from './renderer/cue-mesh';
-import { createGhostBall } from './renderer/ghost-ball';
+import { createGhostBall, getAimLineDistanceM, setAimLineDistanceM } from './renderer/ghost-ball';
+import { createAimLengthDebugUI } from './renderer/aim-length-debug-ui';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
@@ -66,6 +67,14 @@ const aimLine = createAimLine(scene.scene);
 const powerBar = createPowerBar(container);
 const cueMesh = createCueMesh(scene.scene);
 const ghostBall = createGhostBall(scene.scene);
+
+// SP-Harden-9 TEMP: CEO live-tunes lineDistance (aim assist length).
+// Default ON for mobile prod; hide with ?debug=aimlen=0. Remove after CEO locks value.
+const _showAimLenDebug = new URLSearchParams(window.location.search).get('debug') !== 'aimlen=0'
+  && new URLSearchParams(window.location.search).get('debug') !== 'off';
+const aimLengthDebug = _showAimLenDebug
+  ? createAimLengthDebugUI(container, () => { _updateAimVisuals(); })
+  : null;
 
 // CUE-013: ball-in-hand placement (GAME-014 BallMoveManager equiv)
 const ballInHand = createBallInHandController(physics, 0);
@@ -596,6 +605,7 @@ window.addEventListener('beforeunload', () => {
   adapter.dispose();
   aimLine.dispose();
   ghostBall.dispose();
+  aimLengthDebug?.dispose();
   powerSliderUI.dispose();
   fineAdjustBar.dispose();
   spinDiscUI.dispose();
@@ -624,4 +634,7 @@ window.addEventListener('beforeunload', () => {
   gameSession,
   cue,  // exposes getAimState() for overlay hitTest guard smoke test
   toggleColliders: () => scene.toggleColliders?.(),  // show/hide physics boundary overlay
+  // SP-Harden-9 TEMP — CEO live-tunes aim assist length
+  getAimLineDistanceM,
+  setAimLineDistanceM,
 };

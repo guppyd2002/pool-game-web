@@ -26,8 +26,24 @@ import type { CmVector } from '../physics/cm-vector';
  * Separation line budget (meters) when power = 1.
  * Unity CueCalculateManager.lineDistance = 0.25 (cLineDistance = energy01 * lineDistance).
  * Was incorrectly 0.8 (3.2× too long) — SP-Harden-5 parity fix.
+ *
+ * SP-Harden-9: runtime-tunable for CEO live pick; constant remains the default.
  */
 export const SEPARATION_LINE_DEFAULT_LENGTH = 0.25;
+
+/** Live lineDistance (m) used by ghost separation arms — mutable for TEMP debug slider. */
+let _lineDistanceM = SEPARATION_LINE_DEFAULT_LENGTH;
+
+/** Current aim assist lineDistance in meters (power=1 budget). */
+export function getAimLineDistanceM(): number {
+  return _lineDistanceM;
+}
+
+/** Set aim assist lineDistance in meters (clamped). Returns applied value. */
+export function setAimLineDistanceM(m: number): number {
+  _lineDistanceM = Math.max(0.05, Math.min(1.5, m));
+  return _lineDistanceM;
+}
 
 /**
  * Ghost / assist line colours.
@@ -268,7 +284,7 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
 
       const linePts = computeSeparationLines(
         cueBallPos, hit,
-        SEPARATION_LINE_DEFAULT_LENGTH * Math.max(0, Math.min(1, powerFraction)),
+        _lineDistanceM * Math.max(0, Math.min(1, powerFraction)),
       );
       if (linePts) {
         // Arm 1: cue deflection [ghost → deflect_end]
