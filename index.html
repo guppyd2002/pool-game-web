@@ -12,11 +12,27 @@
       /* Landscape UX: left-hand mode flips power (right→left) and spin (left→right) */
       #app.left-hand-mode .power-slider-overlay {
         right: auto !important;
-        left: max(16px, calc(16px + env(safe-area-inset-left, 0px))) !important;
+        left: max(4px, env(safe-area-inset-left, 0px)) !important;
       }
       #app.left-hand-mode .spin-disc-overlay {
         left: auto !important;
-        right: max(12px, calc(12px + env(safe-area-inset-right, 0px))) !important;
+        right: max(4px, env(safe-area-inset-right, 0px)) !important;
+      }
+
+      /* SP-Harden-3: short landscape — shrink chrome so HUD/power don't crush felt */
+      @media screen and (orientation: landscape) and (max-height: 440px) {
+        .power-slider-overlay {
+          transform: translateY(-50%) scale(0.82) !important;
+          transform-origin: right center !important;
+        }
+        .spin-disc-overlay {
+          transform: translateY(-50%) scale(0.82) !important;
+          transform-origin: left center !important;
+        }
+        #player-ball-hud {
+          padding-top: 2px !important;
+          padding-bottom: 2px !important;
+        }
       }
 
       /* Rotate-device prompt — shown only in portrait on mobile */

@@ -20,10 +20,13 @@ const BALL_RADIUS = 0.028;
 
 // Ball colors moved to ball-materials.ts (WPA regulation set, CEO-approved).
 
-// Ortho top-view frustum: table half-extents + 15% margin.
+// Ortho top-view frustum: table half-extents + margin so pocket mouths aren't
+// clipped by the viewport edge (SP-Harden-3 mobile landscape). Was 15% — too
+// tight on short landscape viewports when HUD strip also consumes height.
 // Camera sits at (0,5,0) looking straight down, up=(0,0,-1) to avoid gimbal lock.
-const ORTHO_HALF_X = (TABLE_W / 2) * 1.15;  // ~1.46 m (long axis)
-const ORTHO_HALF_Z = (TABLE_H / 2) * 1.15;  // ~0.73 m (short axis)
+const ORTHO_MARGIN = 1.28; // 28% breathing room around cushion nose-to-nose
+const ORTHO_HALF_X = (TABLE_W / 2) * ORTHO_MARGIN;
+const ORTHO_HALF_Z = (TABLE_H / 2) * ORTHO_MARGIN;
 
 /** Compute OrthographicCamera frustum that fits the whole table for the given viewport aspect. */
 function orthoFrustum(aspect: number): [number, number, number, number] {

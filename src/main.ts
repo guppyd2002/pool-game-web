@@ -424,6 +424,8 @@ function _updatePlayerIndicator(playerIndex: 0 | 1, isBallInHand: boolean): void
   hudBar.setPlayerTurn(playerIndex, isBallInHand);
   // After every turn change (incl. post-shot) refresh 7-slot pocket progress.
   _refreshBallHud();
+  // SP-Harden-3: re-show "Tap to aim" only when turn is ready (not mid-flight).
+  if (!isBallInHand) tutorial.onTurnReady();
 }
 
 // ─── Session callbacks ─────────────────────────────────────────────────────────

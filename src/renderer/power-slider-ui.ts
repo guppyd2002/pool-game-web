@@ -39,29 +39,31 @@ export function createPowerSliderUI(
 ): PowerSliderUI {
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Outer wrapper — right side, vertically centred.
-  // right uses max() so safe-area-inset-right (landscape notch) is respected.
-  // Overlay on table right edge — semi-transparent, opacity transitions on interaction.
+  // Outer wrapper — right edge chrome, NOT over felt (SP-Harden-3).
+  // Larger right inset + lower idle opacity so the bar doesn't cover pocket balls.
   // CSS class used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
   overlay.className = 'power-slider-overlay';
+  overlay.setAttribute('aria-label', 'Shot power');
   overlay.style.cssText = [
     'position:absolute',
-    'right:max(12px, calc(12px + env(safe-area-inset-right, 0px)))',
+    // Push fully into the chrome strip; safe-area for landscape notch.
+    'right:max(4px, env(safe-area-inset-right, 0px))',
     'top:50%', 'transform:translateY(-50%)',
     'z-index:100',
-    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
+    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:4px',
     'user-select:none',
-    'opacity:0.4',
+    'opacity:0.28', // idle: dim so table balls stay readable (brightens on touch)
     'transition:opacity 0.15s ease-out',
   ].join(';');
 
-  // Label above the bar
+  // Explicit legend — Kakashi smoke: unlabeled right strip was mistaken for spin.
   const label = document.createElement('div');
   label.textContent = 'POWER';
   label.style.cssText = [
-    'color:rgba(255,255,255,0.7)', 'font-size:10px', 'font-family:sans-serif',
-    'letter-spacing:1px', 'pointer-events:none',
+    'color:rgba(255,255,255,0.85)', 'font-size:10px', 'font-family:sans-serif',
+    'font-weight:bold', 'letter-spacing:1.5px', 'pointer-events:none',
+    'text-shadow:0 1px 3px rgba(0,0,0,0.9)',
   ].join(';');
 
   // Track container — semi-transparent pill overlaid on table edge.

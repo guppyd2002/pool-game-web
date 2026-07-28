@@ -55,9 +55,19 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'transition:opacity 0.15s ease-out',
   ].join(';');
 
+  // Legend label (SP-Harden-3) — makes english control self-describing.
+  const spinLabel = document.createElement('div');
+  spinLabel.textContent = 'SPIN';
+  spinLabel.style.cssText = [
+    'color:rgba(255,255,255,0.85)', 'font-size:10px', 'font-family:sans-serif',
+    'font-weight:bold', 'letter-spacing:1.5px', 'pointer-events:none',
+    'text-shadow:0 1px 3px rgba(0,0,0,0.9)',
+  ].join(';');
+
   // Collapsed button — 68×68dp circle showing cueball icon
   const btn = document.createElement('button');
-  btn.title = 'Spin';
+  btn.title = 'Spin / English';
+  btn.setAttribute('aria-label', 'Cue ball spin');
   btn.style.cssText = [
     'width:68px', 'height:68px', 'border-radius:50%',
     'background:rgba(28,36,48,0.92)',
@@ -124,6 +134,7 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
   panel.appendChild(hline);
   panel.appendChild(vline);
   panel.appendChild(dot);
+  overlay.appendChild(spinLabel);
   overlay.appendChild(panel);
   overlay.appendChild(btn);
   container.appendChild(overlay);
