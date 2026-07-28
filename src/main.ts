@@ -48,6 +48,7 @@ import { REASON_MESSAGES } from './game/game-play-reason';
 import { createCameraTween, POSE_OVERVIEW, POSE_TABLE } from './renderer/camera-tween';
 import { createTurnPrompt } from './renderer/turn-prompt';
 import { createHudBar } from './renderer/hud-bar';
+import { createPlayerBallHud } from './renderer/player-ball-hud';
 import { createTutorialOverlay } from './renderer/tutorial-overlay';
 import * as THREE from 'three';
 
@@ -303,6 +304,7 @@ loadReplayInput.addEventListener('change', () => {
     if (!shots || shots.length === 0) { alert('Invalid or empty .poolrecord file.'); return; }
     mainMenuEl.style.display = 'none';
     hudBar.setVisible(true);
+    playerBallHud.setVisible(true);
     hudBar.setTopViewLabel('⬇ Table');
     _inTopView = true;
     scene.setOrthoTop(true);
@@ -323,6 +325,7 @@ loadReplayInput.addEventListener('change', () => {
 startBtn.addEventListener('click', () => {
   mainMenuEl.style.display = 'none';
   hudBar.setVisible(true);
+  playerBallHud.setVisible(true);
   hudBar.setTopViewLabel('⬇ Table');
   powerSliderUI.element.style.display = 'block';
   fineAdjustBar.element.style.display = 'block';
@@ -331,6 +334,7 @@ startBtn.addEventListener('click', () => {
   scene.setOrthoTop(true);
   tutorial.start();
   gameSession.startNewGame();
+  _refreshBallHud();
 });
 
 // ─── Session overlays ─────────────────────────────────────────────────────────
@@ -348,6 +352,7 @@ gameOverUI.onExit = () => {
   turnPrompt.dismiss();
   gameSession.exitGame();
   hudBar.setVisible(false);
+  playerBallHud.setVisible(false);
   powerSliderUI.element.style.display = 'none';
   fineAdjustBar.element.style.display = 'none';
   spinDiscUI.element.style.display = 'none';
@@ -394,6 +399,10 @@ const hudBar = createHudBar(container, {
 });
 hudBar.setVisible(false);  // hidden until game starts
 
+// SP-Harden-6: 7-slot solids/stripes progress under HUD (Unity BallPool8PlayerUI)
+const playerBallHud = createPlayerBallHud(container);
+playerBallHud.setVisible(false);
+
 window.addEventListener('keydown', (e: KeyboardEvent) => {
   if ((e.key === 't' || e.key === 'T') && !mainMenuEl.style.display.includes('flex')) {
     _toggleView();
@@ -406,8 +415,15 @@ window.addEventListener('keyup', (e: KeyboardEvent) => {
 
 // ─── Player turn indicator (via HUD bar) ─────────────────────────────────────
 
+function _refreshBallHud(): void {
+  const slots = gameSession.getPlayerBallSlots();
+  playerBallHud.update(slots.p0, slots.p1, slots.t0, slots.t1);
+}
+
 function _updatePlayerIndicator(playerIndex: 0 | 1, isBallInHand: boolean): void {
   hudBar.setPlayerTurn(playerIndex, isBallInHand);
+  // After every turn change (incl. post-shot) refresh 7-slot pocket progress.
+  _refreshBallHud();
 }
 
 // ─── Session callbacks ─────────────────────────────────────────────────────────
@@ -465,6 +481,7 @@ if (_demoConfig) {
   // Auto-start: skip main menu, enter ortho top-view, begin game
   mainMenuEl.style.display = 'none';
   hudBar.setVisible(true);
+  playerBallHud.setVisible(true);
   hudBar.setTopViewLabel('⬇ Table');
   // M-1 defense-in-depth: disable adapter (not just hide bars) so tap/drag cannot
   // pollute _lastAim* during AI demo. Primary gates: hidden bars + _isEnabled in fireNow.
@@ -578,6 +595,7 @@ window.addEventListener('beforeunload', () => {
   replayDriver.dispose();
   turnPrompt.dispose();
   hudBar.dispose();
+  playerBallHud.dispose();
   tutorial.dispose();
 });
 

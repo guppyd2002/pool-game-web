@@ -83,6 +83,18 @@ export interface IGameSession {
    */
   getAllowableFn(): (id: number) => boolean;
 
+  /**
+   * SP-Harden-6: both players' 7-slot ball arrays (PlayerBallInfo.balls).
+   * 0 = empty/pocketed; 1-7 solid; 9-15 stripe; 8 = black after group clear.
+   * Open table → both rows all zeros.
+   */
+  getPlayerBallSlots(): {
+    readonly p0: readonly number[];
+    readonly p1: readonly number[];
+    readonly t0: BallType;
+    readonly t1: BallType;
+  };
+
   readonly currentPlayerIndex: 0 | 1;
   readonly isGameEnded: boolean;
   readonly isBallInHand: boolean;
@@ -321,6 +333,18 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
         if (player.hasBlackBallToShot) return false;                        // can only aim at 8
         return player.currentBallType === BallType.Non ||                   // pre-assignment: all ok
                player.isSameBallType(ballId);                               // post-assignment: own group only
+      };
+    },
+
+    getPlayerBallSlots() {
+      // Snapshot 7-slot arrays for HUD (SP-Harden-6 / BallPool8PlayerUI).
+      const p0 = ruleEngine.players[0];
+      const p1 = ruleEngine.players[1];
+      return {
+        p0: [...p0.balls],
+        p1: [...p1.balls],
+        t0: p0.currentBallType,
+        t1: p1.currentBallType,
       };
     },
   };
