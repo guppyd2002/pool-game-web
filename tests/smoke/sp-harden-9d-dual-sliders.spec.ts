@@ -1,9 +1,9 @@
 /**
- * SP-Harden-9d self-test — 斑 gate traps ③④⑤⑥:
+ * SP-Harden-9d + 10 self-test — 斑 gate:
  *  ③ Aim at a ball (hitType==='ball'); empty felt has no red/cyan arms.
- *  ④ Force high power (setAimPowerFraction(1)) before A min/max compare.
  *  ⑤ Slider DOM min/max === setter clamp (0.05–2.0 / 0.1–3.0).
  *  ⑥ A→ target arms move, blue fixed; B→ blue moves, arms fixed; labels not swapped.
+ *  10 Core: change power → assist arm length UNCHANGED (fixed Aim length).
  */
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
@@ -90,7 +90,8 @@ async function probe(page: import('@playwright/test').Page): Promise<Probe> {
       labels: {
         aLabel: text.includes('目標球延伸') || text.includes('target extension'),
         bLabel: text.includes('母球導引') || text.includes('cue guide'),
-        baseline: text.includes('基準'),
+        // SP-Harden-10: label says 固定 (was 基準 under power-scaled design)
+        baseline: text.includes('固定') || text.includes('基準'),
         orderOk: aIdx >= 0 && bIdx >= 0 && aIdx < bIdx,
       },
       ranges: {
@@ -103,7 +104,7 @@ async function probe(page: import('@playwright/test').Page): Promise<Probe> {
   });
 }
 
-test('SP-Harden-9d dual slider gate (ball + high power)', async ({ page }) => {
+test('SP-Harden-9d/10 dual slider + fixed Aim length (ball)', async ({ page }) => {
   fs.mkdirSync(OUT, { recursive: true });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -122,12 +123,7 @@ test('SP-Harden-9d dual slider gate (ball + high power)', async ({ page }) => {
     d.camera.updateProjectionMatrix();
   });
 
-  // Trap ④: force full energy BEFORE measuring A (else arm ≈ 2R and A looks dead).
-  await page.evaluate(() => {
-    (window as any).__poolDebug.setAimPowerFraction(1);
-  });
-
-  // Trap ③: aim at a ball (drag cue back so aim points into rack).
+  // Aim at a ball (SP-Harden-10: arms no longer need high power to be visible).
   const cs = await page.evaluate(() => {
     const d = (window as any).__poolDebug;
     const v = d.cueBallMesh.position.clone().project(d.camera);
@@ -149,7 +145,6 @@ test('SP-Harden-9d dual slider gate (ball + high power)', async ({ page }) => {
     p0 = await probe(page);
   }
   expect(p0.hitType, 'trap③ must aim at a ball').toBe('ball');
-  expect(p0.power).toBe(1);
 
   // Gate ⑤ ranges + ⑥ labels
   expect(p0.ranges.aMin).toBe('0.05');
@@ -180,12 +175,32 @@ test('SP-Harden-9d dual slider gate (ball + high power)', async ({ page }) => {
   expect(aMax.a).toBeCloseTo(2.0, 5);
   expect(aMin.b).toBeCloseTo(1.5, 5);
   expect(aMax.b).toBeCloseTo(1.5, 5);
-  // Assist arm must grow substantially at high power (trap ④).
+  // Assist arm must grow with slider A (fixed length = A value).
   expect(aMax.assistMaxLen).toBeGreaterThan(aMin.assistMaxLen + 0.4);
   // Blue guide length stable across A
   expect(Math.abs(aMax.blueLen - aMin.blueLen)).toBeLessThan(0.12);
 
-  await page.screenshot({ path: path.join(OUT, 'A-max-ball-highP.png') });
+  await page.screenshot({ path: path.join(OUT, 'A-max-ball.png') });
+
+  // ── SP-Harden-10 CORE: change power → arm length unchanged ───────────────
+  await page.evaluate(() => {
+    const d = (window as any).__poolDebug;
+    d.setAimLineDistanceM(1.0); // known fixed length
+    d.setAimPowerFraction(0);   // idle / low
+  });
+  await page.waitForTimeout(80);
+  const atP0 = await probe(page);
+
+  await page.evaluate(() => {
+    (window as any).__poolDebug.setAimPowerFraction(1);
+  });
+  await page.waitForTimeout(80);
+  const atP1 = await probe(page);
+
+  // Core design assertion: power must NOT scale post-contact arms.
+  expect(Math.abs(atP1.assistMaxLen - atP0.assistMaxLen)).toBeLessThan(0.05);
+  // And arms should be near slider A value (1.0 m target arm).
+  expect(atP1.assistMaxLen).toBeGreaterThan(0.8);
 
   // ── Gate ⑥ B sweep: blue changes, assist arms fixed ──────────────────────
   await page.evaluate(() => {
@@ -200,26 +215,25 @@ test('SP-Harden-9d dual slider gate (ball + high power)', async ({ page }) => {
   await page.waitForTimeout(80);
   const bMax = await probe(page);
 
-  expect(bMin.a).toBeCloseTo(2.0, 5);
-  expect(bMax.a).toBeCloseTo(2.0, 5);
+  expect(bMin.a).toBeCloseTo(1.0, 5);
+  expect(bMax.a).toBeCloseTo(1.0, 5);
   expect(bMin.b).toBeCloseTo(0.3, 5);
   expect(bMax.b).toBeCloseTo(2.8, 5);
   expect(bMax.blueLen).toBeGreaterThan(bMin.blueLen + 0.8);
   expect(Math.abs(bMax.assistMaxLen - bMin.assistMaxLen)).toBeLessThan(0.12);
 
-  await page.screenshot({ path: path.join(OUT, 'B-max-ball-highP.png') });
+  await page.screenshot({ path: path.join(OUT, 'B-max-ball.png') });
 
-  // Trap ③ sanity: empty-ish aim (cushion) → no assist arms after releasing & aiming felt
-  // (optional soft check — not failing gate if hard to re-aim mid-test)
-
-  const report = { p0, aMin, aMax, bMin, bMax, errors,
+  const report = {
+    p0, aMin, aMax, atP0, atP1, bMin, bMax, errors,
     aAssistDelta: aMax.assistMaxLen - aMin.assistMaxLen,
     aBlueDelta: aMax.blueLen - aMin.blueLen,
+    powerAssistDelta: atP1.assistMaxLen - atP0.assistMaxLen,
     bBlueDelta: bMax.blueLen - bMin.blueLen,
     bAssistDelta: bMax.assistMaxLen - bMin.assistMaxLen,
   };
   fs.writeFileSync(path.join(OUT, 'gate.json'), JSON.stringify(report, null, 2));
-  console.log('SP-Harden-9d GATE PASS', JSON.stringify(report, null, 2));
+  console.log('SP-Harden-9d/10 GATE PASS', JSON.stringify(report, null, 2));
 
   await page.mouse.up();
   expect(errors).toHaveLength(0);

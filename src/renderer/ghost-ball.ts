@@ -23,18 +23,22 @@ import type { AimHit } from '../game/ball-pool-physics';
 import type { CmVector } from '../physics/cm-vector';
 
 /**
- * Separation line budget (meters) when power = 1.
- * Unity CueCalculateManager.lineDistance = 0.25 (cLineDistance = energy01 * lineDistance).
- * Was incorrectly 0.8 (3.2× too long) — SP-Harden-5 parity fix.
- *
+ * Default target post-contact extension length (meters) — TEMP slider A default.
+ * Historical Unity lineDistance=0.25; SP-Harden-10 no longer multiplies by energy01.
  * SP-Harden-9: runtime-tunable for CEO live pick; constant remains the default.
  */
 export const SEPARATION_LINE_DEFAULT_LENGTH = 0.25;
 
-/** Live lineDistance (m) used by ghost separation arms — mutable for TEMP debug slider. */
+/**
+ * SP-Harden-10 (8BP Aim parity): target extension ≈ deflect stub × this ratio.
+ * Measured from Miniclip official art (target C≈6.2D, deflect D≈2.8D → ≈2.2×).
+ */
+export const TARGET_TO_DEFLECT_RATIO = 2.2;
+
+/** Live target-extension length (m) — fixed display length (no power/kk scale). */
 let _lineDistanceM = SEPARATION_LINE_DEFAULT_LENGTH;
 
-/** Current aim assist lineDistance in meters (power=1 budget). */
+/** Current target post-contact extension length in meters (slider A / 8BP Aim). */
 export function getAimLineDistanceM(): number {
   return _lineDistanceM;
 }
@@ -48,9 +52,10 @@ export const AIM_LINE_DISTANCE_MIN_M = 0.05;
 export const AIM_LINE_DISTANCE_MAX_M = 2.0;
 
 /**
- * Set aim assist lineDistance in meters (clamped). Returns applied value.
- * SP-Harden-9d: clamp widened 0.05–2.0 m so CEO can explore beyond Unity 0.25.
- * This is the post-contact arm budget (target extension), NOT cue blue guide.
+ * Set target post-contact extension length in meters (clamped). Returns applied value.
+ * SP-Harden-9d: clamp 0.05–2.0 m. SP-Harden-10: this value IS the drawn length
+ * (8BP Aim scalar) — not a budget further scaled by power/kk.
+ * NOT the cue blue guide (setCueAimGuideLengthM).
  */
 export function setAimLineDistanceM(m: number): number {
   _lineDistanceM = Math.max(AIM_LINE_DISTANCE_MIN_M, Math.min(AIM_LINE_DISTANCE_MAX_M, m));
@@ -96,17 +101,18 @@ export function ghostCenter(hit: AimHit): { x: number; y: number; z: number } {
  * Returns null for non-ball hits (cushion lines handled by aim-line reflection).
  *
  * Layout: [ghost, cue_deflect_end, ghost, target_end]
- * Matches C# CueCalculateManager.DrawShotLinesAndSphere (HitType.Ball branch):
- *   direction  = normalize(ghost − cue)
- *   direction2 = normalize(point − ghost)  (= −normal toward target center)
- *   direction1 = normalize(direction − Project(direction, direction2))
- *   kk         = Dot(direction2, direction)
- *   s_deflect  = Clamp01(1.5 − 1.5*kk) * lineLength
- *   s_target   = Clamp01(1.5*kk) * lineLength + 2*r
  *
- * Target ball line-of-centers = ghost → target direction (CEO: 「從目標延伸出去」).
+ * SP-Harden-10 (8 Ball Pool Aim parity — design change, not Unity):
+ *   Post-contact lengths are FIXED geometric guides (deliberately not physics):
+ *     s_target  = lineLength          (= slider A / 8BP Aim scalar)
+ *     s_deflect = lineLength / 2.2    (8BP measured ratio target≈2.2×deflect)
+ *   No energy01 (power) scaling, no kk (cut-angle) length scaling.
+ *   Directions still pure stun geometry from ghost:
+ *     direction2 = −normal (line-of-centers through target)
+ *     direction1 = aimDir − Project(aimDir, direction2)  (90° stun tangent)
+ *   Head-on (dir1≈0): deflect arm collapses to zero length (hidden by caller).
  *
- * @param lineLength total line budget in meters (scale by powerFraction before calling)
+ * @param lineLength target extension length in meters (NOT a power-scaled budget)
  */
 export function computeSeparationLines(
   cueBallPos: CmVector,
@@ -127,7 +133,7 @@ export function computeSeparationLines(
   const nx = hit.normal.x / M, nz = hit.normal.z / M;
   const d2x = -nx, d2z = -nz;
 
-  // kk = Dot(direction2, aimDir)
+  // kk only used to build pure-stun tangent direction1 (NOT for length)
   const kk = d2x * dx + d2z * dz;
 
   // direction1 = perp component of aimDir w.r.t. direction2 (cue ball deflection axis)
@@ -137,9 +143,9 @@ export function computeSeparationLines(
   const dir1x = p1len > 1e-9 ? p1x / p1len : 0;
   const dir1z = p1len > 1e-9 ? p1z / p1len : 0;
 
-  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-  const s1 = clamp01(1.5 - 1.5 * kk) * lineLength;
-  const s2 = clamp01(1.5 * kk) * lineLength + 2 * R;
+  // SP-Harden-10: fixed lengths — independent of power and cut angle
+  const s2 = Math.max(0, lineLength);
+  const s1 = s2 / TARGET_TO_DEFLECT_RATIO;
 
   return [
     { x: g.x,                y: g.y, z: g.z },                 // ghost (cue deflect start)
@@ -179,8 +185,9 @@ export function nearestPocketAlongTarget(
 export interface GhostBallVisual {
   /**
    * Refresh ghost sphere + separation lines + pocket highlight.
-   * Pass null hit to hide. powerFraction scales line length (Unity energy01).
-   * isLegal=false → red (illegal target); true/omit → white.
+   * Pass null hit to hide.
+   * powerFraction retained for API compat; SP-Harden-10 arms ignore it (8BP fixed Aim).
+   * isLegal=false → red (illegal target); true/omit → cyan/white.
    */
   update(
     cueBallPos: CmVector,
@@ -294,9 +301,11 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
       sphere.visible = true;
       outline.visible = true;
 
+      // SP-Harden-10: fixed length = slider A; powerFraction intentionally unused.
+      void powerFraction;
       const linePts = computeSeparationLines(
         cueBallPos, hit,
-        _lineDistanceM * Math.max(0, Math.min(1, powerFraction)),
+        _lineDistanceM,
       );
       if (linePts) {
         // Arm 1: cue deflection [ghost → deflect_end]

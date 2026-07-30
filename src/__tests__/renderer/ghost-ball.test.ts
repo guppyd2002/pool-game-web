@@ -12,6 +12,7 @@ import {
   computeSeparationLines,
   nearestPocketAlongTarget,
   SEPARATION_LINE_DEFAULT_LENGTH,
+  TARGET_TO_DEFLECT_RATIO,
   POCKET_HIGHLIGHT_RADIUS,
   ASSIST_COLOR_LEGAL,
   ASSIST_COLOR_OUTLINE,
@@ -122,7 +123,7 @@ describe('computeSeparationLines — non-ball hits return null', () => {
   });
 });
 
-describe('computeSeparationLines — head-on shot (kk ≈ 1)', () => {
+describe('computeSeparationLines — head-on shot (kk ≈ 1) [SP-Harden-10 fixed length]', () => {
   // Cue at origin, target at +x. Normal = (-1,0,0). kk = 1.
   // hit.point = (0.5 - R) * M in x (contact on target surface)
   // Ghost = (0.5 - 2R, BALL_Y/M, 0)
@@ -148,24 +149,24 @@ describe('computeSeparationLines — head-on shot (kk ≈ 1)', () => {
     expect(pts[2].z).toBeCloseTo(g.z);
   });
 
-  it('head-on: cue deflection line has zero length (pts[0] ≈ pts[1])', () => {
+  it('head-on: cue deflection collapses (dir1=0 → zero length)', () => {
     const pts = computeSeparationLines(cueBall, hit, L)!;
-    // kk=1 → s1 = clamp(1.5 - 1.5*1) = 0 → deflect end = ghost center
+    // Pure head-on: aimDir || direction2 → dir1 length 0 → deflect end = ghost
     expect(pts[1].x).toBeCloseTo(pts[0].x, 3);
     expect(pts[1].z).toBeCloseTo(pts[0].z, 3);
   });
 
-  it('head-on: target ball line has full length L + 2r', () => {
+  it('head-on: target extension length equals L (no +2R, no kk scale)', () => {
+    // SP-Harden-10 design change: was L+2R under Unity energy01×kk formula
     const pts = computeSeparationLines(cueBall, hit, L)!;
     const g = ghostCenter(hit);
-    // kk=1 → s2 = clamp(1.5*1)*L + 2r = L + 2r, direction2 = +x (= -normal = (1,0,0))
-    const expectedTargetX = g.x + (L + 2 * R);
+    const expectedTargetX = g.x + L; // direction2 = +x
     expect(pts[3].x).toBeCloseTo(expectedTargetX, 3);
     expect(pts[3].z).toBeCloseTo(g.z, 3);
   });
 });
 
-describe('computeSeparationLines — tangential shot (kk ≈ 0)', () => {
+describe('computeSeparationLines — tangential shot (kk ≈ 0) [SP-Harden-10 fixed length]', () => {
   // Cue at (ghost.x * M, BALL_Y, -5000), target normal = (1,0,0) → d2 = (-1,0,0).
   // aimDir = (0,0,1) (+z). d2·aimDir = 0 → kk=0.
   // hit.normal = (M, 0, 0), hit.point = (5000, BALL_Y, 0)
@@ -182,36 +183,61 @@ describe('computeSeparationLines — tangential shot (kk ≈ 0)', () => {
     expect(pts!.length).toBe(4);
   });
 
-  it('tangential: cue deflection line has full length (≈ L)', () => {
+  it('tangential: target extension = L (not 2R)', () => {
+    // SP-Harden-10: thin cut no longer collapses target arm to 2R
     const pts = computeSeparationLines(cueBall, hit, L)!;
-    // kk=0 → s1 = clamp(1.5) = 1 → deflection length = L
-    // direction1 = (0,0,1) (same as aimDir, no target component)
-    const g = ghostCenter(hit);
-    const defLen = Math.sqrt((pts[1].x - g.x) ** 2 + (pts[1].z - g.z) ** 2);
-    expect(defLen).toBeCloseTo(L, 2);
-  });
-
-  it('tangential: target ball line has minimum length (≈ 2r)', () => {
-    const pts = computeSeparationLines(cueBall, hit, L)!;
-    // kk=0 → s2 = clamp(0)*L + 2r = 2r, direction2 = -x (-normal)
     const g = ghostCenter(hit);
     const tarLen = Math.sqrt((pts[3].x - g.x) ** 2 + (pts[3].z - g.z) ** 2);
-    expect(tarLen).toBeCloseTo(2 * R, 2);
+    expect(tarLen).toBeCloseTo(L, 2);
+  });
+
+  it('tangential: deflect stub = L / TARGET_TO_DEFLECT_RATIO (8BP 2.2×)', () => {
+    // SP-Harden-10: was full L under Unity kk formula; now fixed ratio
+    const pts = computeSeparationLines(cueBall, hit, L)!;
+    const g = ghostCenter(hit);
+    const defLen = Math.sqrt((pts[1].x - g.x) ** 2 + (pts[1].z - g.z) ** 2);
+    expect(defLen).toBeCloseTo(L / TARGET_TO_DEFLECT_RATIO, 2);
   });
 
   it('tangential: deflection is in +z (perpendicular to target direction)', () => {
     const pts = computeSeparationLines(cueBall, hit, L)!;
     const g = ghostCenter(hit);
     // direction1 for tangential = (0,0,1) since aimDir=(0,0,1) and d2=(-1,0,0)
-    // perp component of (0,0,1) w.r.t. (-1,0,0) = (0,0,1) (unchanged, already perp)
     expect(pts[1].z).toBeGreaterThan(g.z);  // deflects in +z
     expect(Math.abs(pts[1].x - g.x)).toBeLessThan(0.001);  // no x change
   });
 });
 
-describe('SEPARATION_LINE_DEFAULT_LENGTH — Unity lineDistance', () => {
-  it('equals Unity CueCalculateManager.lineDistance = 0.25m (SP-Harden-5)', () => {
-    // Was incorrectly 0.8 (3.2× too long). Spec + visual-spec-audit.
+describe('SP-Harden-10 — fixed length independent of cut angle (same L)', () => {
+  const L = 1.0;
+  const headOnCue = new CmVector(0, BALL_Y, 0);
+  const headOnHit = makeBallHit(
+    Math.round((0.5 - R) * M), BALL_Y, 0,
+    -M, 0, 0,
+  );
+  const gx = 0.5 + R;
+  const tanCue = new CmVector(Math.round(gx * M), BALL_Y, -5000);
+  const tanHit = makeBallHit(5000, BALL_Y, 0, M, 0, 0);
+
+  it('target arm length is L for both head-on and tangential', () => {
+    const headPts = computeSeparationLines(headOnCue, headOnHit, L)!;
+    const tanPts = computeSeparationLines(tanCue, tanHit, L)!;
+    const headG = ghostCenter(headOnHit);
+    const tanG = ghostCenter(tanHit);
+    const headLen = Math.hypot(headPts[3].x - headG.x, headPts[3].z - headG.z);
+    const tanLen = Math.hypot(tanPts[3].x - tanG.x, tanPts[3].z - tanG.z);
+    expect(headLen).toBeCloseTo(L, 5);
+    expect(tanLen).toBeCloseTo(L, 5);
+  });
+
+  it('TARGET_TO_DEFLECT_RATIO is 2.2 (8BP measured)', () => {
+    expect(TARGET_TO_DEFLECT_RATIO).toBeCloseTo(2.2, 5);
+  });
+});
+
+describe('SEPARATION_LINE_DEFAULT_LENGTH — default Aim scalar', () => {
+  it('default target extension is 0.25m (historical Unity lineDistance default)', () => {
+    // SP-Harden-10: still the default slider-A value; no longer energy01 budget.
     expect(SEPARATION_LINE_DEFAULT_LENGTH).toBe(0.25);
   });
 });

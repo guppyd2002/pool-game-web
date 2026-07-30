@@ -1,12 +1,11 @@
 /**
  * SP-Harden-9d TEMP — dual on-screen sliders for CEO live-tune of BOTH aim arms.
  *
- * Slider A (PRIMARY — CEO clarified): 目標球延伸線 (target extension)
+ * Slider A (PRIMARY — CEO / 8BP Aim): 目標球延伸線 (target extension)
  *   → ghost-ball.ts `_lineDistanceM` / setAimLineDistanceM
- *   → red/cyan post-contact line-of-centers arms (deflect + target)
- *   → arm actual length also scales with power(energy01) and cut angle kk:
- *       s_target = clamp01(1.5*kk)*lineLen + 2R
- *     Slider sets the baseline lineLen (shown as「基準」).
+ *   → red/cyan post-contact arms from ghost
+ *   → SP-Harden-10: FIXED length = slider value (no power/kk scale). 8BP Aim parity.
+ *     deflect stub = targetLen / 2.2
  *
  * Slider B: 母球導引線 (cue guide)
  *   → setCueAimGuideLengthM (blue line, 6256539 computeAimLinePoints — DO NOT touch)
@@ -208,9 +207,9 @@ export function createAimLengthDebugUI(
   title.appendChild(closeBtn);
   panel.appendChild(title);
 
-  // ── Slider A: target extension (PRIMARY — CEO) ────────────────────────────
+  // ── Slider A: target extension (PRIMARY — CEO / 8BP Aim) ──────────────────
   // Gate ⑤: min/max === AIM_LINE_DISTANCE_MIN/MAX (same as setAimLineDistanceM).
-  // Trap ③: only visible when hitType==='ball'. Trap ④: actual arm scales power×kk.
+  // Trap ③: only visible when hitType==='ball'. SP-Harden-10: length fixed (no power).
   const rowA = makeSliderRow({
     id: 'aim-len-target-ext',
     label: 'A 目標球延伸線 (target extension)',
@@ -223,10 +222,10 @@ export function createAimLengthDebugUI(
     setValue: setAimLineDistanceM,
     defaultValue: SEPARATION_LINE_DEFAULT_LENGTH,
     accent: COLOR_TARGET,
-    valueSuffix: ' m 基準長度',
+    valueSuffix: ' m 固定',
     hint:
-      '基準長度（實際受力道/切角影響）s=clamp01(1.5·kk)·lineLen+2R。' +
-      '測 A 必瞄球+高 power；空桌無紅線。拖 A→紅/青臂動、藍線不動。',
+      '固定長度＝滑桿值（8BP Aim 等價；不随力道/切角變）。偏折 stub=目標/2.2。' +
+      '測 A 必瞄球。拖 A→紅/青臂動；改力道→臂長不變；藍線不動。',
     onChange,
   });
   panel.appendChild(rowA);
