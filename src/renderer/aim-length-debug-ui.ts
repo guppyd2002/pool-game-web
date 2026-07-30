@@ -19,11 +19,15 @@ import {
   getCueAimGuideLengthM,
   setCueAimGuideLengthM,
   DEFAULT_CUE_AIM_GUIDE_LENGTH_M,
+  CUE_AIM_GUIDE_MIN_M,
+  CUE_AIM_GUIDE_MAX_M,
 } from './aim-line';
 import {
   getAimLineDistanceM,
   setAimLineDistanceM,
   SEPARATION_LINE_DEFAULT_LENGTH,
+  AIM_LINE_DISTANCE_MIN_M,
+  AIM_LINE_DISTANCE_MAX_M,
 } from './ghost-ball';
 
 export interface AimLengthDebugUI {
@@ -205,21 +209,24 @@ export function createAimLengthDebugUI(
   panel.appendChild(title);
 
   // ── Slider A: target extension (PRIMARY — CEO) ────────────────────────────
+  // Gate ⑤: min/max === AIM_LINE_DISTANCE_MIN/MAX (same as setAimLineDistanceM).
+  // Trap ③: only visible when hitType==='ball'. Trap ④: actual arm scales power×kk.
   const rowA = makeSliderRow({
     id: 'aim-len-target-ext',
     label: 'A 目標球延伸線 (target extension)',
     swatchColors: [COLOR_TARGET, COLOR_TARGET_ALT],
     swatchTitle: 'Post-contact arms (red illegal / cyan legal)',
-    min: 0.05,
-    max: 2.0,
+    min: AIM_LINE_DISTANCE_MIN_M,
+    max: AIM_LINE_DISTANCE_MAX_M,
     step: 0.01,
     getValue: getAimLineDistanceM,
     setValue: setAimLineDistanceM,
     defaultValue: SEPARATION_LINE_DEFAULT_LENGTH,
     accent: COLOR_TARGET,
-    valueSuffix: ' m 基準',
+    valueSuffix: ' m 基準長度',
     hint:
-      '基準 lineLen · 實際臂長受 power×切角 kk 影響（s=clamp01(1.5·kk)·lineLen+2R）。拖此滑桿應動紅/青延伸臂，藍線不動。',
+      '基準長度（實際受力道/切角影響）s=clamp01(1.5·kk)·lineLen+2R。' +
+      '測 A 必瞄球+高 power；空桌無紅線。拖 A→紅/青臂動、藍線不動。',
     onChange,
   });
   panel.appendChild(rowA);
@@ -231,13 +238,14 @@ export function createAimLengthDebugUI(
   panel.appendChild(div);
 
   // ── Slider B: cue aim guide (blue, 6256539 locked) ─────────────────────────
+  // Gate ⑤: min/max === CUE_AIM_GUIDE_MIN/MAX (same as setCueAimGuideLengthM).
   const rowB = makeSliderRow({
     id: 'aim-len-cue-guide',
     label: 'B 母球導引線 (cue guide)',
     swatchColors: [COLOR_CUE],
     swatchTitle: 'Cue ball blue aim guide',
-    min: 0.1,
-    max: 3.0,
+    min: CUE_AIM_GUIDE_MIN_M,
+    max: CUE_AIM_GUIDE_MAX_M,
     step: 0.01,
     getValue: getCueAimGuideLengthM,
     setValue: setCueAimGuideLengthM,
@@ -245,7 +253,7 @@ export function createAimLengthDebugUI(
     accent: COLOR_CUE,
     valueSuffix: ' m',
     hint:
-      '母球藍線長度（可超過接觸點）。6256539 邏輯不動。拖此滑桿應動藍線，紅/青臂不動。',
+      '母球藍線（可超過接觸點；空桌也有）。6256539 邏輯不動。拖 B→藍線動、紅/青臂不動。',
     onChange,
   });
   panel.appendChild(rowB);

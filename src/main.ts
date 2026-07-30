@@ -92,6 +92,12 @@ let _bihStartT = 0;
 let _lastAimTime = 0;
 // Current power fraction from the power bar (0..1); used by aim line preview.
 let _currentPowerFraction = 0;
+/**
+ * SP-Harden-9d trap ④: ghost arms scale with energy01. Idle power=0 → arm ≈ 2R only,
+ * so slider A looks dead. Debug override lets Spot/CEO force high power for min/max compare
+ * without holding the power bar. null = use real bar.
+ */
+let _debugPowerOverride: number | null = null;
 let _punchSavedAimDir: CmVector | null = null;
 let _punchSavedCueBallPos: CmVector | null = null;
 /** Injected after gameSession is built — Unity IsAllowableTargetBall for red/white assist. */
@@ -110,10 +116,12 @@ function _updateAimVisuals(): void {
   const cueBall = physics.getBall(0);
   // F-A: use nominal 0.5 force when power bar idle so aim line always shows
   // during aim drag. When power bar held, use real fraction (M-2 bit-exact).
-  const _previewForce = _currentPowerFraction > 0 ? _currentPowerFraction : 0.5;
+  const powerLive = _debugPowerOverride ?? _currentPowerFraction;
+  const _previewForce = powerLive > 0 ? powerLive : 0.5;
   // F-B / SP-Harden-5: suppress assist while simulating (Unity InShot gate).
   const hit = physics.isSimulating ? null : cue.getAimHit(_previewForce);
-  const power = _currentPowerFraction;
+  // Ghost arm energy01: honor debug override (trap ④ self-test / CEO high-power compare).
+  const power = powerLive;
   const show = cue.aimLineVisible ? hit : null;
   // Legal white / illegal red — Unity SetIsAllowableTargetBall on first-hit ball.
   let isLegal = true;
@@ -641,7 +649,21 @@ window.addEventListener('beforeunload', () => {
   toggleColliders: () => scene.toggleColliders?.(),  // show/hide physics boundary overlay
   // SP-Harden-9d TEMP — dual: A=target extension (_lineDistanceM), B=cue blue guide
   getCueAimGuideLengthM,
-  setCueAimGuideLengthM,
+  setCueAimGuideLengthM: (m: number) => {
+    const v = setCueAimGuideLengthM(m);
+    _updateAimVisuals();
+    return v;
+  },
   getAimLineDistanceM,
-  setAimLineDistanceM,
+  setAimLineDistanceM: (m: number) => {
+    const v = setAimLineDistanceM(m);
+    _updateAimVisuals();
+    return v;
+  },
+  /** Trap ④: force energy01 for arm preview (null clears). */
+  setAimPowerFraction: (f: number | null) => {
+    _debugPowerOverride = f == null ? null : Math.max(0, Math.min(1, f));
+    _updateAimVisuals();
+  },
+  getAimPowerFraction: () => _debugPowerOverride ?? _currentPowerFraction,
 };

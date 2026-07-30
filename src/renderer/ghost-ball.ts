@@ -40,12 +40,20 @@ export function getAimLineDistanceM(): number {
 }
 
 /**
+ * SP-Harden-9d: clamp for post-contact arm budget (target extension).
+ * MUST stay in lockstep with TEMP slider A min/max (gate ⑤).
+ * Not the cue blue guide — see aim-line DEFAULT_CUE_AIM_GUIDE_LENGTH_M.
+ */
+export const AIM_LINE_DISTANCE_MIN_M = 0.05;
+export const AIM_LINE_DISTANCE_MAX_M = 2.0;
+
+/**
  * Set aim assist lineDistance in meters (clamped). Returns applied value.
  * SP-Harden-9d: clamp widened 0.05–2.0 m so CEO can explore beyond Unity 0.25.
  * This is the post-contact arm budget (target extension), NOT cue blue guide.
  */
 export function setAimLineDistanceM(m: number): number {
-  _lineDistanceM = Math.max(0.05, Math.min(2.0, m));
+  _lineDistanceM = Math.max(AIM_LINE_DISTANCE_MIN_M, Math.min(AIM_LINE_DISTANCE_MAX_M, m));
   return _lineDistanceM;
 }
 

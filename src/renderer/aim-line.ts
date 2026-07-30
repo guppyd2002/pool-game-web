@@ -26,6 +26,10 @@ export function toWorld(v: CmVector): THREE.Vector3 {
  */
 export const DEFAULT_CUE_AIM_GUIDE_LENGTH_M = 1.5;
 
+/** SP-Harden-9d: TEMP slider B min/max MUST match setter clamp (gate ⑤). */
+export const CUE_AIM_GUIDE_MIN_M = 0.1;
+export const CUE_AIM_GUIDE_MAX_M = 3.0;
+
 /** Live cue aim-guide length (meters). Mutable for TEMP CEO slider. */
 let _cueAimGuideLengthM = DEFAULT_CUE_AIM_GUIDE_LENGTH_M;
 
@@ -33,9 +37,9 @@ export function getCueAimGuideLengthM(): number {
   return _cueAimGuideLengthM;
 }
 
-/** Set cue aim-guide length in meters (clamped 0.10–3.00). Returns applied value. */
+/** Set cue aim-guide length in meters (clamped CUE_AIM_GUIDE_MIN/MAX). Returns applied value. */
 export function setCueAimGuideLengthM(m: number): number {
-  _cueAimGuideLengthM = Math.max(0.1, Math.min(3.0, m));
+  _cueAimGuideLengthM = Math.max(CUE_AIM_GUIDE_MIN_M, Math.min(CUE_AIM_GUIDE_MAX_M, m));
   return _cueAimGuideLengthM;
 }
 
