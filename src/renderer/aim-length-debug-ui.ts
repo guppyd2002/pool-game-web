@@ -1,11 +1,13 @@
 /**
- * SP-Harden-9 TEMP — on-screen slider for CEO live-tune of the CUE AIM GUIDE length.
+ * SP-Harden-9 / 9c TEMP — on-screen slider for CEO live-tune of CUE AIM GUIDE length.
  *
- * Controls: hitLineBase family — the primary aim/travel guide from the cue ball
+ * Controls: hitLineBase family — primary aim/travel guide from the cue ball
  * along the shot direction (CEO "blue line"), NOT post-contact lineDistance arms.
  *
- * Units: meters along aim direction. Can extend past first contact.
- * Default 1.50 m. Range 0.10–3.00 m.
+ * SP-Harden-9c: panel has close (X) + small "aim" reopen chip (mobile-friendly).
+ * Does NOT touch computeAimLinePoints — only panel visibility.
+ *
+ * Units: meters along aim direction. Default 1.50 m. Range 0.10–3.00 m.
  */
 
 import {
@@ -16,17 +18,22 @@ import {
 
 export interface AimLengthDebugUI {
   readonly element: HTMLElement;
+  /** Show the full TEMP panel (hide reopen chip). */
+  show(): void;
+  /** Hide panel; show small reopen control. */
+  hide(): void;
   dispose(): void;
 }
 
 /**
- * Floating TEMP panel. Default visible for CEO mobile prod.
- * Hide with ?debug=off.
+ * Floating TEMP panel + reopen chip.
+ * Default panel visible for CEO mobile prod. Hide panel with X or ?debug=off (not created).
  */
 export function createAimLengthDebugUI(
   container: HTMLElement,
   onChange?: (meters: number) => void,
 ): AimLengthDebugUI {
+  // ── Full panel ────────────────────────────────────────────────────────────
   const panel = document.createElement('div');
   panel.id = 'aim-length-debug';
   panel.style.cssText = [
@@ -49,9 +56,33 @@ export function createAimLengthDebugUI(
   const title = document.createElement('div');
   title.style.cssText =
     'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;';
-  title.innerHTML =
-    '<span style="font-size:11px;font-weight:700;letter-spacing:0.4px;color:#4db8ff;">TEMP · cue aim guide (blue line)</span>' +
-    '<span style="font-size:10px;opacity:0.65;">meters along shot</span>';
+
+  const titleLeft = document.createElement('span');
+  titleLeft.style.cssText =
+    'font-size:11px;font-weight:700;letter-spacing:0.4px;color:#4db8ff;';
+  titleLeft.textContent = 'TEMP · cue aim guide (blue line)';
+
+  // SP-Harden-9c: obvious close control for mobile (no query-string needed).
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = '✕';
+  closeBtn.setAttribute('aria-label', 'Close aim length panel');
+  closeBtn.title = 'Close panel';
+  closeBtn.style.cssText = [
+    'flex:0 0 auto',
+    'width:32px', 'height:32px',
+    'border-radius:8px',
+    'border:1px solid rgba(255,255,255,0.35)',
+    'background:rgba(255,80,80,0.25)',
+    'color:#fff',
+    'font-size:16px', 'font-weight:700', 'line-height:1',
+    'cursor:pointer',
+    'padding:0',
+    'display:flex', 'align-items:center', 'justify-content:center',
+  ].join(';');
+
+  title.appendChild(titleLeft);
+  title.appendChild(closeBtn);
 
   const valueRow = document.createElement('div');
   valueRow.style.cssText =
@@ -108,7 +139,10 @@ export function createAimLengthDebugUI(
   slider.addEventListener('input', () => {
     apply(parseFloat(slider.value));
   });
-  resetBtn.addEventListener('click', () => {
+  // stopPropagation so track clicks don't bubble oddly on mobile overlays
+  slider.addEventListener('pointerdown', (e) => e.stopPropagation());
+  resetBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     apply(DEFAULT_CUE_AIM_GUIDE_LENGTH_M);
   });
 
@@ -119,12 +153,63 @@ export function createAimLengthDebugUI(
   panel.appendChild(resetBtn);
   container.appendChild(panel);
 
+  // ── Reopen chip (shown when panel hidden) ─────────────────────────────────
+  const reopen = document.createElement('button');
+  reopen.type = 'button';
+  reopen.id = 'aim-length-debug-reopen';
+  reopen.textContent = 'aim';
+  reopen.title = 'Reopen aim length panel';
+  reopen.setAttribute('aria-label', 'Reopen aim length panel');
+  reopen.style.cssText = [
+    'position:absolute',
+    'right:max(8px, env(safe-area-inset-right, 0px))',
+    'top:max(48px, calc(40px + env(safe-area-inset-top, 0px)))',
+    'z-index:500',
+    'display:none',
+    'min-width:44px', 'min-height:36px',
+    'padding:6px 12px',
+    'border-radius:18px',
+    'border:1px solid rgba(77,184,255,0.7)',
+    'background:rgba(12,18,28,0.9)',
+    'color:#4db8ff',
+    'font-size:12px', 'font-weight:700',
+    'font-family:system-ui,sans-serif',
+    'cursor:pointer',
+    'box-shadow:0 2px 10px rgba(0,0,0,0.45)',
+    'pointer-events:auto',
+  ].join(';');
+  container.appendChild(reopen);
+
+  function show(): void {
+    panel.style.display = 'block';
+    reopen.style.display = 'none';
+  }
+
+  function hide(): void {
+    panel.style.display = 'none';
+    reopen.style.display = 'block';
+  }
+
+  closeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hide();
+  });
+  reopen.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    show();
+  });
+
   return {
     get element() {
       return panel;
     },
+    show,
+    hide,
     dispose(): void {
       if (panel.parentNode) panel.parentNode.removeChild(panel);
+      if (reopen.parentNode) reopen.parentNode.removeChild(reopen);
     },
   };
 }
