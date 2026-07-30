@@ -1,13 +1,18 @@
 /**
- * SP-Harden-9 / 9c TEMP — on-screen slider for CEO live-tune of CUE AIM GUIDE length.
+ * SP-Harden-9d TEMP — dual on-screen sliders for CEO live-tune of BOTH aim arms.
  *
- * Controls: hitLineBase family — primary aim/travel guide from the cue ball
- * along the shot direction (CEO "blue line"), NOT post-contact lineDistance arms.
+ * Slider A (PRIMARY — CEO clarified): 目標球延伸線 (target extension)
+ *   → ghost-ball.ts `_lineDistanceM` / setAimLineDistanceM
+ *   → red/cyan post-contact line-of-centers arms (deflect + target)
+ *   → arm actual length also scales with power(energy01) and cut angle kk:
+ *       s_target = clamp01(1.5*kk)*lineLen + 2R
+ *     Slider sets the baseline lineLen (shown as「基準」).
  *
- * SP-Harden-9c: panel has close (X) + small "aim" reopen chip (mobile-friendly).
- * Does NOT touch computeAimLinePoints — only panel visibility.
+ * Slider B: 母球導引線 (cue guide)
+ *   → setCueAimGuideLengthM (blue line, 6256539 computeAimLinePoints — DO NOT touch)
  *
- * Units: meters along aim direction. Default 1.50 m. Range 0.10–3.00 m.
+ * SP-Harden-9c UX retained: ✕ close panel + small "aim" reopen chip.
+ * Pure UI/debug — no physics / rules changes.
  */
 
 import {
@@ -15,6 +20,11 @@ import {
   setCueAimGuideLengthM,
   DEFAULT_CUE_AIM_GUIDE_LENGTH_M,
 } from './aim-line';
+import {
+  getAimLineDistanceM,
+  setAimLineDistanceM,
+  SEPARATION_LINE_DEFAULT_LENGTH,
+} from './ghost-ball';
 
 export interface AimLengthDebugUI {
   readonly element: HTMLElement;
@@ -25,13 +35,122 @@ export interface AimLengthDebugUI {
   dispose(): void;
 }
 
+const COLOR_TARGET = '#ff5555'; // red/cyan post-contact arms (illegal red; legal cyan ~#7ec8ff)
+const COLOR_TARGET_ALT = '#7ec8ff';
+const COLOR_CUE = '#4db8ff'; // blue cue aim guide
+
+function makeSwatch(color: string, title: string): HTMLElement {
+  const s = document.createElement('span');
+  s.title = title;
+  s.style.cssText = [
+    'display:inline-block',
+    'width:12px', 'height:12px',
+    'border-radius:3px',
+    `background:${color}`,
+    'border:1px solid rgba(255,255,255,0.45)',
+    'flex:0 0 auto',
+    'box-shadow:0 0 0 1px rgba(0,0,0,0.35)',
+  ].join(';');
+  return s;
+}
+
+function makeSliderRow(opts: {
+  id: string;
+  label: string;
+  swatchColors: string[];
+  swatchTitle: string;
+  min: number;
+  max: number;
+  step: number;
+  getValue: () => number;
+  setValue: (v: number) => number;
+  defaultValue: number;
+  accent: string;
+  valueSuffix: string;
+  hint: string;
+  onChange?: () => void;
+}): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-bottom:10px;';
+
+  const labelRow = document.createElement('div');
+  labelRow.style.cssText =
+    'display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;';
+
+  for (const c of opts.swatchColors) {
+    labelRow.appendChild(makeSwatch(c, opts.swatchTitle));
+  }
+
+  const labelEl = document.createElement('span');
+  labelEl.style.cssText =
+    'font-size:11px;font-weight:700;letter-spacing:0.2px;color:#e8f7f8;';
+  labelEl.textContent = opts.label;
+  labelRow.appendChild(labelEl);
+
+  const valueEl = document.createElement('span');
+  valueEl.style.cssText =
+    'margin-left:auto;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;';
+  valueEl.textContent = `${opts.getValue().toFixed(2)}${opts.valueSuffix}`;
+  labelRow.appendChild(valueEl);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.id = opts.id;
+  slider.min = String(opts.min);
+  slider.max = String(opts.max);
+  slider.step = String(opts.step);
+  slider.value = String(opts.getValue());
+  slider.style.cssText = [
+    'width:100%', 'height:28px', 'margin:0',
+    `accent-color:${opts.accent}`, 'cursor:pointer',
+  ].join(';');
+  slider.setAttribute('aria-label', opts.label);
+
+  const hint = document.createElement('div');
+  hint.style.cssText =
+    'font-size:9px;opacity:0.7;margin-top:2px;line-height:1.3;color:#cde;';
+  hint.textContent = opts.hint;
+
+  const resetBtn = document.createElement('button');
+  resetBtn.type = 'button';
+  resetBtn.textContent = `Reset ${opts.defaultValue.toFixed(2)}`;
+  resetBtn.style.cssText = [
+    'margin-top:4px', 'width:100%',
+    'background:rgba(255,255,255,0.06)', 'color:#cff',
+    'border:1px solid rgba(255,255,255,0.15)', 'border-radius:5px',
+    'padding:3px 6px', 'font-size:10px', 'cursor:pointer',
+  ].join(';');
+
+  function apply(v: number): void {
+    const m = opts.setValue(v);
+    valueEl.textContent = `${m.toFixed(2)}${opts.valueSuffix}`;
+    slider.value = String(m);
+    opts.onChange?.();
+  }
+
+  slider.addEventListener('input', () => {
+    apply(parseFloat(slider.value));
+  });
+  slider.addEventListener('pointerdown', (e) => e.stopPropagation());
+  resetBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    apply(opts.defaultValue);
+  });
+
+  wrap.appendChild(labelRow);
+  wrap.appendChild(slider);
+  wrap.appendChild(hint);
+  wrap.appendChild(resetBtn);
+  return wrap;
+}
+
 /**
- * Floating TEMP panel + reopen chip.
+ * Floating TEMP dual-slider panel + reopen chip.
  * Default panel visible for CEO mobile prod. Hide panel with X or ?debug=off (not created).
  */
 export function createAimLengthDebugUI(
   container: HTMLElement,
-  onChange?: (meters: number) => void,
+  onChange?: () => void,
 ): AimLengthDebugUI {
   // ── Full panel ────────────────────────────────────────────────────────────
   const panel = document.createElement('div');
@@ -41,11 +160,11 @@ export function createAimLengthDebugUI(
     'left:50%', 'transform:translateX(-50%)',
     'top:max(48px, calc(40px + env(safe-area-inset-top, 0px)))',
     'z-index:500',
-    'background:rgba(12,18,28,0.92)',
-    'border:1px solid rgba(77,184,255,0.65)',
+    'background:rgba(12,18,28,0.94)',
+    'border:1px solid rgba(255,120,100,0.55)',
     'border-radius:10px',
-    'padding:8px 12px 10px',
-    'min-width:min(92vw, 340px)',
+    'padding:8px 12px 8px',
+    'min-width:min(94vw, 360px)',
     'font-family:system-ui,sans-serif',
     'color:#e8f7f8',
     'box-shadow:0 4px 18px rgba(0,0,0,0.55)',
@@ -55,12 +174,12 @@ export function createAimLengthDebugUI(
 
   const title = document.createElement('div');
   title.style.cssText =
-    'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;';
+    'display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;';
 
   const titleLeft = document.createElement('span');
   titleLeft.style.cssText =
-    'font-size:11px;font-weight:700;letter-spacing:0.4px;color:#4db8ff;';
-  titleLeft.textContent = 'TEMP · cue aim guide (blue line)';
+    'font-size:11px;font-weight:700;letter-spacing:0.4px;color:#ffaa88;';
+  titleLeft.textContent = 'TEMP · dual aim lengths (9d)';
 
   // SP-Harden-9c: obvious close control for mobile (no query-string needed).
   const closeBtn = document.createElement('button');
@@ -83,74 +202,54 @@ export function createAimLengthDebugUI(
 
   title.appendChild(titleLeft);
   title.appendChild(closeBtn);
-
-  const valueRow = document.createElement('div');
-  valueRow.style.cssText =
-    'display:flex;align-items:baseline;justify-content:center;gap:6px;margin-bottom:4px;';
-
-  const valueEl = document.createElement('span');
-  valueEl.style.cssText =
-    'font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff;';
-  valueEl.textContent = getCueAimGuideLengthM().toFixed(2);
-
-  const unitEl = document.createElement('span');
-  unitEl.style.cssText = 'font-size:12px;opacity:0.75;';
-  unitEl.textContent = 'm';
-
-  valueRow.appendChild(valueEl);
-  valueRow.appendChild(unitEl);
-
-  const slider = document.createElement('input');
-  slider.type = 'range';
-  slider.min = '0.10';
-  slider.max = '3.00';
-  slider.step = '0.01';
-  slider.value = String(getCueAimGuideLengthM());
-  slider.style.cssText = [
-    'width:100%', 'height:28px', 'margin:0',
-    'accent-color:#4db8ff', 'cursor:pointer',
-  ].join(';');
-  slider.setAttribute('aria-label', 'Cue aim guide length meters');
-
-  const hint = document.createElement('div');
-  hint.style.cssText =
-    'font-size:10px;opacity:0.65;margin-top:4px;text-align:center;line-height:1.35;';
-  hint.innerHTML =
-    `母球主瞄準線長度（可超過接觸點）<br>` +
-    `default ${DEFAULT_CUE_AIM_GUIDE_LENGTH_M.toFixed(2)} m · 先瞄準再拖滑桿看藍線`;
-
-  const resetBtn = document.createElement('button');
-  resetBtn.type = 'button';
-  resetBtn.textContent = `Reset ${DEFAULT_CUE_AIM_GUIDE_LENGTH_M.toFixed(2)}`;
-  resetBtn.style.cssText = [
-    'margin-top:6px', 'width:100%',
-    'background:rgba(255,255,255,0.08)', 'color:#cff',
-    'border:1px solid rgba(255,255,255,0.2)', 'border-radius:6px',
-    'padding:5px 8px', 'font-size:11px', 'cursor:pointer',
-  ].join(';');
-
-  function apply(v: number): void {
-    const m = setCueAimGuideLengthM(v);
-    valueEl.textContent = m.toFixed(2);
-    slider.value = String(m);
-    onChange?.(m);
-  }
-
-  slider.addEventListener('input', () => {
-    apply(parseFloat(slider.value));
-  });
-  // stopPropagation so track clicks don't bubble oddly on mobile overlays
-  slider.addEventListener('pointerdown', (e) => e.stopPropagation());
-  resetBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    apply(DEFAULT_CUE_AIM_GUIDE_LENGTH_M);
-  });
-
   panel.appendChild(title);
-  panel.appendChild(valueRow);
-  panel.appendChild(slider);
-  panel.appendChild(hint);
-  panel.appendChild(resetBtn);
+
+  // ── Slider A: target extension (PRIMARY — CEO) ────────────────────────────
+  const rowA = makeSliderRow({
+    id: 'aim-len-target-ext',
+    label: 'A 目標球延伸線 (target extension)',
+    swatchColors: [COLOR_TARGET, COLOR_TARGET_ALT],
+    swatchTitle: 'Post-contact arms (red illegal / cyan legal)',
+    min: 0.05,
+    max: 2.0,
+    step: 0.01,
+    getValue: getAimLineDistanceM,
+    setValue: setAimLineDistanceM,
+    defaultValue: SEPARATION_LINE_DEFAULT_LENGTH,
+    accent: COLOR_TARGET,
+    valueSuffix: ' m 基準',
+    hint:
+      '基準 lineLen · 實際臂長受 power×切角 kk 影響（s=clamp01(1.5·kk)·lineLen+2R）。拖此滑桿應動紅/青延伸臂，藍線不動。',
+    onChange,
+  });
+  panel.appendChild(rowA);
+
+  // Divider
+  const div = document.createElement('div');
+  div.style.cssText =
+    'height:1px;background:rgba(255,255,255,0.12);margin:2px 0 8px;';
+  panel.appendChild(div);
+
+  // ── Slider B: cue aim guide (blue, 6256539 locked) ─────────────────────────
+  const rowB = makeSliderRow({
+    id: 'aim-len-cue-guide',
+    label: 'B 母球導引線 (cue guide)',
+    swatchColors: [COLOR_CUE],
+    swatchTitle: 'Cue ball blue aim guide',
+    min: 0.1,
+    max: 3.0,
+    step: 0.01,
+    getValue: getCueAimGuideLengthM,
+    setValue: setCueAimGuideLengthM,
+    defaultValue: DEFAULT_CUE_AIM_GUIDE_LENGTH_M,
+    accent: COLOR_CUE,
+    valueSuffix: ' m',
+    hint:
+      '母球藍線長度（可超過接觸點）。6256539 邏輯不動。拖此滑桿應動藍線，紅/青臂不動。',
+    onChange,
+  });
+  panel.appendChild(rowB);
+
   container.appendChild(panel);
 
   // ── Reopen chip (shown when panel hidden) ─────────────────────────────────
@@ -169,9 +268,9 @@ export function createAimLengthDebugUI(
     'min-width:44px', 'min-height:36px',
     'padding:6px 12px',
     'border-radius:18px',
-    'border:1px solid rgba(77,184,255,0.7)',
+    'border:1px solid rgba(255,120,100,0.7)',
     'background:rgba(12,18,28,0.9)',
-    'color:#4db8ff',
+    'color:#ffaa88',
     'font-size:12px', 'font-weight:700',
     'font-family:system-ui,sans-serif',
     'cursor:pointer',

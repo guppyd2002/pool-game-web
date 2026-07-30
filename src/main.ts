@@ -22,7 +22,11 @@ import { createCueAdapter } from './game/cue-adapter';
 import { createAimLine } from './renderer/aim-line';
 import { createPowerBar } from './renderer/power-bar';
 import { createCueMesh } from './renderer/cue-mesh';
-import { createGhostBall } from './renderer/ghost-ball';
+import {
+  createGhostBall,
+  getAimLineDistanceM,
+  setAimLineDistanceM,
+} from './renderer/ghost-ball';
 import { getCueAimGuideLengthM, setCueAimGuideLengthM } from './renderer/aim-line';
 import { createAimLengthDebugUI } from './renderer/aim-length-debug-ui';
 import { createPlacementMarker } from './renderer/placement-marker';
@@ -69,8 +73,8 @@ const powerBar = createPowerBar(container);
 const cueMesh = createCueMesh(scene.scene);
 const ghostBall = createGhostBall(scene.scene);
 
-// SP-Harden-9 TEMP: CEO live-tunes lineDistance (aim assist length).
-// Default ON for mobile prod; hide with ?debug=aimlen=0. Remove after CEO locks value.
+// SP-Harden-9d TEMP: dual sliders — A target extension (_lineDistanceM) + B cue blue guide.
+// Default ON for mobile prod; hide with ?debug=aimlen=0 or ?debug=off. Remove after CEO locks.
 const _showAimLenDebug = new URLSearchParams(window.location.search).get('debug') !== 'aimlen=0'
   && new URLSearchParams(window.location.search).get('debug') !== 'off';
 const aimLengthDebug = _showAimLenDebug
@@ -635,7 +639,9 @@ window.addEventListener('beforeunload', () => {
   gameSession,
   cue,  // exposes getAimState() for overlay hitTest guard smoke test
   toggleColliders: () => scene.toggleColliders?.(),  // show/hide physics boundary overlay
-  // SP-Harden-9 TEMP — CEO live-tunes CUE aim guide (blue line) length
+  // SP-Harden-9d TEMP — dual: A=target extension (_lineDistanceM), B=cue blue guide
   getCueAimGuideLengthM,
   setCueAimGuideLengthM,
+  getAimLineDistanceM,
+  setAimLineDistanceM,
 };

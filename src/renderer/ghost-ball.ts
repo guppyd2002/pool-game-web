@@ -39,9 +39,13 @@ export function getAimLineDistanceM(): number {
   return _lineDistanceM;
 }
 
-/** Set aim assist lineDistance in meters (clamped). Returns applied value. */
+/**
+ * Set aim assist lineDistance in meters (clamped). Returns applied value.
+ * SP-Harden-9d: clamp widened 0.05–2.0 m so CEO can explore beyond Unity 0.25.
+ * This is the post-contact arm budget (target extension), NOT cue blue guide.
+ */
 export function setAimLineDistanceM(m: number): number {
-  _lineDistanceM = Math.max(0.05, Math.min(1.5, m));
+  _lineDistanceM = Math.max(0.05, Math.min(2.0, m));
   return _lineDistanceM;
 }
 
