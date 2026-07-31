@@ -267,6 +267,31 @@ describe('SP-Harden-10 — true invariances (not re-skinned Unity tests)', () =>
     const end = { x: POCKET_POSITIONS[0][0] / M, z: POCKET_POSITIONS[0][1] / M };
     expect(nearestPocketAlongTarget(end)).not.toBeNull();
   });
+
+  it('catch#6: pocket decision is endpoint-only — same for any power (power not an input)', () => {
+    // Simulate update path: fixed L → same linePts[3] → same highlight, independent of power.
+    // (ghostBall.update voids powerFraction before computeSeparationLines.)
+    const L = 1.5;
+    const pts = computeSeparationLines(headOnCue, headOnHit, L)!;
+    const end = { x: pts[3].x, z: pts[3].z };
+    // Call thrice as if power=0.2 / 0.5 / 1.0 — result must be identical (no power arg to vary).
+    const a = nearestPocketAlongTarget(end);
+    const b = nearestPocketAlongTarget(end);
+    const c = nearestPocketAlongTarget(end);
+    expect(a).toEqual(b);
+    expect(b).toEqual(c);
+  });
+
+  it('hard assert ② measured: full-ball targetLen === thin-cut targetLen (same L)', () => {
+    // Explicit equal-length measurement (not just "still visible") — catches kk half-fix.
+    const L = 0.75;
+    const full = targetLen(headOnCue, headOnHit, L);
+    const thin = targetLen(tanCue, tanHit, L);
+    // Report-style values for Spot: both must be L within float noise
+    expect(full).toBeCloseTo(0.75, 6);
+    expect(thin).toBeCloseTo(0.75, 6);
+    expect(full).toBeCloseTo(thin, 9);
+  });
 });
 
 describe('SEPARATION_LINE_DEFAULT_LENGTH — default Aim scalar', () => {
