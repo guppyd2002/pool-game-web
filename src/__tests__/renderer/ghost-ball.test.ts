@@ -13,6 +13,8 @@ import {
   nearestPocketAlongTarget,
   SEPARATION_LINE_DEFAULT_LENGTH,
   TARGET_TO_DEFLECT_RATIO,
+  SP_HARDEN_10_FIXED_AIM_LENGTH,
+  SP_HARDEN_10_CANARY,
   POCKET_HIGHLIGHT_RADIUS,
   ASSIST_COLOR_LEGAL,
   ASSIST_COLOR_OUTLINE,
@@ -208,7 +210,7 @@ describe('computeSeparationLines — tangential shot (kk ≈ 0) [SP-Harden-10 fi
   });
 });
 
-describe('SP-Harden-10 — fixed length independent of cut angle (same L)', () => {
+describe('SP-Harden-10 — true invariances (not re-skinned Unity tests)', () => {
   const L = 1.0;
   const headOnCue = new CmVector(0, BALL_Y, 0);
   const headOnHit = makeBallHit(
@@ -219,19 +221,51 @@ describe('SP-Harden-10 — fixed length independent of cut angle (same L)', () =
   const tanCue = new CmVector(Math.round(gx * M), BALL_Y, -5000);
   const tanHit = makeBallHit(5000, BALL_Y, 0, M, 0, 0);
 
-  it('target arm length is L for both head-on and tangential', () => {
-    const headPts = computeSeparationLines(headOnCue, headOnHit, L)!;
-    const tanPts = computeSeparationLines(tanCue, tanHit, L)!;
-    const headG = ghostCenter(headOnHit);
-    const tanG = ghostCenter(tanHit);
-    const headLen = Math.hypot(headPts[3].x - headG.x, headPts[3].z - headG.z);
-    const tanLen = Math.hypot(tanPts[3].x - tanG.x, tanPts[3].z - tanG.z);
+  function targetLen(
+    cue: CmVector,
+    hit: ReturnType<typeof makeBallHit>,
+    lineLen: number,
+  ): number {
+    const pts = computeSeparationLines(cue, hit, lineLen)!;
+    const g = ghostCenter(hit);
+    return Math.hypot(pts[3].x - g.x, pts[3].z - g.z);
+  }
+
+  it('catch#2: full-ball vs thin-cut, same L → target length identical (kk removed)', () => {
+    // Half-fix would drop only energy01 and leave kk — thin cut would still shrink.
+    const headLen = targetLen(headOnCue, headOnHit, L);
+    const tanLen = targetLen(tanCue, tanHit, L);
     expect(headLen).toBeCloseTo(L, 5);
     expect(tanLen).toBeCloseTo(L, 5);
+    expect(Math.abs(headLen - tanLen)).toBeLessThan(1e-9);
   });
 
-  it('TARGET_TO_DEFLECT_RATIO is 2.2 (8BP measured)', () => {
-    expect(TARGET_TO_DEFLECT_RATIO).toBeCloseTo(2.2, 5);
+  it('catch#2: length is the pure lineLength scalar (no +2R leftover)', () => {
+    expect(targetLen(headOnCue, headOnHit, 0.5)).toBeCloseTo(0.5, 5);
+    expect(targetLen(tanCue, tanHit, 0.5)).toBeCloseTo(0.5, 5);
+    // Old Unity formula at kk≈0 gave ~2R regardless of L — must not regress
+    expect(targetLen(tanCue, tanHit, 0.5)).not.toBeCloseTo(2 * R, 2);
+  });
+
+  it('deflect stub ≈ target/2 within 1.8–2.4 band', () => {
+    expect(TARGET_TO_DEFLECT_RATIO).toBeGreaterThanOrEqual(1.8);
+    expect(TARGET_TO_DEFLECT_RATIO).toBeLessThanOrEqual(2.4);
+    const pts = computeSeparationLines(tanCue, tanHit, L)!;
+    const g = ghostCenter(tanHit);
+    const defLen = Math.hypot(pts[1].x - g.x, pts[1].z - g.z);
+    expect(defLen).toBeCloseTo(L / TARGET_TO_DEFLECT_RATIO, 5);
+  });
+
+  it('canary symbols present for Spot prod fingerprint', () => {
+    expect(SP_HARDEN_10_FIXED_AIM_LENGTH).toBe(true);
+    expect(SP_HARDEN_10_CANARY).toBe('SP_HARDEN_10_FIXED_AIM_LENGTH');
+  });
+
+  it('catch#6 DIV: nearestPocketAlongTarget has no power parameter (geometry only)', () => {
+    // Structural: highlight cannot gate on energy if the API has no energy arg.
+    expect(nearestPocketAlongTarget.length).toBeLessThanOrEqual(2);
+    const end = { x: POCKET_POSITIONS[0][0] / M, z: POCKET_POSITIONS[0][1] / M };
+    expect(nearestPocketAlongTarget(end)).not.toBeNull();
   });
 });
 

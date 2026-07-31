@@ -26,6 +26,9 @@ import {
   createGhostBall,
   getAimLineDistanceM,
   setAimLineDistanceM,
+  SP_HARDEN_10_FIXED_AIM_LENGTH,
+  SP_HARDEN_10_CANARY,
+  TARGET_TO_DEFLECT_RATIO,
 } from './renderer/ghost-ball';
 import { getCueAimGuideLengthM, setCueAimGuideLengthM } from './renderer/aim-line';
 import { createAimLengthDebugUI } from './renderer/aim-length-debug-ui';
@@ -93,9 +96,10 @@ let _lastAimTime = 0;
 // Current power fraction from the power bar (0..1); used by aim line preview.
 let _currentPowerFraction = 0;
 /**
- * SP-Harden-9d trap ④: ghost arms scale with energy01. Idle power=0 → arm ≈ 2R only,
- * so slider A looks dead. Debug override lets Spot/CEO force high power for min/max compare
- * without holding the power bar. null = use real bar.
+ * Debug power override for aim preview (hit force / cue mesh backswing).
+ * SP-Harden-10: post-contact arm length no longer uses this (fixed Aim).
+ * Still useful for hit-force / punch visual and Spot power-invariance probes.
+ * null = use real bar.
  */
 let _debugPowerOverride: number | null = null;
 let _punchSavedAimDir: CmVector | null = null;
@@ -120,7 +124,7 @@ function _updateAimVisuals(): void {
   const _previewForce = powerLive > 0 ? powerLive : 0.5;
   // F-B / SP-Harden-5: suppress assist while simulating (Unity InShot gate).
   const hit = physics.isSimulating ? null : cue.getAimHit(_previewForce);
-  // Ghost arm energy01: honor debug override (trap ④ self-test / CEO high-power compare).
+  // Power still drives cue mesh / power bar; ghost arms ignore it (SP-Harden-10).
   const power = powerLive;
   const show = cue.aimLineVisible ? hit : null;
   // Legal white / illegal red — Unity SetIsAllowableTargetBall on first-hit ball.
@@ -660,10 +664,14 @@ window.addEventListener('beforeunload', () => {
     _updateAimVisuals();
     return v;
   },
-  /** Trap ④: force energy01 for arm preview (null clears). */
+  /** Force power for aim preview probes (null clears). Arms ignore this since Harden-10. */
   setAimPowerFraction: (f: number | null) => {
     _debugPowerOverride = f == null ? null : Math.max(0, Math.min(1, f));
     _updateAimVisuals();
   },
   getAimPowerFraction: () => _debugPowerOverride ?? _currentPowerFraction,
+  // SP-Harden-10 canary — Spot prod fingerprint (not present on 9d81193)
+  SP_HARDEN_10_FIXED_AIM_LENGTH,
+  SP_HARDEN_10_CANARY,
+  TARGET_TO_DEFLECT_RATIO,
 };

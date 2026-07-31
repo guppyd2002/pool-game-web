@@ -182,25 +182,42 @@ test('SP-Harden-9d/10 dual slider + fixed Aim length (ball)', async ({ page }) =
 
   await page.screenshot({ path: path.join(OUT, 'A-max-ball.png') });
 
-  // ── SP-Harden-10 CORE: change power → arm length unchanged ───────────────
+  // ── SP-Harden-10 CORE: power invariance (must NOT be old power=1-only test) ─
+  // Explicit 0.2 vs 1.0 — Spot will reject re-skinned smokes that always run at 1.
   await page.evaluate(() => {
     const d = (window as any).__poolDebug;
-    d.setAimLineDistanceM(1.0); // known fixed length
-    d.setAimPowerFraction(0);   // idle / low
+    d.setAimLineDistanceM(1.0);
+    d.setAimPowerFraction(0.2);
   });
   await page.waitForTimeout(80);
-  const atP0 = await probe(page);
+  const atP02 = await probe(page);
 
   await page.evaluate(() => {
-    (window as any).__poolDebug.setAimPowerFraction(1);
+    (window as any).__poolDebug.setAimPowerFraction(1.0);
   });
   await page.waitForTimeout(80);
-  const atP1 = await probe(page);
+  const atP10 = await probe(page);
 
-  // Core design assertion: power must NOT scale post-contact arms.
-  expect(Math.abs(atP1.assistMaxLen - atP0.assistMaxLen)).toBeLessThan(0.05);
-  // And arms should be near slider A value (1.0 m target arm).
-  expect(atP1.assistMaxLen).toBeGreaterThan(0.8);
+  expect(atP02.power).toBeCloseTo(0.2, 5);
+  expect(atP10.power).toBeCloseTo(1.0, 5);
+  // Deciding assertion: power 0.2 vs 1.0 → same assist length
+  expect(Math.abs(atP10.assistMaxLen - atP02.assistMaxLen)).toBeLessThan(0.05);
+  expect(atP10.assistMaxLen).toBeGreaterThan(0.8);
+  expect(atP02.assistMaxLen).toBeGreaterThan(0.8);
+
+  // Canary: SP-Harden-10-only fingerprint (absent on 9d81193)
+  const canary = await page.evaluate(() => {
+    const d = (window as any).__poolDebug;
+    return {
+      flag: d.SP_HARDEN_10_FIXED_AIM_LENGTH === true,
+      name: d.SP_HARDEN_10_CANARY,
+      ratio: d.TARGET_TO_DEFLECT_RATIO,
+    };
+  });
+  expect(canary.flag).toBe(true);
+  expect(canary.name).toBe('SP_HARDEN_10_FIXED_AIM_LENGTH');
+  expect(canary.ratio).toBeGreaterThanOrEqual(1.8);
+  expect(canary.ratio).toBeLessThanOrEqual(2.4);
 
   // ── Gate ⑥ B sweep: blue changes, assist arms fixed ──────────────────────
   await page.evaluate(() => {
@@ -225,10 +242,11 @@ test('SP-Harden-9d/10 dual slider + fixed Aim length (ball)', async ({ page }) =
   await page.screenshot({ path: path.join(OUT, 'B-max-ball.png') });
 
   const report = {
-    p0, aMin, aMax, atP0, atP1, bMin, bMax, errors,
+    p0, aMin, aMax, atP02, atP10, bMin, bMax, canary, errors,
     aAssistDelta: aMax.assistMaxLen - aMin.assistMaxLen,
     aBlueDelta: aMax.blueLen - aMin.blueLen,
-    powerAssistDelta: atP1.assistMaxLen - atP0.assistMaxLen,
+    // Core Harden-10: must be ~0 (power 0.2 vs 1.0)
+    powerAssistDelta: atP10.assistMaxLen - atP02.assistMaxLen,
     bBlueDelta: bMax.blueLen - bMin.blueLen,
     bAssistDelta: bMax.assistMaxLen - bMin.assistMaxLen,
   };

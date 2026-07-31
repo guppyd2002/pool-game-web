@@ -30,10 +30,17 @@ import type { CmVector } from '../physics/cm-vector';
 export const SEPARATION_LINE_DEFAULT_LENGTH = 0.25;
 
 /**
- * SP-Harden-10 (8BP Aim parity): target extension ≈ deflect stub × this ratio.
- * Measured from Miniclip official art (target C≈6.2D, deflect D≈2.8D → ≈2.2×).
+ * SP-Harden-10: target extension / deflect stub ratio (≈2, band 1.8–2.4).
+ * 2.2 from single-frame 8BP art measure — not a physics constant; do not overfit.
  */
 export const TARGET_TO_DEFLECT_RATIO = 2.2;
+
+/**
+ * SP-Harden-10 canary — Spot verifies prod bundle / `__poolDebug` contains this.
+ * (setAimPowerFraction exists on 9d too; this symbol is 10-only.)
+ */
+export const SP_HARDEN_10_FIXED_AIM_LENGTH = true as const;
+export const SP_HARDEN_10_CANARY = 'SP_HARDEN_10_FIXED_AIM_LENGTH' as const;
 
 /** Live target-extension length (m) — fixed display length (no power/kk scale). */
 let _lineDistanceM = SEPARATION_LINE_DEFAULT_LENGTH;
@@ -159,6 +166,12 @@ export function computeSeparationLines(
  * If the target-path endpoint lies within pocketRadius of a pocket centre,
  * return that pocket in world metres (for highlight). Else null.
  * Unity: pocketRadius = 2R, path endpoint = ghost + s_target * direction2.
+ *
+ * SP-Harden-10 DIV (catch#6 / Spot):
+ *   - Pocket highlight is kept = deliberate escape from 8BP (8BP has none); CEO OK.
+ *   - Web port has NO isEnoughEnergy / power gate. Highlight is driven only by
+ *     geometry of the fixed-length target endpoint. Do NOT reintroduce energy
+ *     gating — that would make the assist look power-dependent again.
  */
 export function nearestPocketAlongTarget(
   targetEnd: { x: number; z: number },
@@ -326,7 +339,8 @@ export function createGhostBall(scene: THREE.Scene): GhostBallVisual {
         target.line.computeLineDistances();
         target.line.visible = true;
 
-        // Pocket highlight when target path points into a pocket
+        // Pocket highlight when target path points into a pocket.
+        // SP-Harden-10 DIV: geometry-only (no powerFraction / isEnoughEnergy gate).
         const pk = nearestPocketAlongTarget(linePts[3]);
         if (pk) {
           pocketRing.position.set(pk.x, pk.y, pk.z);
