@@ -19,8 +19,10 @@ import {
 } from '../../game/human-vs-ai';
 import { createPoolTable } from '../../game/table-setup';
 import { calculateAIShot } from '../../game/ai-controller';
+import * as AiController from '../../game/ai-controller';
 import { CmVector } from '../../physics/cm-vector';
 import * as THREE from 'three';
+import { BALL_Y } from '../../physics/constants';
 
 // ─── Shot factories ──────────────────────────────────────────────────────────
 
@@ -223,10 +225,17 @@ describe('attachHumanVsAI', () => {
     expect(physics.applyShot).not.toHaveBeenCalled();
   });
 
-  it('AI turn after break foul: onAiTurn + forceShot after delay', () => {
+  it('AI turn after break foul: onAiTurn + forceShot after delay (BIH with newPos)', () => {
     const { session, physics, space, replayDriver, cue } = setup();
     const onHuman = vi.fn();
     const onAi = vi.fn();
+    const newPos = new CmVector(-4000, BALL_Y, 500);
+    const impulse = new CmVector(111, 0, 222);
+    vi.spyOn(AiController, 'calculateAIShot').mockReturnValue({
+      shotData: { position: newPos, impulse, torque: CmVector.zero },
+      cueBallNewPos: newPos,
+    });
+
     attachHumanVsAI(
       session,
       physics,
@@ -236,14 +245,13 @@ describe('attachHumanVsAI', () => {
         onHumanTurn: onHuman,
         onAiTurn: (idx, bih) => {
           onAi(idx, bih);
-          cue.disable(); // main.ts responsibility
+          cue.disable();
         },
       },
     );
     session.startNewGame();
     onHuman.mockClear();
 
-    // Human break foul → P1 ball-in-hand
     (physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(noShot());
     session.forceShot({
       position: CmVector.zero,
@@ -256,16 +264,61 @@ describe('attachHumanVsAI', () => {
     expect(onAi).toHaveBeenCalledWith(1, true);
     expect(cue.disable).toHaveBeenCalled();
 
-    // First schedule: turn delay; then BIH place + second schedule for forceShot
     expect(scheduled.length).toBeGreaterThanOrEqual(1);
     physics.applyShot.mockClear();
-    // Flush turn delay → doAiShot BIH path schedules forceShot
-    flushAll();
-    // placeBall or respot should have been called
-    expect(physics.placeBall.mock.calls.length + physics.respotCueBall.mock.calls.length).toBeGreaterThanOrEqual(1);
-    // Flush BIH settle → forceShot
-    flushAll();
+    physics.placeBall.mockClear();
+    physics.respotCueBall.mockClear();
+    flushAll(); // turn delay → doAiShot
+    // DIV-008 (b): non-null newPos → placeBall(that pos), never respot
+    expect(physics.placeBall).toHaveBeenCalled();
+    expect(physics.placeBall.mock.calls[0][0]).toBe(0);
+    expect(physics.placeBall.mock.calls[0][1].x).toBe(newPos.x);
+    expect(physics.respotCueBall).not.toHaveBeenCalled();
+    flushAll(); // BIH settle → forceShot
     expect(physics.applyShot).toHaveBeenCalled();
+    expect(physics.applyShot.mock.calls[0][0].impulse.x).toBe(impulse.x);
+  });
+
+  it('AI BIH null newPos: no place/respot; cue unmoved; still forceShot (DIV-008 b)', () => {
+    const { session, physics, space, replayDriver } = setup();
+    const cueStay = new CmVector(-9000, BALL_Y, 0);
+    (physics.getBall as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 0,
+      position: cueStay,
+      velocity: CmVector.zero,
+      angularVelocity: CmVector.zero,
+      isPocketed: false,
+      isOutOfTable: false,
+    });
+    const impulse = new CmVector(333, 0, 444);
+    vi.spyOn(AiController, 'calculateAIShot').mockReturnValue({
+      shotData: { position: cueStay, impulse, torque: CmVector.zero },
+      cueBallNewPos: null,
+    });
+
+    attachHumanVsAI(session, physics, space, {
+      turnDelayMs: 0, bihSettleMs: 0, seed: 1, ...injectTimers(),
+    });
+    session.startNewGame();
+    (physics.applyShot as ReturnType<typeof vi.fn>).mockReturnValueOnce(noShot());
+    session.forceShot({
+      position: CmVector.zero,
+      impulse: new CmVector(0, 0, 1000),
+      torque: CmVector.zero,
+    });
+    replayDriver.triggerComplete();
+
+    physics.placeBall.mockClear();
+    physics.respotCueBall.mockClear();
+    physics.applyShot.mockClear();
+    flushAll();
+    flushAll();
+
+    expect(physics.placeBall).not.toHaveBeenCalled();
+    expect(physics.respotCueBall).not.toHaveBeenCalled();
+    expect(physics.getBall(0).position.x).toBe(cueStay.x);
+    expect(physics.applyShot).toHaveBeenCalled();
+    expect(physics.applyShot.mock.calls[0][0].impulse.z).toBe(impulse.z);
   });
 
   it('W3 input leak: AI turn + cue disabled → fireNow false, applyShot not from human', () => {

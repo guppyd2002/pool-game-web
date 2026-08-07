@@ -118,26 +118,26 @@ describe('runHeadlessGame()', () => {
   });
 
   /**
-   * HS-002 — DIV-004 mechanism direction (not magic seeds / not a fixed %).
+   * HS-002 — INTENTIONALLY RED until QA re-measures on post-DIV-008(b) tree.
    *
-   * History (do not re-introduce bug-derived goldens):
-   *   - d371b76: old "ground truth" cap seeds {7,8,10} under r4v2 were measured while
-   *     headless calculateAIShot args were SWAPPED (false AI). Bug-derived.
-   *   - 9b3a170: arg order fixed (isFirstShot, ballInHand).
-   *   - 72c54f5: QA (卡卡西) independent N=50 ground truth — NOT self-certified by dev.
+   * History of false "mechanism" goldens (do not re-introduce):
+   *   1) d371b76: cap seeds {7,8,10} measured under SWAPPED headless AI args.
+   *   2) 72c54f5 / 11638b7: asymmetric r4v2 seed+shot "cap===0" was measured while
+   *      headless still RESPOTTED on null placement — i.e. ruler A with safety net,
+   *      NOT SP-004 ruler B. After DIV-008 (b) @7b7620c (no respot), that absolute
+   *      zero is no longer valid on headless seed+shot (observed ~35% cap N=20).
    *
-   * Assertions (QA-specified; do not invent alternatives):
-   *   ✅ asymmetric r4v2, seed+shot, seeds 0..49 → cap-hit === 0
-   *   ✅ symmetric r4v4, *7919, same seed range → completion < 100% (symmetric can deadlock)
-   *   ❌ never assert a single seed's fate
-   *   ❌ never assert cap-hit rate == 4% (fragile on seed set)
+   * Required rewrite (dev MUST NOT invent numbers — wait 卡卡西 on 7b7620c+):
+   *   - Measure ONLY on committed no-respot harness (SP-004 / *7919 ruler B)
+   *   - Assert directional: symmetric cap-hit rate > asymmetric cap-hit rate
+   *     (same seed formula both sides; reference was ~45% sym r4 vs ~20% asym SP-005)
+   *   - ❌ single-seed fate  ❌ fixed percent like 4% or 0%
    *
-   * DIV-004 disposition (fleet): "low self-play completion is expected / not a FAIL"
-   * is withdrawn as a blanket excuse — high cap-hit must be investigated as regression.
-   * This test only locks the directional claim: asymmetric completes; symmetric can cap.
+   * Until QA lands, keep the obsolete expect so CI stays red (honest).
    */
-  it('HS-002: asymmetric r4v2 (seed+shot) has zero cap over seeds 0..49', () => {
-    // Ruler A-ish headless: seed + shotCount, production respot path inside runHeadlessGame
+  it('HS-002: STALE respot-ON asymmetric zero-cap (leave red — wait QA on SP-004 ruler)', () => {
+    // STALE: absolute zero on headless seed+shot was respot-inflated @72c54f5.
+    // After (b) this fails. Do not "fix" by lowering the number — change the RULER.
     let caps = 0;
     for (let seed = SEED_LO; seed <= SEED_HI; seed++) {
       const r = runHeadlessGame(seed, 4, 2, MAX_SHOTS);
@@ -146,8 +146,9 @@ describe('runHeadlessGame()', () => {
     expect(caps).toBe(0);
   }, 180_000);
 
-  it('HS-002b: symmetric r4v4 (*7919 SP-004 loop) completion < 100% over seeds 0..49', () => {
-    // Ruler B: SP-004 faithful — can deadlock; we only require "not always completes"
+  it('HS-002b: symmetric r4v4 (*7919 SP-004) completion < 100% over seeds 0..49', () => {
+    // Ruler B (always no-respot) — still valid directional sanity: not always completes.
+    // Full sym vs asym comparison awaits QA post-(b) numbers on this same ruler.
     let completed = 0;
     const n = SEED_HI - SEED_LO + 1;
     for (let seed = SEED_LO; seed <= SEED_HI; seed++) {
@@ -155,9 +156,10 @@ describe('runHeadlessGame()', () => {
       if (r.won && !r.capHit) completed++;
     }
     expect(completed).toBeLessThan(n);
-    expect(completed).toBeGreaterThan(0); // sanity: not total meltdown
+    expect(completed).toBeGreaterThan(0);
   }, 300_000);
 });
+
 
 describe('pickValidSeed()', () => {
   it('HS-003: returns a seed that produces a winner for r0=4 r1=2', () => {
