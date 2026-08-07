@@ -59,6 +59,10 @@ import { createTurnPrompt } from './renderer/turn-prompt';
 import { createHudBar } from './renderer/hud-bar';
 import { createPlayerBallHud } from './renderer/player-ball-hud';
 import { createTutorialOverlay } from './renderer/tutorial-overlay';
+import { createShotTimer } from './renderer/shot-timer';
+import { createPointFlyUI } from './renderer/point-fly-ui';
+import { createFindOpponentUI } from './renderer/find-opponent-ui';
+import { createSettingsPanel } from './renderer/settings-panel';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -296,6 +300,15 @@ const gameSession = createBallPool8Session({
 // SP-Harden-5: wire group-aware allowable for ghost/aim legal colour.
 _isAllowableBall = (id) => gameSession.getAllowableFn()(id);
 
+// UI-024: pause shot clock during InShot / leave table (timer restarts on Aiming turn)
+gameSession.store.subscribe(() => {
+  const phase = gameSession.store.getState().phase;
+  if (phase === 'InShot' || phase === 'GameOver' || phase === 'MainMenu') {
+    shotTimer.stop();
+    hudBar.setTimer(null);
+  }
+});
+
 // ─── GAME-002: main menu UI ────────────────────────────────────────────────────
 
 const mainMenuEl = document.createElement('div');
@@ -309,17 +322,32 @@ mainMenuEl.style.cssText = [
 ].join(';');
 mainMenuEl.innerHTML = [
   '<h1 style="font-size:36px;margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
-  '<p style="font-size:14px;opacity:0.6;margin-bottom:32px;">HotSeat — 2 players, same screen</p>',
+  '<p style="font-size:14px;opacity:0.6;margin-bottom:24px;">HotSeat — 2 players, same screen</p>',
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
-  '<label id="btn-load-replay" style="margin-top:16px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
+  '<label id="btn-load-replay" style="margin-top:14px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
   '<input id="inp-record" type="file" accept=".poolrecord,.json" style="display:none;">',
+  // UI-003: entry row structure — Settings live; monetization/social P3 greyed
+  '<div id="menu-entry-row" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:28px;max-width:360px;">',
+  '  <button id="btn-settings" type="button" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;">⚙ Settings</button>',
+  '  <button type="button" disabled title="P3" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">🏆 Achievements</button>',
+  '  <button type="button" disabled title="P3" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">📊 Leaderboard</button>',
+  '  <button type="button" disabled title="P3" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">🛒 Shop</button>',
+  '  <button type="button" disabled title="P2" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">🏠 Rooms</button>',
+  '</div>',
 ].join('');
 container.appendChild(mainMenuEl);
 
 const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
 const loadReplayLabel = mainMenuEl.querySelector('#btn-load-replay') as HTMLLabelElement;
 const loadReplayInput = mainMenuEl.querySelector('#inp-record') as HTMLInputElement;
+const settingsBtn = mainMenuEl.querySelector('#btn-settings') as HTMLButtonElement;
 loadReplayLabel.htmlFor = 'inp-record';
+
+// UI-007 settings panel + UI-025 find-opponent + UI-018 point fly
+const settingsPanel = createSettingsPanel(container);
+const findOpponentUI = createFindOpponentUI(container);
+const pointFlyUI = createPointFlyUI(container);
+settingsBtn.addEventListener('click', () => settingsPanel.show());
 
 loadReplayInput.addEventListener('change', () => {
   const file = loadReplayInput.files?.[0];
@@ -347,9 +375,9 @@ loadReplayInput.addEventListener('change', () => {
   loadReplayInput.value = '';
 });
 
-// ─── GAME-003: start → Aiming, cue enabled ───────────────────────────────────
+// ─── GAME-003 / UI-025: find-opponent then start → Aiming ────────────────────
 
-startBtn.addEventListener('click', () => {
+function _beginHotSeatMatch(): void {
   mainMenuEl.style.display = 'none';
   hudBar.setVisible(true);
   playerBallHud.setVisible(true);
@@ -362,6 +390,14 @@ startBtn.addEventListener('click', () => {
   tutorial.start();
   gameSession.startNewGame();
   _refreshBallHud();
+  shotTimer.start();
+}
+
+startBtn.addEventListener('click', () => {
+  // UI-025: short HotSeat opponent carousel then enter table
+  findOpponentUI.play(() => {
+    _beginHotSeatMatch();
+  });
 });
 
 // ─── Session overlays ─────────────────────────────────────────────────────────
@@ -373,10 +409,14 @@ const replayHUD = createReplayHUD(container);
 gameOverUI.onPlayAgain = () => {
   gameOverUI.hide();
   gameSession.playAgain();
+  _refreshBallHud();
+  if (!_demoConfig) shotTimer.start(); // UI-027 + UI-024
 };
 gameOverUI.onExit = () => {
   gameOverUI.hide();
   turnPrompt.dismiss();
+  shotTimer.stop();
+  hudBar.setTimer(null);
   gameSession.exitGame();
   hudBar.setVisible(false);
   playerBallHud.setVisible(false);
@@ -429,12 +469,50 @@ const hudBar = createHudBar(container, {
     hudBar.setLeftHandActive(_isLeftHand);
   },
   onToggleFineAim: _toggleFineAim,
+  // UI-004: mid-game exit → main menu
+  onExit: () => {
+    if (!confirm('Leave the table and return to the main menu?')) return;
+    shotTimer.stop();
+    gameOverUI.hide();
+    turnPrompt.dismiss();
+    gameSession.exitGame();
+    hudBar.setVisible(false);
+    playerBallHud.setVisible(false);
+    powerSliderUI.element.style.display = 'none';
+    fineAdjustBar.element.style.display = 'none';
+    spinDiscUI.element.style.display = 'none';
+    adapter.setFineAim(false);
+    hudBar.setFineAimActive(false);
+    hudBar.setTimer(null);
+    _inTopView = false;
+    hudBar.setTopViewLabel('⬆ Top');
+    scene.setOrthoTop(false);
+    cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
+    _runCameraTween(true);
+    mainMenuEl.style.display = 'flex';
+  },
 });
 hudBar.setVisible(false);  // hidden until game starts
 
 // SP-Harden-6: 7-slot solids/stripes progress under HUD (Unity BallPool8PlayerUI)
 const playerBallHud = createPlayerBallHud(container);
 playerBallHud.setVisible(false);
+
+// UI-024 / RULE-006: shot countdown (HotSeat only — AI demo does not use wall-clock foul)
+const shotTimer = createShotTimer({
+  onTick: (rem, inGrace) => {
+    const urgency = rem <= 5 ? 'critical' : inGrace || rem <= 10 ? 'warn' : 'normal';
+    hudBar.setTimer(rem, urgency);
+  },
+  onShotTimeout: () => {
+    if (_demoConfig) return;
+    gameSession.notifyShotTimeout();
+  },
+  onGameEndTimeout: () => {
+    if (_demoConfig) return;
+    gameSession.notifyGameEndTimeout();
+  },
+});
 
 window.addEventListener('keydown', (e: KeyboardEvent) => {
   if ((e.key === 't' || e.key === 'T') && !mainMenuEl.style.display.includes('flex')) {
@@ -466,12 +544,24 @@ function _updatePlayerIndicator(playerIndex: 0 | 1, isBallInHand: boolean): void
 // onGameEnded and onReasonMessage are shared by both HotSeat and demo modes
 gameSession.onGameEnded = (winner, reason) => {
   turnPrompt.dismiss();
+  shotTimer.stop();
+  hudBar.setTimer(null);
   gameOverUI.show(winner, REASON_MESSAGES[reason] ?? '');
 };
 
 gameSession.onReasonMessage = (msg) => {
   if (msg) reasonBanner.show(msg);
 };
+
+// UI-018: fly +1 toward shooter when any object ball was pocketed this shot.
+function _hookPointFly(prev: typeof gameSession.onShotFired): typeof gameSession.onShotFired {
+  return (shot) => {
+    prev?.(shot);
+    const pots = shot.ruleState.pocketedBalls.filter((p) => p.ballId !== 0);
+    if (pots.length > 0) pointFlyUI.fly(shot.player, pots.length > 1 ? `+${pots.length}` : '+1');
+  };
+}
+gameSession.onShotFired = _hookPointFly(gameSession.onShotFired);
 
 // ─── Demo mode: ?demo=ai-selfplay [&seed=N] [&r0=N] [&r1=N] [&delay=N] ───────
 
@@ -504,10 +594,11 @@ if (_demoConfig) {
   };
   const { driver: _recDriver, record: _recRecord } = createRecordDriver(_recConfig);
   // SP-Harden-8: refresh group HUD after every settled shot (AI demo has no aim events).
-  gameSession.onShotFired = (s) => {
+  // Chain UI-018 point-fly under the record driver.
+  gameSession.onShotFired = _hookPointFly((s) => {
     _refreshBallHud();
     _recDriver.onShotFired(s);
-  };
+  });
 
   // Override onGameEnded to finalize recording and expose download button
   const _prevDemoGameEnded = gameSession.onGameEnded;
@@ -543,9 +634,17 @@ if (_demoConfig) {
     _currentPowerFraction = 0;
     // B4: show clear instruction overlay + cue standby preview
     turnPrompt.show(playerIndex, isBallInHand);
+    // UI-024: restart shot clock on every new aiming turn; pause during BIH placement
     if (isBallInHand) {
+      shotTimer.stop();
+      hudBar.setTimer(null);
       _enterBallInHandMode();
     } else {
+      shotTimer.start();
+      // UI-016: re-enable control chrome for active player
+      hudBar.setControlsEnabled(true);
+      powerSliderUI.element.style.display = 'block';
+      fineAdjustBar.element.style.display = 'block';
       // G-2: set default aim so _updateAimVisuals shows cue + line before first drag.
       // direction = start − current = (0.2, 0) → normalized +X (toward rack).
       // resetForNewTurn() already cleared stale aim; this sets a fresh default each turn.
