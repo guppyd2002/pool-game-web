@@ -4,7 +4,14 @@
 
 The same question (“how good is the AI?”) has **three incompatible worlds**. Mixing them produced the 100% vs 70% self-play fight and the 0.94 foul-median disaster. Numbers from different rulers **must not be compared or cited as each other**.
 
-Registered context: **DIV-008** (web BIH null-placement respot vs Unity in-place shot); **DIV-004** (symmetric self-play cap-hit band — diagnosis valid, June geometry numbers may be stale after pocket shift `3fa92431`).
+Registered context: **DIV-008** (was: web BIH null → respot vs Unity in-place; **(b) on feature `7b7620c+` removes product respot**); **DIV-004** (symmetric self-play cap-hit band — diagnosis valid, June geometry numbers may be stale after pocket shift `3fa92431`).
+
+**Branch skew (read before citing A):**
+
+| Tree | Product AI null placement |
+|------|---------------------------|
+| **`master` `11638b7` (prod)** | Still **respot** head-spot on null `cueBallNewPos` |
+| **Feature `prep/…` @ `7b7620c+`** | **No respot** — place only if non-null; else in-place forceShot (Unity-aligned) |
 
 ---
 
@@ -12,8 +19,8 @@ Registered context: **DIV-008** (web BIH null-placement respot vs Unity in-place
 
 | Ruler | What it measures | BIH when AI returns no placement | Typical harness / path |
 |-------|------------------|----------------------------------|-------------------------|
-| **A. Production (web product)** | What CEO / player experiences | **`respotCueBall()` → head-spot**, then shoot | `attachHumanVsAI`, `attachAIDemo`, `headless-game` / `pickValidSeed`, live `?demo=ai-selfplay` |
-| **B. SP-004 faithful harness** | Deterministic REC-1 / DIV-004 evidence path | **No respot**: place only if `cueBallNewPos !== null`; else leave cue, still forceShot | `src/__tests__/game/ai-self-play.test.ts` (`runSelfPlay`), `kakashi-foul-metric-sweep` self-play rows |
+| **A. Production (web product)** | What CEO / player experiences | **Feature (b):** in-place (no respot). **Master/prod:** still respot → head-spot | `attachHumanVsAI`, `attachAIDemo`, `headless-game` / `pickValidSeed`, live `?demo=ai-selfplay` |
+| **B. SP-004 faithful harness** | Deterministic REC-1 / DIV-004 evidence path | **No respot** (always): place only if `cueBallNewPos !== null`; else leave cue, still forceShot | `ai-self-play.test.ts` (`runSelfPlay`), kakashi self-play rows, `run-seed-batch --harness sp004` |
 | **C. Unity C# original** | Ground-truth engine behaviour | **No respot**: `ResetCueBallPosition` only if position changed; else **shoot from current transform** | `BallPoolAIManager.cs` `:266-269` / `:319-322` |
 
 ```
@@ -21,18 +28,20 @@ Registered context: **DIV-008** (web BIH null-placement respot vs Unity in-place
                               │
          ┌────────────────────┼────────────────────┐
          ▼                    ▼                    ▼
-   (A) web product      (B) SP-004 harness    (C) Unity C#
-   respot head-spot     no place / no respot  keep transform
-   then forceShot       forceShot in place    then Shot()
+   (A) product            (B) SP-004           (C) Unity C#
+   master: respot         no place/no respot   keep transform
+   feature(b): in-place   forceShot in place   then Shot()
          │                    │                    │
-    kinder world         harsher world          original world
-    (higher completion)  (more cap-hits)        (fidelity GT)
+    check which tree      DIV-004 / REC-1       fidelity GT
 ```
+
+After (b) **on the feature branch**, A’s **null-placement policy matches C**. A and B can still disagree because **seed formula / seat stream / harness loop** differ — never merge tables.
 
 **Do not:**
 - Use **B** completion % as “product quality for CEO”
-- Use **A**/respot sweep as “SP-004 / DIV-004”
-- Treat **A** respot as Unity-faithful without calling it a **divergence** (DIV-008)
+- Use master respot numbers as “post-(b) product”
+- Compare `--harness sp004` vs `--harness headless` as one ruler
+- “Fix” Mode A record playback `cueBallPlaced else respot` — that is **replay of recorded positions**, not live AI null (DIV-008 scope excludes it)
 
 ---
 
@@ -42,10 +51,11 @@ Registered context: **DIV-008** (web BIH null-placement respot vs Unity in-place
 |-----------------|-------|--------|
 | `ai-self-play.test.ts` (SP-004 / SP-001…005) | **B** | Canonical DIV-004 evidence path. Args correct since birth (`ee41c83`). Production table factory. |
 | `kakashi-foul-metric-sweep.test.ts` self-play arms | **B** | Intentionally SP-004 placement parity (no respot). |
-| `kakashi-foul-metric-baseline-6a5f87d.*` | **B** (self-play) + **A-shaped HVA** | Self-play rows = no respot. HVA rows use product `attachHumanVsAI` (has respot). |
-| `hva-foul-seed-sweep.test.ts` self-play | **A-like** | Historically had **`else respotCueBall()`** → rank3 looked 100% complete; **not** SP-004. |
-| `attachHumanVsAI` / Play vs Robot | **A** | Product. |
-| `ai-demo.ts` / `headless-game.ts` | **A** | CEO demo + seed picker; also respot. |
+| `kakashi-foul-metric-baseline-6a5f87d.*` | **B** (self-play) + **A-shaped HVA** | Measured **pre-(b)** @ `6a5f87d` — HVA rows still had product respot. Do not re-use as post-(b) truth without remeasure. |
+| `hva-foul-seed-sweep.test.ts` self-play | historical **A-like** | Had **`else respotCueBall()`** → rank3 looked 100% complete; **not** SP-004. |
+| `attachHumanVsAI` / Play vs Robot | **A** | Product; placement policy = tree (master respot / feature (b) in-place). |
+| `ai-demo.ts` / `headless-game.ts` | **A** | Same tree split as HVA for null placement. Headless seed = `seed+shotCount` (≠ `*7919`). |
+| `scripts/run-seed-batch.mjs` | **B** or headless-A formula | Explicit `--harness`; output has `measureCommit`. |
 | `BallPoolAIManager.cs` | **C** | Unity. |
 
 ---
