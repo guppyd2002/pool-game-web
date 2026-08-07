@@ -152,11 +152,15 @@ export function runDeterminismCheck(
     pendingBallInHand = null;
 
     const rank = ranks[session.currentPlayerIndex];
+    // Arg order: (isFirstShot, ballInHand) — matches ai-controller / self-play / demo / headless.
+    // Was swapped (bih, isFirst) from birth (6626a92). Mode A playback of stored shotData is
+    // immune; this re-derive path is not. Recordings downloaded before this fix still Mode-A
+    // replay correctly but re-derive will not match the old buggy AI trajectory.
     const aiResult = calculateAIShot(
       space,
       session.getAllowableFn(),
-      ballInHand,
       isFirstShot,
+      ballInHand,
       rank,
       5,
       gameSeed + shotCount,
