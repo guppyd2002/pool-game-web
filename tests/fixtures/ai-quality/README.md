@@ -116,9 +116,10 @@ If the first line is missing, the number is not usable for CEO or for DIV regist
 ## Related lessons (do not re-learn)
 
 1. **Arg-swap:** first wrong call site became a template (`ai-demo` → headless / replay / HVA). Signature was always correct; callers were not.  
-2. **Harness vs production:** respot in product/demo, absent in SP-004 — same “secret kindness” class of bug as parallel tables.  
-3. **Bug-derived goldens:** HS-002 seed=7 cap probe was measured under swapped headless AI (`d371b76`); left red until QA mechanism bands (`9b3a170` fix).  
-4. **No hash → rumor:** every measured number needs a full commit SHA (DIV register rule).
+2. **Harness vs production:** historically respot in product/demo vs no-respot SP-004 — “secret kindness.” Feature (b) removes product null-respot; master/prod still has it until merge.  
+3. **Bug-derived goldens:** HS-002: swapped args (`d371b76`) then respot-inflated zero-cap (`72c54f5`/`11638b7`). After (b) left **intentionally red** until QA remeasures **ruler B** on `7b7620c+`. Do not invent green.  
+4. **No hash → rumor:** every measured number needs a full commit SHA (DIV register rule).  
+5. **Control group:** SP-004 (ruler B) must not move when product placement changes; N=50 post-(b) matched N=20 magnitude → (b) scoped correctly.
 
 ---
 
@@ -158,6 +159,7 @@ Output schema matches `kakashi-foul-metric-baseline-*.json` (`schemaVersion`, `m
 
 ---
 
-## Freeze note (ops)
+## Freeze / handover (ops)
 
-Product freezes (HVA path, replay-controller, HS-002 assertion rewrite) are fleet decisions. This README is **documentation only** — it does not change runtime behaviour.
+Stop point and CEO wait list: **`docs/handover-2026-08-08.md`**.  
+Do not push master / merge / deploy until CEO answers shot clock + deploy gate.
