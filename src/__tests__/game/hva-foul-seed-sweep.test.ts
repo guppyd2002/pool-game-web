@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createBallPoolPhysics } from '../../game/ball-pool-physics';
-import type { IBallPoolPhysics, ShotResult } from '../../game/ball-pool-physics';
+import type { IBallPoolPhysics } from '../../game/ball-pool-physics';
 import type { SceneAPI } from '../../renderer/scene';
 import type { CueController } from '../../game/cue-controller';
 import type { ReplayDriver } from '../../renderer/replay-driver';
