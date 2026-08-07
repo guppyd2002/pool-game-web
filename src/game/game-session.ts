@@ -95,6 +95,18 @@ export interface IGameSession {
     readonly t1: BallType;
   };
 
+  /**
+   * RULE-006 first tier (ShotTime): foul turn change + ball-in-hand.
+   * Only valid in Aiming. UI/timer owns wall-clock; session applies pure rule outcome.
+   */
+  notifyShotTimeout(): void;
+
+  /**
+   * RULE-006 second tier (GameEndTime = 1.5×ShotTime): current player loses.
+   * Only valid in Aiming.
+   */
+  notifyGameEndTimeout(): void;
+
   readonly currentPlayerIndex: 0 | 1;
   readonly isGameEnded: boolean;
   readonly isBallInHand: boolean;
@@ -176,34 +188,38 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
   }
 
   // ── Hook into cue-controller shot events ─────────────────────────────────
-  cue.onShotData = (data) => { _pendingHumanShotData = data; };
+  // Re-bind on startNewGame/playAgain: exitGame nulls the hook so menu cannot fire.
+  function _bindCueHooks(): void {
+    cue.onShotData = (data) => { _pendingHumanShotData = data; };
 
-  cue.onShotApplied = (result) => {
-    if (store.getState().phase !== 'Aiming') {
-      _pendingHumanShotData = null;  // discard stale — no shot was legally processed
-      return;
-    }
+    cue.onShotApplied = (result) => {
+      if (store.getState().phase !== 'Aiming') {
+        _pendingHumanShotData = null;  // discard stale — no shot was legally processed
+        return;
+      }
 
-    ruleEngine.beginShot();
-    const verdict = ruleEngine.processShotResult(result);
+      ruleEngine.beginShot();
+      const verdict = ruleEngine.processShotResult(result);
 
-    // Post-settle record (physics.applyShot already settled before this callback)
-    if (_pendingHumanShotData) {
-      _emitShotFired(_pendingHumanShotData);
-      _pendingHumanShotData = null;
-    }
+      // Post-settle record (physics.applyShot already settled before this callback)
+      if (_pendingHumanShotData) {
+        _emitShotFired(_pendingHumanShotData);
+        _pendingHumanShotData = null;
+      }
 
-    store.dispatch({ type: 'SHOT_FIRED' });
-    cue.disable();  // no input during replay
+      store.dispatch({ type: 'SHOT_FIRED' });
+      cue.disable();  // no input during replay
 
-    replayDriver.watch(
-      physics,
-      scene,
-      result.pocketed,
-      result.outOfTable,
-      () => _onReplayComplete(verdict),
-    );
-  };
+      replayDriver.watch(
+        physics,
+        scene,
+        result.pocketed,
+        result.outOfTable,
+        () => _onReplayComplete(verdict),
+      );
+    };
+  }
+  _bindCueHooks();
 
   // ── Replay done: apply verdict side-effects ───────────────────────────────
   function _onReplayComplete(verdict: ShotVerdict): void {
@@ -269,6 +285,8 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       _lastCueBallPlaced = null;
       store.dispatch({ type: 'EXIT_GAME' });   // force MainMenu so START_GAME gate passes from any phase
       store.dispatch({ type: 'START_GAME' });
+      // GAME-003/005: re-bind cue hooks after exitGame null-out
+      _bindCueHooks();
       // GAME-014: cue bind id=0 + resetForNewTurn initial state
       cue.resetForNewTurn();
       session.onTurnChanged?.(0, false);
@@ -276,7 +294,9 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
 
     exitGame(): void {
       replayDriver.dispose();
+      // Drop hooks while on MainMenu so stray pointer events cannot fire shots.
       cue.onShotApplied = null;
+      cue.onShotData = null;
       _ballInHandActive = false;
       store.dispatch({ type: 'EXIT_GAME' });
     },
@@ -288,6 +308,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       _placeRack();
       _ballInHandActive = false;
       store.dispatch({ type: 'PLAY_AGAIN' });
+      _bindCueHooks();
       // GAME-014: re-init cue state for new game
       cue.resetForNewTurn();
       session.onTurnChanged?.(0, false);
@@ -346,6 +367,34 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
         t0: p0.currentBallType,
         t1: p1.currentBallType,
       };
+    },
+
+    notifyShotTimeout(): void {
+      // RULE-006 ShotTime: pure rule outcome, no physics/replay
+      if (store.getState().phase !== 'Aiming') return;
+      const verdict = ruleEngine.applyTimeout();
+      const reasonMsg = REASON_MESSAGES[verdict.reason] ?? '';
+      // Fabricate REPLAY_DONE without InShot — store only accepts REPLAY_DONE from InShot.
+      // Use a synthetic SHOT_FIRED → REPLAY_DONE path with empty replay for timer fouls.
+      store.dispatch({ type: 'SHOT_FIRED' });
+      store.dispatch({ type: 'REPLAY_DONE', verdict, reasonMessage: reasonMsg });
+      _ballInHandActive = verdict.ballInHand;
+      if (verdict.ballInHand) trail?.disable();
+      cue.disable();
+      session.onTurnChanged?.(store.getState().currentPlayerIndex, verdict.ballInHand);
+      if (reasonMsg) session.onReasonMessage?.(reasonMsg);
+    },
+
+    notifyGameEndTimeout(): void {
+      // RULE-006 GameEndTime: force lose
+      if (store.getState().phase !== 'Aiming') return;
+      const verdict = ruleEngine.applyGameEndTimeout();
+      const reasonMsg = REASON_MESSAGES[verdict.reason] ?? '';
+      store.dispatch({ type: 'SHOT_FIRED' });
+      store.dispatch({ type: 'REPLAY_DONE', verdict, reasonMessage: reasonMsg });
+      cue.disable();
+      session.onGameEnded?.(verdict.winner, verdict.reason);
+      if (reasonMsg) session.onReasonMessage?.(reasonMsg);
     },
   };
 

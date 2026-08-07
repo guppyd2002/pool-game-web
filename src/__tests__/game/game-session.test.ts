@@ -136,9 +136,12 @@ interface MockCue extends CueController {
 
 function makeCue(): MockCue {
   let _hook: ((r: ShotResult) => void) | null = null;
+  let _dataHook: ((d: ShotData) => void) | null = null;
   const cue = {
     get onShotApplied() { return _hook; },
     set onShotApplied(fn: ((r: ShotResult) => void) | null) { _hook = fn; },
+    get onShotData() { return _dataHook; },
+    set onShotData(fn: ((d: ShotData) => void) | null | undefined) { _dataHook = fn ?? null; },
     disable: vi.fn(),
     enable: vi.fn(),
     resetForNewTurn: vi.fn(),
@@ -396,6 +399,20 @@ describe('game-session — IGameSession (GAME-018)', () => {
       expect(cue.onShotApplied).toBeNull();
       expect(session.store.getState().phase).toBe('MainMenu');
     });
+
+    it('GAME-005/003: startNewGame after exit re-binds cue.onShotApplied (menu→play)', () => {
+      // Regression: exitGame nulls the hook; without re-bind, HotSeat restart is dead.
+      const { cue, replayDriver, session } = setup();
+      session.startNewGame();
+      session.exitGame();
+      expect(cue.onShotApplied).toBeNull();
+      session.startNewGame();
+      expect(cue.onShotApplied).not.toBeNull();
+      expect(session.store.getState().phase).toBe('Aiming');
+      // Shot pipeline must work again
+      cue.fireShotApplied(noShot());
+      expect(replayDriver.watch).toHaveBeenCalled();
+    });
   });
 
   describe('playAgain()', () => {
@@ -451,6 +468,40 @@ describe('game-session — IGameSession (GAME-018)', () => {
       replayDriver.triggerComplete();
       // Player 1 is now active (BallInHand)
       expect(session.currentPlayerIndex).toBe(1);
+    });
+  });
+
+  describe('RULE-006 session timeouts (GAME flow)', () => {
+    it('notifyShotTimeout in Aiming → BallInHand + turn change', () => {
+      const { session } = setup();
+      session.startNewGame();
+      const onTurn = vi.fn();
+      session.onTurnChanged = onTurn;
+      session.notifyShotTimeout();
+      expect(session.store.getState().phase).toBe('BallInHand');
+      expect(session.isBallInHand).toBe(true);
+      expect(session.currentPlayerIndex).toBe(1);
+      expect(onTurn).toHaveBeenCalledWith(1, true);
+    });
+
+    it('notifyGameEndTimeout in Aiming → GameOver, opponent wins', () => {
+      const { session } = setup();
+      session.startNewGame();
+      const onEnd = vi.fn();
+      session.onGameEnded = onEnd;
+      session.notifyGameEndTimeout();
+      expect(session.store.getState().phase).toBe('GameOver');
+      expect(session.isGameEnded).toBe(true);
+      expect(onEnd).toHaveBeenCalledWith(1, expect.any(Number));
+    });
+
+    it('timeouts are no-ops outside Aiming', () => {
+      const { session } = setup();
+      // MainMenu
+      session.notifyShotTimeout();
+      expect(session.store.getState().phase).toBe('MainMenu');
+      session.notifyGameEndTimeout();
+      expect(session.store.getState().phase).toBe('MainMenu');
     });
   });
 
