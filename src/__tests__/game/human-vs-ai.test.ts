@@ -76,6 +76,16 @@ function makePhysics(applyResult: ShotResult = noShot()): IBallPoolPhysics & {
     resetToStartState: vi.fn(),
     getConstants: vi.fn().mockReturnValue({} as PhysicsConstants),
     getSpace: vi.fn(),
+    // attachHumanVsAI chains onShotFired → _emitShotFired needs state string.
+    getStateAsString: vi.fn().mockReturnValue(''),
+    setStateFromString: vi.fn(),
+    getPhysicsConstants: vi.fn().mockReturnValue({} as PhysicsConstants),
+    getActiveBalls: vi.fn().mockReturnValue([ball]),
+    allBalls: [ball],
+    shotFrames: [],
+    step: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
   } as unknown as IBallPoolPhysics & {
     applyShot: ReturnType<typeof vi.fn>;
     placeBall: ReturnType<typeof vi.fn>;

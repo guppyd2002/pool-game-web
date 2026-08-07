@@ -11,6 +11,17 @@
  *
  * Shot timer / cue enable/disable are caller responsibilities (main.ts hooks).
  * Use `shouldRunShotTimer` so AI seats never arm RULE-006 wall-clock.
+ *
+ * isFirstShot (GAME-level break flag):
+ *   true only until the first settled shot of the match (human or AI).
+ *   After a human break, AI's first turn MUST see isFirstShot=false so placement
+ *   uses normal "behind target" logic — not break-quadrant random (CEO first impression).
+ *
+ * AI-local PRNG seed index (INTENTIONAL — do not "align" to global):
+ *   shotCount restarts at 0 for the AI seat; first AI seed reuses base
+ *   (same formula as self-play's shot 0). That breaks DIV-004-style symmetry
+ *   and is a real HVA fact (human ≠ AI). Aligning seeds to a global index
+ *   would re-symmetrize the harness and collapse completion rate — not a fix.
  */
 
 import type { IGameSession } from './game-session';
@@ -98,9 +109,19 @@ export function attachHumanVsAI(
   const setT = config.setTimeoutFn ?? ((fn, ms) => setTimeout(fn, ms));
   const clearT = config.clearTimeoutFn ?? ((id) => clearTimeout(id));
 
+  // AI-local PRNG index (intentional; see file header). Not a global shot counter.
   let shotCount = 0;
+  // Game-level break flag — cleared on any settled shot (human or AI) via onShotFired.
   let isFirstShot = true;
   const pending: ReturnType<typeof setTimeout>[] = [];
+
+  // Chain: any forceShot / human cue path emits onShotFired post-settle, before onTurnChanged.
+  // So after human break, AI's first calculateAIShot already sees isFirstShot=false.
+  const prevOnShotFired = session.onShotFired;
+  session.onShotFired = (shot) => {
+    isFirstShot = false;
+    prevOnShotFired?.(shot);
+  };
 
   function _schedule(fn: () => void, ms: number): void {
     const id = setT(() => {
@@ -120,16 +141,19 @@ export function attachHumanVsAI(
     if (session.isGameEnded) return;
     if (session.currentPlayerIndex !== aiSeat) return;
 
+    // Arg order matches ai-controller / self-play: (isFirstShot, ballInHand).
+    // seed = base + AI-local index * 7919 (intentional base reuse on AI's first shot)
     const result = calculateAIShot(
       space,
       session.getAllowableFn(),
-      ballInHand,
       isFirstShot,
+      ballInHand,
       aiRank,
       rankLast,
       deriveAiShotSeed(seedBase, shotCount),
     );
     shotCount++;
+    // Defensive: also clear here if a code path skipped onShotFired.
     isFirstShot = false;
 
     if (ballInHand) {
