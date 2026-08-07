@@ -10,6 +10,8 @@ import {
   isSfxOn,
   isMusicOn,
   isAutoCueOn,
+  isSettingsUiDeferred,
+  SETTINGS_UI_DEFERRED_KEYS,
 } from '../../renderer/settings-panel';
 
 const store = new Map<string, string>();
@@ -69,5 +71,15 @@ describe('settings-panel SET-001~003 live helpers + subscribe', () => {
     unsub();
     saveSettings({ music: false, sfx: false, autoCue: false });
     expect(spy).toHaveBeenCalledTimes(1); // unsubscribed
+  });
+});
+
+describe('settings UI honesty (Phase 1 close-out — no fake toggles)', () => {
+  it('music and autoCue are UI-deferred; sfx is not', () => {
+    expect(SETTINGS_UI_DEFERRED_KEYS).toContain('music');
+    expect(SETTINGS_UI_DEFERRED_KEYS).toContain('autoCue');
+    expect(isSettingsUiDeferred('music')).toBe(true);
+    expect(isSettingsUiDeferred('autoCue')).toBe(true);
+    expect(isSettingsUiDeferred('sfx')).toBe(false);
   });
 });

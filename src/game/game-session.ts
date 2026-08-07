@@ -54,7 +54,8 @@ export interface RecordedShot {
 
 /**
  * Thin abstraction matching C# BallPoolGameManager abstract contract.
- * P1 implements only 8-ball HotSeat. IsLocal/IsAI deferred to P1-T05/P2.
+ * P1: HotSeat + human-vs-AI via session-external matchMode / attachHumanVsAI
+ * (not PlayerGameInfo.IsLocal/IsAI — that identity model remains P2 if needed).
  */
 export interface IGameSession {
   startNewGame(): void;
