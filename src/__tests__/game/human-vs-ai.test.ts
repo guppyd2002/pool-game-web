@@ -10,7 +10,13 @@ import type { IBallPoolPhysics, ShotResult, BallState, AimHit, PhysicsConstants 
 import type { CueController } from '../../game/cue-controller';
 import type { SceneAPI } from '../../renderer/scene';
 import type { ReplayDriver } from '../../renderer/replay-driver';
-import { attachHumanVsAI, shouldRunShotTimer, HUMAN_VS_AI_DEFAULTS } from '../../game/human-vs-ai';
+import {
+  attachHumanVsAI,
+  shouldRunShotTimer,
+  HUMAN_VS_AI_DEFAULTS,
+  deriveAiShotSeed,
+  AI_SHOT_SEED_STRIDE,
+} from '../../game/human-vs-ai';
 import { createPoolTable } from '../../game/table-setup';
 import { calculateAIShot } from '../../game/ai-controller';
 import { CmVector } from '../../physics/cm-vector';
@@ -138,6 +144,22 @@ describe('shouldRunShotTimer (W3 — no AI wall-clock foul)', () => {
     expect(shouldRunShotTimer(1, 1)).toBe(false);
     expect(shouldRunShotTimer(0, 0)).toBe(false);
     expect(shouldRunShotTimer(1, 0)).toBe(true);
+  });
+});
+
+describe('deriveAiShotSeed (self-play parity)', () => {
+  it('matches REC-1 formula base + shotIndex * 7919', () => {
+    expect(AI_SHOT_SEED_STRIDE).toBe(7919);
+    expect(deriveAiShotSeed(42, 0)).toBe(42);
+    expect(deriveAiShotSeed(42, 1)).toBe(42 + 7919);
+    expect(deriveAiShotSeed(42, 2)).toBe(42 + 2 * 7919);
+  });
+
+  it('successive shot seeds are not consecutive integers', () => {
+    const a = deriveAiShotSeed(100, 0);
+    const b = deriveAiShotSeed(100, 1);
+    expect(b - a).toBe(7919);
+    expect(b).not.toBe(a + 1);
   });
 });
 
@@ -437,7 +459,7 @@ describe('human-vs-AI real physics smoke', () => {
           shotCount === 0,
           3,
           5,
-          42 + shotCount * 7919,
+          deriveAiShotSeed(42, shotCount),
         );
         if (bih) {
           if (aiShot.cueBallNewPos) physics.placeBall(0, aiShot.cueBallNewPos);

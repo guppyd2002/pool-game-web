@@ -18,6 +18,18 @@ import type { IBallPoolPhysics } from './ball-pool-physics';
 import type { CmSpace } from '../physics/cm-space';
 import { calculateAIShot } from './ai-controller';
 
+/**
+ * PRNG seed stride per shot — must match self-play harness (REC-1 / ai-self-play.test.ts):
+ *   seed + shotIndex * 7919
+ * Avoids consecutive-integer seeds that can correlate Mulberry32 streams.
+ */
+export const AI_SHOT_SEED_STRIDE = 7919;
+
+/** Derive per-shot AI PRNG seed (same formula as self-play). */
+export function deriveAiShotSeed(baseSeed: number, shotIndex: number): number {
+  return baseSeed + shotIndex * AI_SHOT_SEED_STRIDE;
+}
+
 export interface HumanVsAIConfig {
   /** Seat controlled by AI. Default 1 (P1). */
   aiSeat?: 0 | 1;
@@ -115,7 +127,7 @@ export function attachHumanVsAI(
       isFirstShot,
       aiRank,
       rankLast,
-      seedBase + shotCount,
+      deriveAiShotSeed(seedBase, shotCount),
     );
     shotCount++;
     isFirstShot = false;
