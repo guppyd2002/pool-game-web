@@ -4,8 +4,7 @@
  * P1: localStorage profile only (no PlayFab stats).
  */
 
-const LS_NAME = 'pool.profile.name';
-const LS_AVATAR = 'pool.profile.avatar';
+import { getDefaultPlayerDataManager } from '../game/player-data-manager';
 
 const AVATAR_CHOICES = ['🎱', '😎', '🦊', '🐼', '🐯', '🦁', '🐸', '🦄'];
 
@@ -14,16 +13,21 @@ export interface PlayerProfile {
   avatar: string;
 }
 
+/** DATA-006: read identity from unified player data store. */
 export function loadPlayerProfile(): PlayerProfile {
-  return {
-    name: localStorage.getItem(LS_NAME) || 'Player 1',
-    avatar: localStorage.getItem(LS_AVATAR) || '🎱',
-  };
+  const p = getDefaultPlayerDataManager().getPlayerData();
+  return { name: p.name, avatar: p.avatar };
 }
 
+/** DATA-006: persist identity via PlayerDataManager (DATA-004). */
 export function savePlayerProfile(p: PlayerProfile): void {
-  localStorage.setItem(LS_NAME, p.name.slice(0, 24));
-  localStorage.setItem(LS_AVATAR, p.avatar);
+  const mgr = getDefaultPlayerDataManager();
+  const cur = mgr.getPlayerData();
+  mgr.savePlayerData({
+    ...cur,
+    name: p.name.slice(0, 24),
+    avatar: p.avatar,
+  });
 }
 
 export interface PlayerProfilePopup {

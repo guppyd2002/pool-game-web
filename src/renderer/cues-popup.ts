@@ -4,7 +4,8 @@
  * P1: free starter set; equip persists to localStorage.
  */
 
-const LS_EQUIPPED = 'pool.cue.equipped';
+import { getDefaultPlayerDataManager } from '../game/player-data-manager';
+import { setEquippedCue as setEquippedOnData, addAndSetCue } from '../game/player-data';
 
 export interface CueDef {
   readonly id: string;
@@ -13,30 +14,55 @@ export interface CueDef {
   readonly aim: number;
   /** Power flavour 0–1 (display only). */
   readonly power: number;
-  /** P1: all free starters are owned. */
+  /** Owned if free starter or in PlayerData.ownedCues. */
   readonly owned: boolean;
 }
 
-/** Starter cue catalogue (no IAP). */
-export const CUE_CATALOGUE: readonly CueDef[] = [
-  { id: 'standard', name: 'Standard', aim: 0.5, power: 0.5, owned: true },
-  { id: 'pro', name: 'Pro Stick', aim: 0.7, power: 0.6, owned: true },
-  { id: 'sniper', name: 'Sniper', aim: 0.9, power: 0.45, owned: true },
-  { id: 'legend', name: 'Legend', aim: 0.85, power: 0.85, owned: false }, // locked / P3 buy
+/** Starter cue catalogue (no IAP). Legend locked until unlock/P3. */
+export const CUE_CATALOGUE_BASE: readonly Omit<CueDef, 'owned'>[] = [
+  { id: 'standard', name: 'Standard', aim: 0.5, power: 0.5 },
+  { id: 'pro', name: 'Pro Stick', aim: 0.7, power: 0.6 },
+  { id: 'sniper', name: 'Sniper', aim: 0.9, power: 0.45 },
+  { id: 'legend', name: 'Legend', aim: 0.85, power: 0.85 },
 ];
 
+/** Dynamic catalogue with owned flags from player data. */
+export function getCueCatalogue(): readonly CueDef[] {
+  const owned = new Set(getDefaultPlayerDataManager().getPlayerData().ownedCues);
+  // Free starters always owned
+  owned.add('standard');
+  owned.add('pro');
+  owned.add('sniper');
+  return CUE_CATALOGUE_BASE.map((c) => ({ ...c, owned: owned.has(c.id) }));
+}
+
+/** @deprecated use getCueCatalogue — kept for tests that expect static list shape */
+export const CUE_CATALOGUE: readonly CueDef[] = CUE_CATALOGUE_BASE.map((c) => ({
+  ...c,
+  owned: c.id !== 'legend',
+}));
+
 export function loadEquippedCueId(): string {
-  const id = localStorage.getItem(LS_EQUIPPED) || 'standard';
-  return CUE_CATALOGUE.some((c) => c.id === id && c.owned) ? id : 'standard';
+  const p = getDefaultPlayerDataManager().getPlayerData();
+  const cat = getCueCatalogue();
+  return cat.some((c) => c.id === p.cueId && c.owned) ? p.cueId : 'standard';
 }
 
 export function saveEquippedCueId(id: string): void {
-  localStorage.setItem(LS_EQUIPPED, id);
+  const mgr = getDefaultPlayerDataManager();
+  const next = setEquippedOnData(mgr.getPlayerData(), id);
+  if (next) mgr.savePlayerData(next);
+}
+
+/** DATA-007: unlock + equip (e.g. reward path). */
+export function unlockAndEquipCue(id: string): void {
+  const mgr = getDefaultPlayerDataManager();
+  mgr.savePlayerData(addAndSetCue(mgr.getPlayerData(), id));
 }
 
 export function getEquippedCue(): CueDef {
   const id = loadEquippedCueId();
-  return CUE_CATALOGUE.find((c) => c.id === id) ?? CUE_CATALOGUE[0];
+  return getCueCatalogue().find((c) => c.id === id) ?? getCueCatalogue()[0];
 }
 
 export interface CuesPopup {
@@ -119,7 +145,8 @@ export function createCuesPopup(container: HTMLElement): CuesPopup {
 
   function _renderList(): void {
     list.innerHTML = '';
-    for (const cue of CUE_CATALOGUE) {
+    equipped = loadEquippedCueId();
+    for (const cue of getCueCatalogue()) {
       const row = document.createElement('div');
       row.style.cssText = [
         'display:flex', 'align-items:center', 'gap:10px',
@@ -151,8 +178,8 @@ export function createCuesPopup(container: HTMLElement): CuesPopup {
         btn.style.cssText =
           'padding:6px 12px;border-radius:6px;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:12px;cursor:pointer;';
         btn.addEventListener('click', () => {
-          equipped = cue.id;
           saveEquippedCueId(cue.id);
+          equipped = cue.id;
           api.onEquip?.(cue);
           _renderList();
         });

@@ -33,7 +33,9 @@ export type GameAction =
   | { type: 'REPLAY_DONE'; verdict: ShotVerdict; reasonMessage: string }
   | { type: 'BALL_PLACED' }
   | { type: 'EXIT_GAME' }
-  | { type: 'PLAY_AGAIN' };
+  | { type: 'PLAY_AGAIN' }
+  /** DATA-001: resume mid-game save into Aiming or BallInHand. */
+  | { type: 'RESTORE_GAME'; playerIndex: 0 | 1; phase: 'Aiming' | 'BallInHand' };
 
 export interface GameStore {
   getState(): Readonly<GameState>;
@@ -116,6 +118,13 @@ function reduce(state: GameState, action: GameAction): GameState {
     case 'PLAY_AGAIN':
       if (state.phase !== 'GameOver') return state;
       return { ...INITIAL_STATE, phase: 'Aiming', currentPlayerIndex: 0 };
+
+    case 'RESTORE_GAME':
+      return {
+        ...INITIAL_STATE,
+        phase: action.phase,
+        currentPlayerIndex: action.playerIndex,
+      };
 
     default:
       return state;

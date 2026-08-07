@@ -4,10 +4,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   CUE_CATALOGUE,
+  getCueCatalogue,
   loadEquippedCueId,
   saveEquippedCueId,
   getEquippedCue,
 } from '../../renderer/cues-popup';
+import { _resetDefaultPlayerDataManagerForTests } from '../../game/player-data-manager';
 
 const store = new Map<string, string>();
 const lsStub = {
@@ -23,12 +25,14 @@ describe('cues catalogue / equip', () => {
   beforeEach(() => {
     store.clear();
     Object.defineProperty(globalThis, 'localStorage', { value: lsStub, configurable: true });
+    _resetDefaultPlayerDataManagerForTests();
   });
 
   it('catalogue has free starters and one locked', () => {
     expect(CUE_CATALOGUE.length).toBeGreaterThanOrEqual(3);
-    expect(CUE_CATALOGUE.filter((c) => c.owned).length).toBeGreaterThanOrEqual(2);
-    expect(CUE_CATALOGUE.some((c) => !c.owned)).toBe(true);
+    const cat = getCueCatalogue();
+    expect(cat.filter((c) => c.owned).length).toBeGreaterThanOrEqual(2);
+    expect(cat.some((c) => !c.owned)).toBe(true);
   });
 
   it('default equip is standard', () => {

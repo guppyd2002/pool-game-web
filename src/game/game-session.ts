@@ -107,6 +107,29 @@ export interface IGameSession {
    */
   notifyGameEndTimeout(): void;
 
+  /**
+   * DATA-001: snapshot for mid-game save (rule + physics strings + phase).
+   */
+  captureSaveSnapshot(): {
+    ruleState: GameLogicStateV1;
+    physicsState: string;
+    phase: 'Aiming' | 'BallInHand';
+    currentPlayerIndex: 0 | 1;
+    ballInHand: boolean;
+  } | null;
+
+  /**
+   * DATA-001: restore physics + rules + FSM from a valid save.
+   * Caller must re-sync scene ball meshes after this returns.
+   */
+  restoreSavedGame(opts: {
+    ruleState: GameLogicStateV1;
+    physicsState: string;
+    phase: 'Aiming' | 'BallInHand';
+    currentPlayerIndex: 0 | 1;
+    ballInHand: boolean;
+  }): void;
+
   readonly currentPlayerIndex: 0 | 1;
   readonly isGameEnded: boolean;
   readonly isBallInHand: boolean;
@@ -395,6 +418,55 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       cue.disable();
       session.onGameEnded?.(verdict.winner, verdict.reason);
       if (reasonMsg) session.onReasonMessage?.(reasonMsg);
+    },
+
+    captureSaveSnapshot() {
+      const phase = store.getState().phase;
+      if (phase !== 'Aiming' && phase !== 'BallInHand') return null;
+      return {
+        ruleState: ruleEngine.serialize(),
+        physicsState: physics.getStateAsString(),
+        phase,
+        currentPlayerIndex: store.getState().currentPlayerIndex,
+        ballInHand: _ballInHandActive || phase === 'BallInHand',
+      };
+    },
+
+    restoreSavedGame(opts): void {
+      physics.setStateFromString(opts.physicsState);
+      ruleEngine.deserialize(opts.ruleState);
+      _ballInHandActive = opts.ballInHand;
+      _shotCounter = 0;
+      _lastCueBallPlaced = null;
+      _bindCueHooks();
+      store.dispatch({
+        type: 'RESTORE_GAME',
+        playerIndex: opts.currentPlayerIndex,
+        phase: opts.ballInHand ? 'BallInHand' : 'Aiming',
+      });
+      // Sync Three.js ball positions from physics
+      const BALL_COUNT = 16;
+      for (let id = 0; id < BALL_COUNT; id++) {
+        const b = physics.getBall(id);
+        if (!b) continue;
+        const x = b.position.x / 10000;
+        const y = BALL_SCENE_Y;
+        const z = b.position.z / 10000;
+        scene.updateBallPosition(id, x, y, z);
+        const mesh = scene.balls[id];
+        if (mesh) {
+          // Hide if out / pocketed (velocity zero far from table heuristic via isOutOfTable)
+          mesh.visible = !b.isOutOfTable;
+        }
+      }
+      if (opts.ballInHand) {
+        trail?.disable();
+        cue.disable();
+      } else {
+        trail?.enable();
+        cue.resetForNewTurn();
+      }
+      session.onTurnChanged?.(opts.currentPlayerIndex, opts.ballInHand);
     },
   };
 

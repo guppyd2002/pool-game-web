@@ -64,8 +64,12 @@ import { createPointFlyUI } from './renderer/point-fly-ui';
 import { createFindOpponentUI } from './renderer/find-opponent-ui';
 import { createSettingsPanel } from './renderer/settings-panel';
 import { createPopupManager } from './renderer/popup-manager';
-import { createPlayerProfilePopup, loadPlayerProfile } from './renderer/player-profile-popup';
+import { createPlayerProfilePopup } from './renderer/player-profile-popup';
 import { createCuesPopup, getEquippedCue } from './renderer/cues-popup';
+import { getDefaultPlayerDataManager } from './game/player-data-manager';
+import { addCoins } from './game/player-data';
+import { getDefaultGameSaveManager } from './game/game-save-manager';
+import { DEFAULT_SHOT_TIME_S } from './renderer/shot-timer';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -326,6 +330,7 @@ mainMenuEl.innerHTML = [
   '<h1 style="font-size:36px;margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
   '<p style="font-size:14px;opacity:0.6;margin-bottom:24px;">HotSeat — 2 players, same screen</p>',
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
+  '<button id="btn-continue" type="button" style="display:none;margin-top:12px;padding:12px 36px;font-size:15px;border-radius:6px;border:1px solid rgba(76,175,80,0.6);background:rgba(76,175,80,0.2);color:#fff;cursor:pointer;">▶ Continue saved game</button>',
   '<label id="btn-load-replay" style="margin-top:14px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
   '<input id="inp-record" type="file" accept=".poolrecord,.json" style="display:none;">',
   // UI-003 entry row + P1-T08 popups (settings/profile/cues live; mon/social grey)
@@ -342,12 +347,22 @@ mainMenuEl.innerHTML = [
 container.appendChild(mainMenuEl);
 
 const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
+const continueBtn = mainMenuEl.querySelector('#btn-continue') as HTMLButtonElement;
 const loadReplayLabel = mainMenuEl.querySelector('#btn-load-replay') as HTMLLabelElement;
 const loadReplayInput = mainMenuEl.querySelector('#inp-record') as HTMLInputElement;
 const settingsBtn = mainMenuEl.querySelector('#btn-settings') as HTMLButtonElement;
 const profileBtn = mainMenuEl.querySelector('#btn-profile') as HTMLButtonElement;
 const cuesBtn = mainMenuEl.querySelector('#btn-cues') as HTMLButtonElement;
 loadReplayLabel.htmlFor = 'inp-record';
+
+// P1-T09 DATA layer
+const playerDataMgr = getDefaultPlayerDataManager();
+const gameSaveMgr = getDefaultGameSaveManager();
+
+function _refreshContinueButton(): void {
+  continueBtn.style.display = gameSaveMgr.isSavedGame() ? 'inline-block' : 'none';
+}
+_refreshContinueButton();
 
 // UI-025 find-opponent + UI-018 point fly
 const findOpponentUI = createFindOpponentUI(container);
@@ -386,14 +401,15 @@ settingsBtn.addEventListener('click', () => popupManager.open('settings'));
 profileBtn.addEventListener('click', () => popupManager.open('profile'));
 cuesBtn.addEventListener('click', () => popupManager.open('cues'));
 
-// Reflect profile name on start button subtitle / profile button label
+// Reflect profile name / coins / equipped cue on menu chrome (DATA-006)
 function _refreshProfileChrome(): void {
-  const p = loadPlayerProfile();
-  profileBtn.textContent = `${p.avatar} ${p.name}`;
+  const p = playerDataMgr.getPlayerData();
+  profileBtn.textContent = `${p.avatar} ${p.name} · 🪙${p.coins}`;
   cuesBtn.title = `Equipped: ${getEquippedCue().name}`;
 }
 profilePopup.onChange = () => { _refreshProfileChrome(); };
 cuesPopup.onEquip = () => { _refreshProfileChrome(); };
+playerDataMgr.subscribe(() => { _refreshProfileChrome(); });
 _refreshProfileChrome();
 
 loadReplayInput.addEventListener('change', () => {
@@ -424,7 +440,7 @@ loadReplayInput.addEventListener('change', () => {
 
 // ─── GAME-003 / UI-025: find-opponent then start → Aiming ────────────────────
 
-function _beginHotSeatMatch(): void {
+function _enterTableChrome(): void {
   mainMenuEl.style.display = 'none';
   hudBar.setVisible(true);
   playerBallHud.setVisible(true);
@@ -434,10 +450,41 @@ function _beginHotSeatMatch(): void {
   spinDiscUI.element.style.display = 'block';
   _inTopView = true;
   scene.setOrthoTop(true);
+}
+
+function _beginHotSeatMatch(): void {
+  _enterTableChrome();
   tutorial.start();
+  gameSaveMgr.clearGameState(); // fresh game
   gameSession.startNewGame();
   _refreshBallHud();
   shotTimer.start();
+  _refreshContinueButton();
+}
+
+function _resumeSavedMatch(): void {
+  const save = gameSaveMgr.getGameState();
+  if (!save || !gameSaveMgr.isSavedGame()) {
+    _refreshContinueButton();
+    return;
+  }
+  _enterTableChrome();
+  gameSession.restoreSavedGame({
+    ruleState: save.g,
+    physicsState: save.p,
+    phase: save.phase,
+    currentPlayerIndex: save.currentPlayerIndex,
+    ballInHand: save.ballInHand,
+  });
+  _refreshBallHud();
+  if (save.ballInHand) {
+    shotTimer.stop();
+    hudBar.setTimer(null);
+    _enterBallInHandMode();
+  } else {
+    shotTimer.start();
+  }
+  _refreshContinueButton();
 }
 
 startBtn.addEventListener('click', () => {
@@ -445,6 +492,11 @@ startBtn.addEventListener('click', () => {
   findOpponentUI.play(() => {
     _beginHotSeatMatch();
   });
+});
+
+// DATA-001: continue mid-game if within TTL
+continueBtn.addEventListener('click', () => {
+  _resumeSavedMatch();
 });
 
 // ─── Session overlays ─────────────────────────────────────────────────────────
@@ -478,6 +530,8 @@ gameOverUI.onExit = () => {
   cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
   _runCameraTween(true);
   mainMenuEl.style.display = 'flex';
+  _refreshContinueButton();
+  _refreshProfileChrome();
 };
 
 // ─── HUD bar (top strip) — landscape layout ──────────────────────────────────
@@ -522,6 +576,8 @@ const hudBar = createHudBar(container, {
     shotTimer.stop();
     gameOverUI.hide();
     turnPrompt.dismiss();
+    // Keep mid-game save so Continue stays available (DATA-001)
+    _persistMidGameSave();
     gameSession.exitGame();
     hudBar.setVisible(false);
     playerBallHud.setVisible(false);
@@ -537,6 +593,7 @@ const hudBar = createHudBar(container, {
     cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
     _runCameraTween(true);
     mainMenuEl.style.display = 'flex';
+    _refreshContinueButton();
   },
 });
 hudBar.setVisible(false);  // hidden until game starts
@@ -588,12 +645,34 @@ function _updatePlayerIndicator(playerIndex: 0 | 1, isBallInHand: boolean): void
 
 // ─── Session callbacks ─────────────────────────────────────────────────────────
 
+// DATA-001: persist mid-game after each settled shot (physics + rule)
+function _persistMidGameSave(): void {
+  if (_demoConfig) return;
+  const snap = gameSession.captureSaveSnapshot();
+  if (!snap) return;
+  gameSaveMgr.saveGameState({
+    g: snap.ruleState,
+    p: snap.physicsState,
+    shotTimeS: DEFAULT_SHOT_TIME_S,
+    phase: snap.phase,
+    currentPlayerIndex: snap.currentPlayerIndex,
+    ballInHand: snap.ballInHand,
+  });
+}
+
 // onGameEnded and onReasonMessage are shared by both HotSeat and demo modes
 gameSession.onGameEnded = (winner, reason) => {
   turnPrompt.dismiss();
   shotTimer.stop();
   hudBar.setTimer(null);
+  gameSaveMgr.clearGameState();
+  // DATA-004: award coins to local profile on HotSeat win (P1 simple economy)
+  if (!_demoConfig && winner === 0) {
+    const cur = playerDataMgr.getPlayerData();
+    playerDataMgr.savePlayerData(addCoins(cur, 50));
+  }
   gameOverUI.show(winner, REASON_MESSAGES[reason] ?? '');
+  _refreshContinueButton();
 };
 
 gameSession.onReasonMessage = (msg) => {
@@ -608,7 +687,10 @@ function _hookPointFly(prev: typeof gameSession.onShotFired): typeof gameSession
     if (pots.length > 0) pointFlyUI.fly(shot.player, pots.length > 1 ? `+${pots.length}` : '+1');
   };
 }
-gameSession.onShotFired = _hookPointFly(gameSession.onShotFired);
+gameSession.onShotFired = _hookPointFly((shot) => {
+  _persistMidGameSave();
+  void shot;
+});
 
 // ─── Demo mode: ?demo=ai-selfplay [&seed=N] [&r0=N] [&r1=N] [&delay=N] ───────
 
