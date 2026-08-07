@@ -63,6 +63,9 @@ import { createShotTimer } from './renderer/shot-timer';
 import { createPointFlyUI } from './renderer/point-fly-ui';
 import { createFindOpponentUI } from './renderer/find-opponent-ui';
 import { createSettingsPanel } from './renderer/settings-panel';
+import { createPopupManager } from './renderer/popup-manager';
+import { createPlayerProfilePopup, loadPlayerProfile } from './renderer/player-profile-popup';
+import { createCuesPopup, getEquippedCue } from './renderer/cues-popup';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -325,9 +328,11 @@ mainMenuEl.innerHTML = [
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
   '<label id="btn-load-replay" style="margin-top:14px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
   '<input id="inp-record" type="file" accept=".poolrecord,.json" style="display:none;">',
-  // UI-003: entry row structure — Settings live; monetization/social P3 greyed
-  '<div id="menu-entry-row" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:28px;max-width:360px;">',
+  // UI-003 entry row + P1-T08 popups (settings/profile/cues live; mon/social grey)
+  '<div id="menu-entry-row" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:28px;max-width:380px;">',
   '  <button id="btn-settings" type="button" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;">⚙ Settings</button>',
+  '  <button id="btn-profile" type="button" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;">👤 Profile</button>',
+  '  <button id="btn-cues" type="button" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;">🏑 Cues</button>',
   '  <button type="button" disabled title="P3" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">🏆 Achievements</button>',
   '  <button type="button" disabled title="P3" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">📊 Leaderboard</button>',
   '  <button type="button" disabled title="P3" style="padding:8px 14px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.35);cursor:not-allowed;">🛒 Shop</button>',
@@ -340,13 +345,56 @@ const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
 const loadReplayLabel = mainMenuEl.querySelector('#btn-load-replay') as HTMLLabelElement;
 const loadReplayInput = mainMenuEl.querySelector('#inp-record') as HTMLInputElement;
 const settingsBtn = mainMenuEl.querySelector('#btn-settings') as HTMLButtonElement;
+const profileBtn = mainMenuEl.querySelector('#btn-profile') as HTMLButtonElement;
+const cuesBtn = mainMenuEl.querySelector('#btn-cues') as HTMLButtonElement;
 loadReplayLabel.htmlFor = 'inp-record';
 
-// UI-007 settings panel + UI-025 find-opponent + UI-018 point fly
-const settingsPanel = createSettingsPanel(container);
+// UI-025 find-opponent + UI-018 point fly
 const findOpponentUI = createFindOpponentUI(container);
 const pointFlyUI = createPointFlyUI(container);
-settingsBtn.addEventListener('click', () => settingsPanel.show());
+
+// P1-T08 POPUP-001 manager + POPUP-002/005/009 panels
+const popupManager = createPopupManager(container);
+const settingsPanel = createSettingsPanel(container);
+const profilePopup = createPlayerProfilePopup(container);
+const cuesPopup = createCuesPopup(container);
+popupManager.register('settings', settingsPanel);
+popupManager.register('profile', {
+  show: () => profilePopup.show({ readOnly: false }),
+  hide: () => profilePopup.hide(),
+});
+popupManager.register('cues', cuesPopup);
+
+// Wrap panel hide to also pop manager stack when Close is used inside panel
+const _settingsHide = settingsPanel.hide.bind(settingsPanel);
+settingsPanel.hide = () => {
+  _settingsHide();
+  if (popupManager.isOpen('settings')) popupManager.close('settings');
+};
+const _profileHide = profilePopup.hide.bind(profilePopup);
+profilePopup.hide = () => {
+  _profileHide();
+  if (popupManager.isOpen('profile')) popupManager.close('profile');
+};
+const _cuesHide = cuesPopup.hide.bind(cuesPopup);
+cuesPopup.hide = () => {
+  _cuesHide();
+  if (popupManager.isOpen('cues')) popupManager.close('cues');
+};
+
+settingsBtn.addEventListener('click', () => popupManager.open('settings'));
+profileBtn.addEventListener('click', () => popupManager.open('profile'));
+cuesBtn.addEventListener('click', () => popupManager.open('cues'));
+
+// Reflect profile name on start button subtitle / profile button label
+function _refreshProfileChrome(): void {
+  const p = loadPlayerProfile();
+  profileBtn.textContent = `${p.avatar} ${p.name}`;
+  cuesBtn.title = `Equipped: ${getEquippedCue().name}`;
+}
+profilePopup.onChange = () => { _refreshProfileChrome(); };
+cuesPopup.onEquip = () => { _refreshProfileChrome(); };
+_refreshProfileChrome();
 
 loadReplayInput.addEventListener('change', () => {
   const file = loadReplayInput.files?.[0];
