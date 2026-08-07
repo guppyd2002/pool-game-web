@@ -1,0 +1,609 @@
+{
+  "schemaVersion": 1,
+  "title": "Kakashi-metric AI foul quality baseline",
+  "measureCommit": "6a5f87d58916efaeae924c2c564c04c3d1c6f40f",
+  "measureCommitShort": "6a5f87d",
+  "repro": "MEASURE_SHA=6a5f87d58916efaeae924c2c564c04c3d1c6f40f npx vitest run src/__tests__/game/kakashi-foul-metric-sweep.test.ts",
+  "metric": {
+    "name": "foulPerShot",
+    "definition": "foul shots / legal applyShot count",
+    "foulShot": "after forceShot settles, session.isBallInHand === true counts as one foul shot",
+    "denominator": "applyShot count (not turn events)",
+    "completedOnlyMedian": "median foulPerShot over games with completed=true AND capHit=false",
+    "capHitRateSeparate": "cap-hit games never folded into completed-only median",
+    "authority": "pool-qa (Kakashi) ruled definition; developer re-measures only"
+  },
+  "maxShots": 200,
+  "nSeeds": 20,
+  "seedRange": "0..19 inclusive",
+  "groups": [
+    {
+      "label": "self-play symmetric rank3",
+      "seedDeriv": "seed + globalShotIndex * 7919 (both seats share global index)",
+      "completedOnlyFoulMedian": 0.091,
+      "capHits": 6,
+      "n": 20,
+      "capHitRate": 0.3,
+      "completed": 14,
+      "completionRate": 0.7,
+      "measureCommitFromRun": "HEAD",
+      "seeds": [
+        {
+          "seed": 0,
+          "shots": 23,
+          "fouls": 2,
+          "foulPerShot": 0.087,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 1,
+          "shots": 31,
+          "fouls": 2,
+          "foulPerShot": 0.065,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 2,
+          "shots": 29,
+          "fouls": 4,
+          "foulPerShot": 0.138,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 3,
+          "shots": 33,
+          "fouls": 5,
+          "foulPerShot": 0.152,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 4,
+          "shots": 21,
+          "fouls": 2,
+          "foulPerShot": 0.095,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 5,
+          "shots": 36,
+          "fouls": 2,
+          "foulPerShot": 0.056,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 6,
+          "shots": 26,
+          "fouls": 2,
+          "foulPerShot": 0.077,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 7,
+          "shots": 29,
+          "fouls": 3,
+          "foulPerShot": 0.103,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 8,
+          "shots": 200,
+          "fouls": 172,
+          "foulPerShot": 0.86,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 9,
+          "shots": 25,
+          "fouls": 1,
+          "foulPerShot": 0.04,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 10,
+          "shots": 21,
+          "fouls": 2,
+          "foulPerShot": 0.095,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 11,
+          "shots": 200,
+          "fouls": 188,
+          "foulPerShot": 0.94,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 12,
+          "shots": 28,
+          "fouls": 5,
+          "foulPerShot": 0.179,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 13,
+          "shots": 200,
+          "fouls": 183,
+          "foulPerShot": 0.915,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 14,
+          "shots": 200,
+          "fouls": 185,
+          "foulPerShot": 0.925,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 15,
+          "shots": 19,
+          "fouls": 0,
+          "foulPerShot": 0.0,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 16,
+          "shots": 200,
+          "fouls": 176,
+          "foulPerShot": 0.88,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 17,
+          "shots": 25,
+          "fouls": 5,
+          "foulPerShot": 0.2,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 18,
+          "shots": 21,
+          "fouls": 1,
+          "foulPerShot": 0.048,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 19,
+          "shots": 200,
+          "fouls": 191,
+          "foulPerShot": 0.955,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        }
+      ],
+      "id": "self-play-symmetric-rank3"
+    },
+    {
+      "label": "self-play symmetric rank4 (SP-004 path)",
+      "seedDeriv": "seed + globalShotIndex * 7919 (both seats share global index)",
+      "completedOnlyFoulMedian": 0.107,
+      "capHits": 9,
+      "n": 20,
+      "capHitRate": 0.45,
+      "completed": 11,
+      "completionRate": 0.55,
+      "measureCommitFromRun": "HEAD",
+      "seeds": [
+        {
+          "seed": 0,
+          "shots": 200,
+          "fouls": 191,
+          "foulPerShot": 0.955,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 1,
+          "shots": 32,
+          "fouls": 4,
+          "foulPerShot": 0.125,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 2,
+          "shots": 200,
+          "fouls": 192,
+          "foulPerShot": 0.96,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 3,
+          "shots": 8,
+          "fouls": 0,
+          "foulPerShot": 0.0,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 4,
+          "shots": 28,
+          "fouls": 3,
+          "foulPerShot": 0.107,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 5,
+          "shots": 17,
+          "fouls": 1,
+          "foulPerShot": 0.059,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 6,
+          "shots": 200,
+          "fouls": 188,
+          "foulPerShot": 0.94,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 7,
+          "shots": 23,
+          "fouls": 3,
+          "foulPerShot": 0.13,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 8,
+          "shots": 200,
+          "fouls": 178,
+          "foulPerShot": 0.89,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 9,
+          "shots": 200,
+          "fouls": 182,
+          "foulPerShot": 0.91,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 10,
+          "shots": 200,
+          "fouls": 172,
+          "foulPerShot": 0.86,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 11,
+          "shots": 22,
+          "fouls": 1,
+          "foulPerShot": 0.045,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 12,
+          "shots": 24,
+          "fouls": 3,
+          "foulPerShot": 0.125,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 13,
+          "shots": 200,
+          "fouls": 190,
+          "foulPerShot": 0.95,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 14,
+          "shots": 34,
+          "fouls": 4,
+          "foulPerShot": 0.118,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 15,
+          "shots": 22,
+          "fouls": 4,
+          "foulPerShot": 0.182,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 16,
+          "shots": 35,
+          "fouls": 2,
+          "foulPerShot": 0.057,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 17,
+          "shots": 200,
+          "fouls": 198,
+          "foulPerShot": 0.99,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 18,
+          "shots": 200,
+          "fouls": 182,
+          "foulPerShot": 0.91,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        },
+        {
+          "seed": 19,
+          "shots": 1,
+          "fouls": 0,
+          "foulPerShot": 0.0,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        }
+      ],
+      "id": "self-play-symmetric-rank4-sp004"
+    },
+    {
+      "label": "HVA product path rank3",
+      "seedDeriv": "P1 attachHumanVsAI: AI-local *7919; P0 stand-in: global *7919 at fire (NOT comparable 1:1 to pure self-play)",
+      "completedOnlyFoulMedian": 0.148,
+      "capHits": 1,
+      "n": 20,
+      "capHitRate": 0.05,
+      "completed": 19,
+      "completionRate": 0.95,
+      "measureCommitFromRun": "HEAD",
+      "seeds": [
+        {
+          "seed": 0,
+          "shots": 17,
+          "fouls": 3,
+          "foulPerShot": 0.176,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 1,
+          "shots": 27,
+          "fouls": 4,
+          "foulPerShot": 0.148,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 2,
+          "shots": 34,
+          "fouls": 4,
+          "foulPerShot": 0.118,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 3,
+          "shots": 22,
+          "fouls": 4,
+          "foulPerShot": 0.182,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 4,
+          "shots": 29,
+          "fouls": 4,
+          "foulPerShot": 0.138,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 5,
+          "shots": 21,
+          "fouls": 5,
+          "foulPerShot": 0.238,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 6,
+          "shots": 26,
+          "fouls": 2,
+          "foulPerShot": 0.077,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 7,
+          "shots": 46,
+          "fouls": 20,
+          "foulPerShot": 0.435,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 8,
+          "shots": 28,
+          "fouls": 9,
+          "foulPerShot": 0.321,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 9,
+          "shots": 4,
+          "fouls": 1,
+          "foulPerShot": 0.25,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 10,
+          "shots": 41,
+          "fouls": 6,
+          "foulPerShot": 0.146,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 11,
+          "shots": 5,
+          "fouls": 0,
+          "foulPerShot": 0.0,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 12,
+          "shots": 32,
+          "fouls": 9,
+          "foulPerShot": 0.281,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 13,
+          "shots": 26,
+          "fouls": 6,
+          "foulPerShot": 0.231,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 14,
+          "shots": 20,
+          "fouls": 8,
+          "foulPerShot": 0.4,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 15,
+          "shots": 14,
+          "fouls": 0,
+          "foulPerShot": 0.0,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 16,
+          "shots": 39,
+          "fouls": 3,
+          "foulPerShot": 0.077,
+          "completed": true,
+          "capHit": false,
+          "winner": 1
+        },
+        {
+          "seed": 17,
+          "shots": 11,
+          "fouls": 1,
+          "foulPerShot": 0.091,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 18,
+          "shots": 21,
+          "fouls": 2,
+          "foulPerShot": 0.095,
+          "completed": true,
+          "capHit": false,
+          "winner": 0
+        },
+        {
+          "seed": 19,
+          "shots": 200,
+          "fouls": 177,
+          "foulPerShot": 0.885,
+          "completed": false,
+          "capHit": true,
+          "winner": null
+        }
+      ],
+      "id": "hva-product-rank3"
+    }
+  ],
+  "notes": [
+    "*7919 paths are not 1:1 comparable to seed+shotCount (headless) paths",
+    "HVA P1 uses AI-local *7919; P0 stand-in uses global *7919 — not pure self-play",
+    "Do not report all-seed median foul (includes deadlocks; recreates 0.94 illusion)",
+    "First baseline under correct calculateAIShot arg order on demo/headless/HVA product paths"
+  ]
+}
