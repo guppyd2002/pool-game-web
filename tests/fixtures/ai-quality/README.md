@@ -117,7 +117,7 @@ If the first line is missing, the number is not usable for CEO or for DIV regist
 
 1. **Arg-swap:** first wrong call site became a template (`ai-demo` → headless / replay / HVA). Signature was always correct; callers were not.  
 2. **Harness vs production:** historically respot in product/demo vs no-respot SP-004 — “secret kindness.” Feature (b) removes product null-respot; master/prod still has it until merge.  
-3. **Bug-derived goldens:** HS-002: swapped args (`d371b76`) then respot-inflated zero-cap (`72c54f5`/`11638b7`). After (b) left **intentionally red** until QA remeasures **ruler B** on `7b7620c+`. Do not invent green.  
+3. **Bug-derived goldens:** HS-002 history: swapped args; respot-ON zero-cap; then **“sym cap > asym cap” as universal mechanism** (disproved under ruler B — pair-dependent / noise). Final HS-002 = sym cap>0 + **bimodal foul** (≤0.20 / ≥0.86) + asym quality only.  
 4. **No hash → rumor:** every measured number needs a full commit SHA (DIV register rule).  
 5. **Control group:** SP-004 (ruler B) must not move when product placement changes; N=50 post-(b) matched N=20 magnitude → (b) scoped correctly.
 
