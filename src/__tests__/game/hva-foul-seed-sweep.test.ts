@@ -5,13 +5,36 @@
  * across N seeds using the SAME PRNG seed derivation:
  *   deriveAiShotSeed(base, shotIndex) = base + shotIndex * 7919
  *
- * Metrics reported (console + assertions on structural sanity):
- *   - foulPerShot median / min / max (all seeds)
- *   - completion rate (ended without cap)
- *   - foulPerShot median among completed games only
+ * ─── FOUL METRIC (two definitions, both reported) ───────────────────────────
  *
- * foul definition matches self-play REC-1: count onTurnChanged(bih=true).
- * foulPerShot = fouls / shots (not / turns).
+ * (A) per-shot (AUTHORITATIVE for product conclusions):
+ *     After each legal forceShot settles, count ONE foul if that shot awarded
+ *     ball-in-hand (session.isBallInHand post-replay). One attempt → one count.
+ *
+ * (B) turn-event (LEGACY / audit only — DO NOT use alone):
+ *     Count onTurnChanged(bih===true) / onHumanTurn|onAiTurn(bih===true).
+ *
+ * ─── HARNESS DEFECT (document — will mislead again if forgotten) ────────────
+ *
+ * Dual-drive HVA (human stand-in forceShot + attachHumanVsAI onTurnChanged)
+ * emits EXTRA turn events relative to production:
+ *   - forceShot → _onReplayComplete → onTurnChanged (once per shot)
+ *   - human BIH: notifyBallPlaced → onTurnChanged(bih=false) (extra)
+ *   - AI BIH: attachHumanVsAI suppresses onTurnChanged during place, then
+ *     forceShot later → another turn event
+ * Live browser production turn sequence is clean alternate seats (卡卡西:
+ * [1,0,1,0,...]); double-fire is harness-only. turnEvents/shots ≫ 1 is expected
+ * in this file — that is NOT a product bug.
+ *
+ * Older sweeps (foul median self-play ~0.94 / HVA ~0.27) counted (B) only and
+ * also called calculateAIShot(bih, isFirst) with args swapped vs signature
+ * (isFirstShot, ballInHand). Both inflate/distort numbers. This file uses
+ * correct arg order + dual reporting.
+ *
+ * Metrics reported (console + structural assertions):
+ *   - foulPerShot median (A) and foulPerShotTurnEvent median (B)
+ *   - completion rate
+ *   - turnEvents / shots ratio (double-trigger audit)
  */
 import { describe, it, expect } from 'vitest';
 import { createBallPoolPhysics } from '../../game/ball-pool-physics';
@@ -105,8 +128,15 @@ function trackPhysics(base: IBallPoolPhysics): IBallPoolPhysics {
 export interface SweepRow {
   seed: number;
   shots: number;
-  fouls: number;
+  /** (A) per-shot: fouls awarded by shot verdict (isBallInHand post-settle). */
+  foulsPerShot: number;
   foulPerShot: number;
+  /** (B) turn-event: onTurnChanged(bih===true) counts. */
+  foulsTurnEvent: number;
+  foulPerShotTurnEvent: number;
+  /** Total onTurnChanged firings (any bih) — double-trigger audit. */
+  turnEvents: number;
+  turnEventsPerShot: number;
   ended: boolean;
   capHit: boolean;
   winner: 0 | 1 | null;
@@ -115,12 +145,14 @@ export interface SweepRow {
 export interface SweepSummary {
   label: string;
   n: number;
+  foulMedian: number;
   foulMin: number;
   foulMax: number;
-  foulMedian: number;
+  foulTurnEventMedian: number;
   completed: number;
   completionRate: number;
   completedFoulMedian: number | null;
+  medianTurnEventsPerShot: number;
   rows: SweepRow[];
 }
 
@@ -133,6 +165,7 @@ function median(xs: number[]): number {
 
 function summarize(label: string, rows: SweepRow[]): SweepSummary {
   const rates = rows.map((r) => r.foulPerShot);
+  const turnRates = rows.map((r) => r.foulPerShotTurnEvent);
   const completed = rows.filter((r) => r.ended && !r.capHit);
   const completedRates = completed.map((r) => r.foulPerShot);
   return {
@@ -141,50 +174,76 @@ function summarize(label: string, rows: SweepRow[]): SweepSummary {
     foulMin: Math.min(...rates),
     foulMax: Math.max(...rates),
     foulMedian: median(rates),
+    foulTurnEventMedian: median(turnRates),
     completed: completed.length,
     completionRate: completed.length / rows.length,
     completedFoulMedian: completedRates.length ? median(completedRates) : null,
+    medianTurnEventsPerShot: median(rows.map((r) => r.turnEventsPerShot)),
     rows,
   };
 }
 
-/** Pure self-play rank3 vs rank3 — same as REC-1 harness. */
+/**
+ * Per-shot foul sample: after forceShot + sync replay, the shot awarded BIH.
+ * (Game-ending shots that never enter BIH are not counted as BIH-fouls —
+ * same as production turn path; rare for r3 complete games.)
+ */
+function samplePerShotFoul(session: { isBallInHand: boolean }): boolean {
+  return session.isBallInHand;
+}
+
+/** Pure self-play rank3 vs rank3 — arg order matches ai-controller signature. */
 function runSelfPlay(seed: number): SweepRow {
   const space = createPoolTable();
   const physics = trackPhysics(createBallPoolPhysics(space, MOCK_SCENE));
   const session = createBallPool8Session({
     physics, cue: MOCK_CUE, scene: MOCK_SCENE, replayDriver: syncReplay(),
   });
-  let fouls = 0;
+  let foulsTurnEvent = 0;
+  let foulsPerShot = 0;
+  let turnEvents = 0;
   let shots = 0;
   let winner: 0 | 1 | null = null;
-  session.onTurnChanged = (_i, bih) => { if (bih) fouls++; };
+
+  session.onTurnChanged = (_i, bih) => {
+    turnEvents++;
+    if (bih) foulsTurnEvent++;
+  };
   session.onGameEnded = (w) => { winner = w; };
   session.startNewGame();
+
   while (!session.isGameEnded && shots < MAX_SHOTS) {
     const bih = session.isBallInHand;
+    // Signature: (space, allowable, isFirstShot, ballInHand, rank, rankLast, seed)
     const shot = calculateAIShot(
       space,
       session.getAllowableFn(),
-      bih,
       shots === 0,
+      bih,
       RANK,
       RANK_LAST,
       deriveAiShotSeed(seed, shots),
     );
     if (bih) {
       if (shot.cueBallNewPos) physics.placeBall(0, shot.cueBallNewPos);
-      session.notifyBallPlaced();
+      else physics.respotCueBall();
+      session.notifyBallPlaced(); // may emit turn event bih=false (not a foul count)
     }
     session.forceShot(shot.shotData);
     shots++;
+    if (samplePerShotFoul(session)) foulsPerShot++;
   }
+
   const capHit = shots >= MAX_SHOTS && !session.isGameEnded;
   return {
     seed,
     shots,
-    fouls,
-    foulPerShot: shots > 0 ? fouls / shots : 0,
+    foulsPerShot,
+    foulPerShot: shots > 0 ? foulsPerShot / shots : 0,
+    foulsTurnEvent,
+    foulPerShotTurnEvent: shots > 0 ? foulsTurnEvent / shots : 0,
+    turnEvents,
+    turnEventsPerShot: shots > 0 ? turnEvents / shots : 0,
     ended: session.isGameEnded,
     capHit,
     winner,
@@ -193,8 +252,8 @@ function runSelfPlay(seed: number): SweepRow {
 
 /**
  * HVA path: P1 via attachHumanVsAI (rank3, *7919 on AI-local shot index);
- * P0 AI-quality stand-in using GLOBAL shot index *7919 (same formula).
- * Shot count = applyShot calls (authoritative); fouls = bih turn starts.
+ * P0 AI-quality stand-in using GLOBAL shot index *7919.
+ * Shot count = applyShot calls (authoritative).
  */
 function runHvaBothAiQuality(seed: number): SweepRow {
   const space = createPoolTable();
@@ -211,10 +270,18 @@ function runHvaBothAiQuality(seed: number): SweepRow {
     physics, cue: MOCK_CUE, scene: MOCK_SCENE, replayDriver: syncReplay(),
   });
   const scheduled: Array<() => void> = [];
-  let fouls = 0;
+  let foulsTurnEvent = 0;
+  let foulsPerShot = 0;
+  let turnEvents = 0;
   let winner: 0 | 1 | null = null;
+  let shotsAtLastSample = 0;
 
   session.onGameEnded = (w) => { winner = w; };
+
+  // Sample per-shot foul after every settled applyShot (human or AI).
+  // onShotFired fires inside forceShot before replay complete; isBallInHand is
+  // set in _onReplayComplete. Chain after existing hooks via turn of forceShot:
+  // we sample when shot counter advances (see loop / AI flush below).
 
   attachHumanVsAI(
     session,
@@ -234,30 +301,59 @@ function runHvaBothAiQuality(seed: number): SweepRow {
       clearTimeoutFn: () => {},
     },
     {
-      onHumanTurn: (_i, bih) => { if (bih) fouls++; },
-      onAiTurn: (_i, bih) => { if (bih) fouls++; },
+      onHumanTurn: (_i, bih) => {
+        turnEvents++;
+        if (bih) foulsTurnEvent++;
+      },
+      onAiTurn: (_i, bih) => {
+        turnEvents++;
+        if (bih) foulsTurnEvent++;
+      },
     },
   );
 
-  session.startNewGame();
+  session.startNewGame(); // start emits onTurnChanged → turnEvents includes open
+
+  function sampleIfNewShot(): void {
+    if (shots > shotsAtLastSample) {
+      // One sample per newly applied shot (may batch if multiple in flush — loop per increment)
+      while (shotsAtLastSample < shots) {
+        shotsAtLastSample++;
+        // After the shot that just applied, BIH means that shot fouled.
+        // Note: if multiple shots in one flush, isBallInHand only reflects the LAST.
+        // Drain AI one forceShot at a time so sampling stays 1:1 (see flush below).
+      }
+    }
+  }
 
   let stall = 0;
   let guard = 0;
   while (!session.isGameEnded && shots < MAX_SHOTS && stall < 12 && guard < MAX_SHOTS * 4) {
     guard++;
-    // Drain AI schedules first
-    while (scheduled.length > 0) scheduled.shift()!();
+
+    // Drain AI schedules ONE callback at a time so each forceShot is sampled.
+    if (scheduled.length > 0) {
+      const before = shots;
+      scheduled.shift()!();
+      if (shots > before) {
+        // AI (or BIH settle→forceShot) applied a shot
+        if (samplePerShotFoul(session)) foulsPerShot++;
+        shotsAtLastSample = shots;
+        stall = 0;
+      }
+      continue;
+    }
+
     if (session.isGameEnded) break;
 
     if (session.currentPlayerIndex === 0) {
       const bih = session.isBallInHand;
-      // Global index for human stand-in (matches self-play shot ordinal at fire time)
-      const shotIdx = shots; // next applyShot will be this index
+      const shotIdx = shots;
       const shot = calculateAIShot(
         space,
         session.getAllowableFn(),
-        bih,
         shotIdx === 0,
+        bih,
         RANK,
         RANK_LAST,
         deriveAiShotSeed(seed, shotIdx),
@@ -265,35 +361,37 @@ function runHvaBothAiQuality(seed: number): SweepRow {
       if (bih) {
         if (shot.cueBallNewPos) physics.placeBall(0, shot.cueBallNewPos);
         else physics.respotCueBall();
-        session.notifyBallPlaced();
+        session.notifyBallPlaced(); // extra turn event bih=false (harness defect)
       }
       const before = shots;
       session.forceShot(shot.shotData);
       if (shots === before) {
-        // forceShot no-op (wrong phase) — abort
         stall++;
         if (stall > 5) break;
       } else {
+        if (samplePerShotFoul(session)) foulsPerShot++;
+        shotsAtLastSample = shots;
         stall = 0;
       }
     } else {
-      // AI turn: must have scheduled work or just completed a flush
-      if (scheduled.length > 0) {
-        stall = 0;
-        continue;
-      }
-      // After flush, if still AI seat with no schedule, AI may be mid-BIH settle already flushed
+      // AI seat, no schedule left — stall or mid-state
       stall++;
       if (stall > 5) break;
     }
   }
 
+  void sampleIfNewShot;
+
   const capHit = shots >= MAX_SHOTS && !session.isGameEnded;
   return {
     seed,
     shots,
-    fouls,
-    foulPerShot: shots > 0 ? fouls / shots : 0,
+    foulsPerShot,
+    foulPerShot: shots > 0 ? foulsPerShot / shots : 0,
+    foulsTurnEvent,
+    foulPerShotTurnEvent: shots > 0 ? foulsTurnEvent / shots : 0,
+    turnEvents,
+    turnEventsPerShot: shots > 0 ? turnEvents / shots : 0,
     ended: session.isGameEnded,
     capHit,
     winner,
@@ -302,26 +400,31 @@ function runHvaBothAiQuality(seed: number): SweepRow {
 
 function logSummary(s: SweepSummary): void {
   console.log(
-    `[${s.label}] N=${s.n} foulPerShot median=${s.foulMedian.toFixed(3)} ` +
-    `min=${s.foulMin.toFixed(3)} max=${s.foulMax.toFixed(3)} ` +
-    `completion=${s.completed}/${s.n} (${(s.completionRate * 100).toFixed(0)}%) ` +
-    `completedFoulMedian=${s.completedFoulMedian == null ? 'n/a' : s.completedFoulMedian.toFixed(3)}`,
+    `[${s.label}] N=${s.n}\n` +
+    `  per-shot(A):  foulMedian=${s.foulMedian.toFixed(3)} min=${s.foulMin.toFixed(3)} max=${s.foulMax.toFixed(3)} ` +
+    `completedFoulMedian=${s.completedFoulMedian == null ? 'n/a' : s.completedFoulMedian.toFixed(3)}\n` +
+    `  turn-event(B): foulMedian=${s.foulTurnEventMedian.toFixed(3)}\n` +
+    `  completion=${s.completed}/${s.n} (${(s.completionRate * 100).toFixed(0)}%) ` +
+    `median turnEvents/shot=${s.medianTurnEventsPerShot.toFixed(2)}`,
   );
   for (const r of s.rows) {
     console.log(
-      `  seed=${r.seed} shots=${r.shots} fouls=${r.fouls} foul/s=${r.foulPerShot.toFixed(3)} ` +
+      `  seed=${r.seed} shots=${r.shots} ` +
+      `foulA=${r.foulsPerShot}(${r.foulPerShot.toFixed(3)}) ` +
+      `foulB=${r.foulsTurnEvent}(${r.foulPerShotTurnEvent.toFixed(3)}) ` +
+      `turns=${r.turnEvents}(×${r.turnEventsPerShot.toFixed(2)}) ` +
       `ended=${r.ended} cap=${r.capHit} winner=${r.winner}`,
     );
   }
 }
 
-describe('HVA foul seed sweep (N=20, rank3)', () => {
+describe('HVA foul seed sweep (N=20, rank3, dual metric)', () => {
   it('deriveAiShotSeed stride is 7919 (self-play parity lock)', () => {
     expect(AI_SHOT_SEED_STRIDE).toBe(7919);
     expect(deriveAiShotSeed(0, 1)).toBe(7919);
   });
 
-  it('N=20 self-play rank3vs3 distribution', () => {
+  it('N=20 self-play rank3vs3 — per-shot vs turn-event foul', () => {
     const rows: SweepRow[] = [];
     for (let seed = 0; seed < N_SEEDS; seed++) {
       rows.push(runSelfPlay(seed));
@@ -331,9 +434,16 @@ describe('HVA foul seed sweep (N=20, rank3)', () => {
     expect(sum.n).toBe(N_SEEDS);
     expect(sum.foulMedian).toBeGreaterThanOrEqual(0);
     expect(sum.foulMedian).toBeLessThanOrEqual(1);
+    // Per-shot fouls must never exceed turn-event fouls by... actually turn events
+    // can double-count; per-shot should be ≤ turn-event when both count BIH.
+    for (const r of rows) {
+      // Each per-shot foul should correspond to at least one turn-event bih
+      // (or equal). If turn-event under-counts, something else is wrong.
+      expect(r.foulsPerShot).toBeLessThanOrEqual(r.foulsTurnEvent + 1);
+    }
   }, 300_000);
 
-  it('N=20 HVA both-AI-quality rank3 distribution (post *7919 fix)', () => {
+  it('N=20 HVA both-AI-quality rank3 — per-shot vs turn-event foul', () => {
     const rows: SweepRow[] = [];
     for (let seed = 0; seed < N_SEEDS; seed++) {
       rows.push(runHvaBothAiQuality(seed));
@@ -343,5 +453,20 @@ describe('HVA foul seed sweep (N=20, rank3)', () => {
     expect(sum.n).toBe(N_SEEDS);
     expect(sum.foulMedian).toBeGreaterThanOrEqual(0);
     expect(sum.foulMedian).toBeLessThanOrEqual(1);
+
+    // seed=42 pin cross-check with 卡卡西 (if within 0..19 — seed 42 is out of range;
+    // run dedicated extra below via console for seed 42).
   }, 300_000);
+
+  it('seed=42 HVA dual-metric pin (卡卡西 cross-check)', () => {
+    const r = runHvaBothAiQuality(42);
+    console.log(
+      `[seed=42 HVA] shots=${r.shots} foulA=${r.foulsPerShot}/${r.shots}=${r.foulPerShot.toFixed(3)} ` +
+      `foulB=${r.foulsTurnEvent}/${r.shots}=${r.foulPerShotTurnEvent.toFixed(3)} ` +
+      `turns=${r.turnEvents} ended=${r.ended} winner=${r.winner}`,
+    );
+    expect(r.shots).toBeGreaterThan(0);
+    // Per-shot should be the conservative product metric
+    expect(r.foulPerShot).toBeLessThanOrEqual(1);
+  }, 120_000);
 });
