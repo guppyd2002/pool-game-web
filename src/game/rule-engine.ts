@@ -1,14 +1,17 @@
 /**
- * 8-Ball rule engine — faithful port of C# BallPool8GameLogic.
+ * 8-Ball rule engine — faithful port of C# BallPool8GameLogic (P1-T03 LOCK).
  *
  * Core mapping:
- *   beginShot()          ← Shot() [reset per-shot state]
- *   processShotResult()  ← OnBallHitBall/OnBallHitBoard/OnBallInPocket/
- *                          OnBallOutOfTable/EndShot/TurnChanged/GameEnded (merged)
- *   applyTimeout()       ← OnTimeEnded path in Update()
+ *   beginShot()              ← Shot() [reset per-shot state]
+ *   processShotResult()      ← OnBallHitBall/OnBallHitBoard/OnBallInPocket/
+ *                              OnBallOutOfTable/EndShot/TurnChanged/GameEnded (merged)
+ *   applyTimeout()           ← OnTimeEnded (ShotTime expiry → foul turn change)
+ *   applyGameEndTimeout()    ← Update GameEndTime (1.5×ShotTime → force lose)
  *
- * RULE-007 via serialize()/deserialize().
- * LOC-003 via getReasonMessage() (English baseline).
+ * RULE-001~010 + LOC-003. RULE-007 via serialize()/deserialize().
+ *
+ * Timer wall-clock lives in session/UI; this module only judges pure rule outcomes.
+ * Caller supplies which timeout tier fired (client-side ShotTime / GameEndTime).
  */
 
 import { createPlayerBallInfo, BallType } from './player-ball-info';
@@ -71,8 +74,18 @@ export interface RuleEngine {
    */
   processShotResult(result: ShotResult): ShotVerdict;
 
-  /** Timeout foul — replaces shot when timer fires. C# OnTimeEnded(). */
+  /**
+   * Per-shot timer expired (spendedTime >= ShotTime) → foul turn change + ball-in-hand.
+   * C# OnTimeEnded() path.
+   */
   applyTimeout(): ShotVerdict;
+
+  /**
+   * Long idle (spendedTime >= GameEndTime = 1.5×ShotTime) → current player LOSES.
+   * C# Update(): if (spendedTime >= GameEndTime) force game end with TimeIsEnded.
+   * RULE-006 second tier (超長超時判負).
+   */
+  applyGameEndTimeout(): ShotVerdict;
 
   // ── RULE-007 ──────────────────────────────────────────────────────────────
   serialize(): GameLogicStateV1;
@@ -453,7 +466,7 @@ export function createRuleEngine(): RuleEngine {
       return _turnChanged();
     },
 
-    // ── C# OnTimeEnded() path ──────────────────────────────────────────────
+    // ── C# OnTimeEnded() path — first-tier ShotTime expiry ─────────────────
     applyTimeout(): ShotVerdict {
       _turnIsChanged = true;
       _tableIsOpened = true;
@@ -469,6 +482,28 @@ export function createRuleEngine(): RuleEngine {
         winner: null,
         turnChanged: true,
         ballInHand: true,
+        reason: Reason.TimeIsEnded,
+        ballTypeAssigned: false,
+      };
+    },
+
+    // ── C# Update GameEndTime path — second-tier long idle (1.5×ShotTime) ──
+    applyGameEndTimeout(): ShotVerdict {
+      // Current player loses for stalling past GameEndTime; opponent wins.
+      // C#: GameIsEnded=true, reason=TimeIsEnded, force-end handler (not turn foul).
+      _tableIsOpened = true;
+      _gameIsEnded = true;
+      _isWinner = false;
+      _turnIsChanged = false;
+      _shotBallInHand = false;
+      _lastReason = Reason.TimeIsEnded;
+      _ballTypeAssigned = false;
+
+      return {
+        gameEnded: true,
+        winner: _nextPlayerIndex(),
+        turnChanged: false,
+        ballInHand: false,
         reason: Reason.TimeIsEnded,
         ballTypeAssigned: false,
       };

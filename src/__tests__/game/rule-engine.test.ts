@@ -531,7 +531,7 @@ describe('Break shot — faithful port of C# dead-branch behavior', () => {
 // ─── RULE-006: turn timer ────────────────────────────────────────────────────
 
 describe('RULE-006 — turn timer', () => {
-  it('timer timeout → turn changes (BallInHand=true, reason=TimeIsEnded)', () => {
+  it('ShotTime timeout → turn changes (BallInHand=true, reason=TimeIsEnded)', () => {
     const engine = makeEngine();
     // Assign type first
     engine.beginShot();
@@ -544,7 +544,29 @@ describe('RULE-006 — turn timer', () => {
     const verdict = engine.applyTimeout();
     expect(verdict.turnChanged).toBe(true);
     expect(verdict.ballInHand).toBe(true);
+    expect(verdict.gameEnded).toBe(false);
     expect(verdict.reason).toBe(Reason.TimeIsEnded);
+    expect(engine.currentPlayerIndex).toBe(1);
+  });
+
+  it('GameEndTime (long idle 1.5×ShotTime) → current player loses, opponent wins', () => {
+    // C# Update: spendedTime >= GameEndTime → GameIsEnded, reason TimeIsEnded
+    const engine = makeEngine();
+    engine.beginShot();
+    engine.processShotResult(makeShotResult({
+      contacts: [cueHits(1), railHit(1)],
+      pocketed: [pocketed(1)],
+    }));
+    expect(engine.currentPlayerIndex).toBe(0);
+
+    engine.beginShot();
+    const verdict = engine.applyGameEndTimeout();
+    expect(verdict.gameEnded).toBe(true);
+    expect(verdict.turnChanged).toBe(false);
+    expect(verdict.ballInHand).toBe(false);
+    expect(verdict.winner).toBe(1); // opponent wins
+    expect(verdict.reason).toBe(Reason.TimeIsEnded);
+    expect(engine.gameIsEnded).toBe(true);
   });
 });
 
