@@ -80,10 +80,9 @@ const powerBar = createPowerBar(container);
 const cueMesh = createCueMesh(scene.scene);
 const ghostBall = createGhostBall(scene.scene);
 
-// SP-Harden-9d TEMP: dual sliders — A target extension (_lineDistanceM) + B cue blue guide.
-// Default ON for mobile prod; hide with ?debug=aimlen=0 or ?debug=off. Remove after CEO locks.
-const _showAimLenDebug = new URLSearchParams(window.location.search).get('debug') !== 'aimlen=0'
-  && new URLSearchParams(window.location.search).get('debug') !== 'off';
+// CEO 2026-08-07 bake: cue guide = cue→ghost fixed; target arm = 0.3 m only.
+// TEMP dual sliders removed (opt-in: ?debug=aimlen).
+const _showAimLenDebug = new URLSearchParams(window.location.search).get('debug') === 'aimlen';
 const aimLengthDebug = _showAimLenDebug
   ? createAimLengthDebugUI(container, () => { _updateAimVisuals(); })
   : null;

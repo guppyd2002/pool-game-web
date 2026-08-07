@@ -46,23 +46,21 @@ export function setCueAimGuideLengthM(m: number): number {
 /**
  * Compute polyline for the cue primary aim guide (hitLineBase family).
  *
- * SP-Harden-9 CATCH-1 (斑 gate): ALL hitTypes — ball / cushion / none — use the
- * same rule: [cue, cue + aimDir * guideLength]. Enclosed-table empty-felt aims
- * always hit a cushion first; ignoring guideLength there made the CEO slider a no-op.
- *
- * Length is independent of first-contact distance (may pass through / past contact).
- * Post-contact separation arms (ghost-ball lineDistance 0.25) are a different line.
- * bounceLength retained in signature for API compat but unused on the primary guide.
+ * CEO 2026-08-07 bake: 母球導引線固定「母球 → ghost/接觸點」，不可調長度。
+ *   - ball:    end = ghost center (imaginary ball at contact)
+ *   - cushion/none: end = first contact point
+ * guideLength retained in signature for API compat but **ignored**.
+ * Post-contact target arm is ghost-ball.ts only (default 0.3 m).
  */
 export function computeAimLinePoints(
   cueBallPos: CmVector,
   hit: AimHit,
-  guideLength: number = _cueAimGuideLengthM,
+  _guideLength: number = _cueAimGuideLengthM,
   _bounceLength = 0.25,
 ): THREE.Vector3[] {
   const from = toWorld(cueBallPos);
 
-  // Aim direction: toward ghost (ball) or contact point (cushion/none).
+  // End at ghost (ball) or contact point (cushion/none) — never past contact.
   let aimTarget: THREE.Vector3;
   if (hit.hitType === 'ball') {
     const g = ghostCenter(hit);
@@ -71,20 +69,9 @@ export function computeAimLinePoints(
     aimTarget = toWorld(hit.point);
   }
 
-  const dir = new THREE.Vector3(
-    aimTarget.x - from.x,
-    0,
-    aimTarget.z - from.z,
-  );
-  const dlen = dir.length();
-  if (dlen < 1e-9) {
-    return [from, from.clone()];
-  }
-  dir.multiplyScalar(1 / dlen);
-
-  // Same for ball / cushion / none: fixed-length pointer along shot direction.
-  const guideEnd = from.clone().add(dir.clone().multiplyScalar(guideLength));
-  return [from, guideEnd];
+  // Flatten Y so the line stays on the table plane.
+  const end = new THREE.Vector3(aimTarget.x, from.y, aimTarget.z);
+  return [from, end];
 }
 
 // ─── Three.js wrapper (browser) ───────────────────────────────────────────────

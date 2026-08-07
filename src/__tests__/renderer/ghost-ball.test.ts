@@ -12,7 +12,6 @@ import {
   computeSeparationLines,
   nearestPocketAlongTarget,
   SEPARATION_LINE_DEFAULT_LENGTH,
-  TARGET_TO_DEFLECT_RATIO,
   SP_HARDEN_10_FIXED_AIM_LENGTH,
   SP_HARDEN_10_CANARY,
   POCKET_HIGHLIGHT_RADIUS,
@@ -193,20 +192,11 @@ describe('computeSeparationLines — tangential shot (kk ≈ 0) [SP-Harden-10 fi
     expect(tarLen).toBeCloseTo(L, 2);
   });
 
-  it('tangential: deflect stub = L / TARGET_TO_DEFLECT_RATIO (8BP 2.2×)', () => {
-    // SP-Harden-10: was full L under Unity kk formula; now fixed ratio
+  it('CEO bake: deflect stub is zero (only target arm drawn)', () => {
     const pts = computeSeparationLines(cueBall, hit, L)!;
     const g = ghostCenter(hit);
     const defLen = Math.sqrt((pts[1].x - g.x) ** 2 + (pts[1].z - g.z) ** 2);
-    expect(defLen).toBeCloseTo(L / TARGET_TO_DEFLECT_RATIO, 2);
-  });
-
-  it('tangential: deflection is in +z (perpendicular to target direction)', () => {
-    const pts = computeSeparationLines(cueBall, hit, L)!;
-    const g = ghostCenter(hit);
-    // direction1 for tangential = (0,0,1) since aimDir=(0,0,1) and d2=(-1,0,0)
-    expect(pts[1].z).toBeGreaterThan(g.z);  // deflects in +z
-    expect(Math.abs(pts[1].x - g.x)).toBeLessThan(0.001);  // no x change
+    expect(defLen).toBeCloseTo(0, 5);
   });
 });
 
@@ -247,13 +237,10 @@ describe('SP-Harden-10 — true invariances (not re-skinned Unity tests)', () =>
     expect(targetLen(tanCue, tanHit, 0.5)).not.toBeCloseTo(2 * R, 2);
   });
 
-  it('deflect stub ≈ target/2 within 1.8–2.4 band', () => {
-    expect(TARGET_TO_DEFLECT_RATIO).toBeGreaterThanOrEqual(1.8);
-    expect(TARGET_TO_DEFLECT_RATIO).toBeLessThanOrEqual(2.4);
+  it('CEO bake: deflect stub always zero regardless of cut', () => {
     const pts = computeSeparationLines(tanCue, tanHit, L)!;
     const g = ghostCenter(tanHit);
-    const defLen = Math.hypot(pts[1].x - g.x, pts[1].z - g.z);
-    expect(defLen).toBeCloseTo(L / TARGET_TO_DEFLECT_RATIO, 5);
+    expect(Math.hypot(pts[1].x - g.x, pts[1].z - g.z)).toBeCloseTo(0, 5);
   });
 
   it('canary symbols present for Spot prod fingerprint', () => {
@@ -294,10 +281,9 @@ describe('SP-Harden-10 — true invariances (not re-skinned Unity tests)', () =>
   });
 });
 
-describe('SEPARATION_LINE_DEFAULT_LENGTH — default Aim scalar', () => {
-  it('default target extension is 0.25m (historical Unity lineDistance default)', () => {
-    // SP-Harden-10: still the default slider-A value; no longer energy01 budget.
-    expect(SEPARATION_LINE_DEFAULT_LENGTH).toBe(0.25);
+describe('SEPARATION_LINE_DEFAULT_LENGTH — CEO bake default', () => {
+  it('default target extension is 0.3m (CEO 2026-08-07)', () => {
+    expect(SEPARATION_LINE_DEFAULT_LENGTH).toBe(0.3);
   });
 });
 

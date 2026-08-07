@@ -23,15 +23,14 @@ import type { AimHit } from '../game/ball-pool-physics';
 import type { CmVector } from '../physics/cm-vector';
 
 /**
- * Default target post-contact extension length (meters) — TEMP slider A default.
- * Historical Unity lineDistance=0.25; SP-Harden-10 no longer multiplies by energy01.
- * SP-Harden-9: runtime-tunable for CEO live pick; constant remains the default.
+ * Default target post-contact extension length (meters).
+ * CEO 2026-08-07 bake: 目標延伸線預設 0.3 m（只畫目標球被撞後前進方向）.
  */
-export const SEPARATION_LINE_DEFAULT_LENGTH = 0.25;
+export const SEPARATION_LINE_DEFAULT_LENGTH = 0.3;
 
 /**
- * SP-Harden-10: target extension / deflect stub ratio (≈2, band 1.8–2.4).
- * 2.2 from single-frame 8BP art measure — not a physics constant; do not overfit.
+ * @deprecated CEO bake: cue-deflect stub removed — only target arm is drawn.
+ * Kept for canary/bundle fingerprint continuity (numeric 2.2 unused in geometry).
  */
 export const TARGET_TO_DEFLECT_RATIO = 2.2;
 
@@ -109,17 +108,13 @@ export function ghostCenter(hit: AimHit): { x: number; y: number; z: number } {
  *
  * Layout: [ghost, cue_deflect_end, ghost, target_end]
  *
- * SP-Harden-10 (8 Ball Pool Aim parity — design change, not Unity):
- *   Post-contact lengths are FIXED geometric guides (deliberately not physics):
- *     s_target  = lineLength          (= slider A / 8BP Aim scalar)
- *     s_deflect = lineLength / 2.2    (8BP measured ratio target≈2.2×deflect)
- *   No energy01 (power) scaling, no kk (cut-angle) length scaling.
- *   Directions still pure stun geometry from ghost:
- *     direction2 = −normal (line-of-centers through target)
- *     direction1 = aimDir − Project(aimDir, direction2)  (90° stun tangent)
- *   Head-on (dir1≈0): deflect arm collapses to zero length (hidden by caller).
+ * CEO 2026-08-07 bake:
+ *   - Only **target** post-contact arm is drawn (目標球被撞後前進方向 = direction2).
+ *   - Cue-deflect stub removed (s_deflect = 0; caller hides zero-length arm).
+ *   - s_target = lineLength (fixed, no power/kk scale); default 0.3 m.
+ *   - direction2 = −normal (line-of-centers from ghost through target).
  *
- * @param lineLength target extension length in meters (NOT a power-scaled budget)
+ * @param lineLength target extension length in meters
  */
 export function computeSeparationLines(
   cueBallPos: CmVector,
@@ -131,34 +126,22 @@ export function computeSeparationLines(
   const g = ghostCenter(hit);
   const fx = cueBallPos.x / M, fz = cueBallPos.z / M;
 
-  // Aim direction: from cue ball to ghost center (horizontal plane only)
+  // Need non-degenerate cue→ghost for valid contact geometry
   const dlen = Math.sqrt((g.x - fx) ** 2 + (g.z - fz) ** 2);
   if (dlen < 1e-9) return null;
-  const dx = (g.x - fx) / dlen, dz = (g.z - fz) / dlen;
 
   // direction2 = −normal = from ghost toward target ball center
   const nx = hit.normal.x / M, nz = hit.normal.z / M;
   const d2x = -nx, d2z = -nz;
 
-  // kk only used to build pure-stun tangent direction1 (NOT for length)
-  const kk = d2x * dx + d2z * dz;
-
-  // direction1 = perp component of aimDir w.r.t. direction2 (cue ball deflection axis)
-  const proj1x = kk * d2x, proj1z = kk * d2z;
-  const p1x = dx - proj1x, p1z = dz - proj1z;
-  const p1len = Math.sqrt(p1x * p1x + p1z * p1z);
-  const dir1x = p1len > 1e-9 ? p1x / p1len : 0;
-  const dir1z = p1len > 1e-9 ? p1z / p1len : 0;
-
-  // SP-Harden-10: fixed lengths — independent of power and cut angle
+  // CEO: only target extension arm; deflect stub zeroed
   const s2 = Math.max(0, lineLength);
-  const s1 = s2 / TARGET_TO_DEFLECT_RATIO;
 
   return [
-    { x: g.x,                y: g.y, z: g.z },                 // ghost (cue deflect start)
-    { x: g.x + s1 * dir1x,   y: g.y, z: g.z + s1 * dir1z },   // cue deflect end
-    { x: g.x,                y: g.y, z: g.z },                 // ghost (target path start)
-    { x: g.x + s2 * d2x,     y: g.y, z: g.z + s2 * d2z },     // target ball end
+    { x: g.x, y: g.y, z: g.z },                               // ghost (deflect start — unused)
+    { x: g.x, y: g.y, z: g.z },                               // zero-length deflect
+    { x: g.x, y: g.y, z: g.z },                               // ghost (target path start)
+    { x: g.x + s2 * d2x, y: g.y, z: g.z + s2 * d2z },         // target ball end
   ];
 }
 

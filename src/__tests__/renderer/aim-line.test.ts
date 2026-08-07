@@ -1,6 +1,5 @@
 /**
- * P1-T02 / SP-Harden-9: aim-line pure function tests.
- * Cue aim guide (blue line) length is guideLength along aim dir for ALL hitTypes.
+ * Cue aim guide (blue line): CEO bake — always cue → ghost/contact (not extendable).
  */
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
@@ -13,6 +12,7 @@ import {
   getCueAimGuideLengthM,
   DEFAULT_CUE_AIM_GUIDE_LENGTH_M,
 } from '../../renderer/aim-line';
+import { ghostCenter } from '../../renderer/ghost-ball';
 import { MULTIPLIER } from '../../physics/fixed-math';
 import { BALL_Y } from '../../physics/constants';
 
@@ -42,54 +42,40 @@ describe('toWorld — Fixed CmVector → THREE.Vector3 float', () => {
   });
 });
 
-describe('computeAimLinePoints — guideLength for ALL hitTypes (CATCH-1)', () => {
-  it('none: end is guideLength along aim dir, not locked to hit.point', () => {
-    const hit = makeHit('none', 120000, BALL_Y, 0);
-    const pts = computeAimLinePoints(CUE_POS, hit, 1.5);
-    expect(pts).toHaveLength(2);
-    expect(pts[0].x).toBeCloseTo(0, 6);
-    expect(pts[1].x).toBeCloseTo(1.5, 4);
-  });
-
-  it('ball: guideLength extends past ghost/contact', () => {
+describe('computeAimLinePoints — CEO bake: cue → ghost/contact only', () => {
+  it('ball: end is ghost center (not past contact, ignores guideLength)', () => {
     const R = 285 / MULTIPLIER;
     const hit = makeHit(
       'ball',
       Math.round((0.5 - R) * MULTIPLIER), BALL_Y, 0,
       -MULTIPLIER, 0, 0,
     );
+    const g = ghostCenter(hit);
+    const short = computeAimLinePoints(CUE_POS, hit, 0.5);
+    const long = computeAimLinePoints(CUE_POS, hit, 3.0);
+    expect(short).toHaveLength(2);
+    expect(short[1].x).toBeCloseTo(g.x, 5);
+    expect(short[1].z).toBeCloseTo(g.z, 5);
+    // guideLength ignored
+    expect(long[1].x).toBeCloseTo(short[1].x, 5);
+  });
+
+  it('cushion: end is contact point (not extendable)', () => {
+    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
     const pts = computeAimLinePoints(CUE_POS, hit, 2.0);
     expect(pts).toHaveLength(2);
-    expect(pts[1].x).toBeCloseTo(2.0, 4);
+    expect(pts[1].x).toBeCloseTo(126990 / MULTIPLIER, 4);
   });
 
-  it('cushion: ALSO uses guideLength (not contact-locked) — empty-felt aim DOA fix', () => {
-    // Enclosed table empty-felt aim → SphereCast hits cushion. Slider must work here.
-    const hit = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const short = computeAimLinePoints(CUE_POS, hit, 0.5);
-    const long = computeAimLinePoints(CUE_POS, hit, 2.0);
-    expect(short).toHaveLength(2);
-    expect(long).toHaveLength(2);
-    // Contact is at ~1.27 m; guide must NOT be locked to contact for either length.
-    expect(short[1].x).toBeCloseTo(0.5, 4);
-    expect(long[1].x).toBeCloseTo(2.0, 4);
-    expect(long[1].x).toBeGreaterThan(short[1].x);
-  });
-
-  it('cushion and ball with same aim dir and guideLength share end length', () => {
-    const ball = makeHit('ball', 50000, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const cush = makeHit('cushion', 126990, BALL_Y, 0, -MULTIPLIER, 0, 0);
-    const b = computeAimLinePoints(CUE_POS, ball, 1.2);
-    const c = computeAimLinePoints(CUE_POS, cush, 1.2);
-    const lenB = b[0].distanceTo(b[1]);
-    const lenC = c[0].distanceTo(c[1]);
-    expect(lenB).toBeCloseTo(1.2, 4);
-    expect(lenC).toBeCloseTo(1.2, 4);
+  it('none: end is hit.point', () => {
+    const hit = makeHit('none', 50000, BALL_Y, 0);
+    const pts = computeAimLinePoints(CUE_POS, hit, 1.5);
+    expect(pts[1].x).toBeCloseTo(5.0, 4);
   });
 });
 
 describe('setCueAimGuideLengthM', () => {
-  it('clamps to 0.10–3.00 and get returns applied', () => {
+  it('clamps still work (API retained; geometry ignores value)', () => {
     expect(setCueAimGuideLengthM(0.01)).toBeCloseTo(0.1, 6);
     expect(getCueAimGuideLengthM()).toBeCloseTo(0.1, 6);
     expect(setCueAimGuideLengthM(9)).toBeCloseTo(3.0, 6);
