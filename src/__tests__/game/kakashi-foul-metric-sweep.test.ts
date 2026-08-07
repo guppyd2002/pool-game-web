@@ -12,7 +12,24 @@
  *   *7919  = base + shotIndex * 7919  (SP-004 / HVA production AI path)
  *   AI-local vs global only applies inside HVA dual-drive (documented per row)
  *
- * Does not modify production code. Does not touch HS-002 / replay-controller / HVA product.
+ * ## Ruler-diff harness (千手拍 A — permanent anti-mixup)
+ *
+ * Same AI config can show night-and-day cap rates under different BIH null policies:
+ *   respot=false → ruler B / SP-004 / Unity-faithful (no head-spot on null placement)
+ *   respot=true  → production-historical respot-ON scale (kinder; inflates completion)
+ *
+ * Contrast asserts (asym r4v2, *7919, N=20) prove cap **depends on the ruler** —
+ * so respotON cap===0 must NEVER be used as HS-002 green / DIV-004 mechanism.
+ *
+ * measureCommit notes (卡卡西, ruler B respot-invariant; measured @11638b7 ≡ 7debce3 game physics):
+ *   sym r3 ≈ 30% cap, r4 ≈ 45% cap (N=20)
+ *   asym r4v2 faithful ≈ 35% (N20) / 40% (N50) / 41% (N51); respotON seeds 0..50 → **0** caps
+ *   asym r2v4 ≈ 45% (N20) / 36% (N50)
+ *
+ * OOM discipline: one config per `it()` (do not chain multi-config 50×200 in one worker).
+ * Prefer `NODE_OPTIONS=--max-old-space-size=8192` or scripts/run-seed-batch.mjs for large N.
+ *
+ * Does not modify production code. Does not rewrite HS-002 (separate file; already final @402024c).
  */
 import { describe, it, expect } from 'vitest';
 import { createBallPoolPhysics } from '../../game/ball-pool-physics';
@@ -32,6 +49,13 @@ import {
 const MAX_SHOTS = 200;
 const N_SEEDS = 20;
 const RANK_LAST = 5;
+
+/** Sweep bimodal foul bands (looser than HS-002 0.20/0.86; matches SP-004 style gap). */
+const SWEEP_COMPLETED_FOUL_MAX = 0.35;
+const SWEEP_CAP_HIT_FOUL_MIN = 0.6;
+
+/** Faithful asym floor — QA N20≈35%; guard against collapsing to respot-ON zero. */
+const FAITHFUL_ASYM_CAP_MIN = 0.25;
 
 const MOCK_SCENE = {
   updateBallPosition: () => {},
@@ -145,8 +169,12 @@ function logTable(t: TableRow, measureSha: string): void {
   }
 }
 
-/** Self-play symmetric r vs r, seed = base + globalShot * 7919 (SP-004 formula). */
-function runSelfPlaySym(seed: number, rank: number): GameRow {
+/**
+ * Self-play config runner (*7919 global both seats).
+ * @param respot false = ruler B / SP-004 (no respot on null); true = respot-ON scale.
+ * Asymmetry via r0 ≠ r1.
+ */
+function runSelfPlayCfg(seed: number, rank0: number, rank1: number, respot: boolean): GameRow {
   const space = createPoolTable();
   const base = createBallPoolPhysics(space, MOCK_SCENE);
   let shots = 0;
@@ -183,6 +211,7 @@ function runSelfPlaySym(seed: number, rank: number): GameRow {
   while (!session.isGameEnded && shots < MAX_SHOTS) {
     const bih = session.isBallInHand;
     const shotIdx = shots;
+    const rank = session.currentPlayerIndex === 0 ? rank0 : rank1;
     // Signature (isFirstShot, ballInHand); seed *7919 global
     const shot = calculateAIShot(
       space,
@@ -193,10 +222,10 @@ function runSelfPlaySym(seed: number, rank: number): GameRow {
       RANK_LAST,
       seed + shotIdx * AI_SHOT_SEED_STRIDE,
     );
-    // SP-004 / REC-1 placement: place only when cueBallNewPos non-null — NO respot fallback
-    // (respot would diverge trajectories from SP-004; product HVA path does respot separately).
     if (bih) {
+      // Ruler switch: place if AI returned a pos; else optional head-spot respot.
       if (shot.cueBallNewPos !== null) physics.placeBall(0, shot.cueBallNewPos);
+      else if (respot) physics.respotCueBall();
       session.notifyBallPlaced();
     }
     const before = shots;
@@ -219,9 +248,15 @@ function runSelfPlaySym(seed: number, rank: number): GameRow {
   };
 }
 
+/** Symmetric same-rank shortcut (default ruler B / no respot). */
+function runSelfPlaySym(seed: number, rank: number, respot = false): GameRow {
+  return runSelfPlayCfg(seed, rank, rank, respot);
+}
+
 /**
  * HVA product path: attachHumanVsAI for P1 (AI-local *7919);
  * P0 stand-in uses global *7919 at fire time (AI-quality surrogate for human).
+ * P0 stand-in still uses respot-ON on null — documents product dual-drive, not ruler B.
  */
 function runHvaProduct(seed: number, rank = 3): GameRow {
   const space = createPoolTable();
@@ -342,32 +377,89 @@ function runHvaProduct(seed: number, rank = 3): GameRow {
 const MEASURE_SHA = process.env.MEASURE_SHA ?? 'HEAD';
 
 describe('Kakashi-metric foul quality table (N=20)', () => {
-  it('self-play symmetric rank3 (*7919 global)', () => {
+  it('self-play symmetric rank3 (*7919, ruler B no respot) — deadlock exists', () => {
     const rows: GameRow[] = [];
-    for (let seed = 0; seed < N_SEEDS; seed++) rows.push(runSelfPlaySym(seed, 3));
+    for (let seed = 0; seed < N_SEEDS; seed++) rows.push(runSelfPlaySym(seed, 3, false));
     const t = summarize(
-      'self-play symmetric rank3',
-      'seed + globalShotIndex * 7919 (both seats share global index)',
+      'self-play symmetric rank3 (ruler B)',
+      'seed + globalShotIndex * 7919; respot=false',
       rows,
     );
     logTable(t, MEASURE_SHA);
     expect(t.n).toBe(N_SEEDS);
-    // Structural only — quality numbers are the console table for CEO/QA
-    expect(t.completionRate).toBeGreaterThanOrEqual(0);
-    expect(t.completionRate).toBeLessThanOrEqual(1);
+    // DIV-004: same-rank deadlock mode is real (QA ~30% N=20 — do not lock exact rate)
+    expect(t.capHits, 'sym r3v3 must show at least one cap-hit').toBeGreaterThan(0);
   }, 300_000);
 
-  it('self-play symmetric rank4 SP-004 path (*7919 global)', () => {
+  it('self-play symmetric rank4 SP-004 path (*7919, ruler B) — cap>0 + bimodal foul', () => {
     const rows: GameRow[] = [];
-    for (let seed = 0; seed < N_SEEDS; seed++) rows.push(runSelfPlaySym(seed, 4));
+    for (let seed = 0; seed < N_SEEDS; seed++) rows.push(runSelfPlaySym(seed, 4, false));
     const t = summarize(
-      'self-play symmetric rank4 (SP-004 path)',
-      'seed + globalShotIndex * 7919 (both seats share global index)',
+      'self-play symmetric rank4 (SP-004 / ruler B)',
+      'seed + globalShotIndex * 7919; respot=false',
       rows,
     );
     logTable(t, MEASURE_SHA);
     expect(t.n).toBe(N_SEEDS);
-    expect(t.completionRate).toBeGreaterThanOrEqual(0);
+    // Deadlock mode (QA ~45% N=20)
+    expect(t.capHits, 'sym r4v4 must show at least one cap-hit').toBeGreaterThan(0);
+
+    const completed = rows.filter((r) => r.completed && !r.capHit);
+    const capHits = rows.filter((r) => r.capHit);
+    expect(completed.length).toBeGreaterThan(0);
+    for (const r of completed) {
+      expect(
+        r.foulPerShot,
+        `completed seed=${r.seed} fps=${r.foulPerShot}`,
+      ).toBeLessThan(SWEEP_COMPLETED_FOUL_MAX);
+    }
+    for (const r of capHits) {
+      expect(
+        r.foulPerShot,
+        `cap-hit seed=${r.seed} fps=${r.foulPerShot}`,
+      ).toBeGreaterThan(SWEEP_CAP_HIT_FOUL_MIN);
+    }
+  }, 300_000);
+
+  /**
+   * Ruler-diff core (pair with next it): same config 4v2 *7919, only respot flag differs.
+   * Together they prove cap is ruler-dependent — never use respotON zero as mechanism green.
+   */
+  it('ruler-diff A: faithful asym r4v2 (*7919, respot=false) cap rate > 0.25', () => {
+    const rows: GameRow[] = [];
+    for (let seed = 0; seed < N_SEEDS; seed++) {
+      rows.push(runSelfPlayCfg(seed, 4, 2, false));
+    }
+    const t = summarize(
+      'asym r4v2 faithful (ruler B)',
+      'seed + globalShotIndex * 7919; respot=false; ranks 4 vs 2',
+      rows,
+    );
+    logTable(t, MEASURE_SHA);
+    expect(t.n).toBe(N_SEEDS);
+    // QA: N20≈35%, N50≈40% — floor 0.25 leaves margin; proves NOT the respot-ON zero world
+    expect(t.capHitRate, `faithful asym capRate=${t.capHitRate}`).toBeGreaterThan(FAITHFUL_ASYM_CAP_MIN);
+  }, 300_000);
+
+  it('ruler-diff B: respotON asym r4v2 (*7919, respot=true) cap === 0', () => {
+    const rows: GameRow[] = [];
+    for (let seed = 0; seed < N_SEEDS; seed++) {
+      rows.push(runSelfPlayCfg(seed, 4, 2, true));
+    }
+    const t = summarize(
+      'asym r4v2 respot-ON (kinder scale)',
+      'seed + globalShotIndex * 7919; respot=true on null placement; ranks 4 vs 2',
+      rows,
+    );
+    logTable(t, MEASURE_SHA);
+    expect(t.n).toBe(N_SEEDS);
+    // Documents respot ruler: QA seeds 0..50 → 0 caps. NOT HS-002 green / NOT mechanism.
+    expect(t.capHits, 'respotON asym must be zero-cap (kinder scale)').toBe(0);
+    // Cross-doc for readers of the console table:
+    console.log(
+      '[RULER-DIFF] respotON asym r4v2 cap===0 coexists with faithful cap>0.25 on same ranks — ' +
+      'cap depends on ruler; NEVER take respotON zero as HS-002/DIV-004 green.',
+    );
   }, 300_000);
 
   it('HVA product path rank3 (P1 AI-local *7919; P0 stand-in global *7919)', () => {
