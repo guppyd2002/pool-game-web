@@ -7,7 +7,7 @@
  */
 
 import * as THREE from 'three';
-import { POCKET_POSITIONS, POCKET_RADIUS, PHYSICS_MULTIPLIER } from '../physics/constants';
+import { POCKET_POSITIONS, POCKET_RADIUS, PHYSICS_MULTIPLIER, BALL_RADIUS_M } from '../physics/constants';
 
 /**
  * Pocket positions in Three.js world space (meters).
@@ -50,7 +50,7 @@ export function animateBallSink(mesh: THREE.Mesh, threeScene: THREE.Scene): void
     : new THREE.Color(0xffffff);
 
   const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 1, roughness: 0.3 });
-  const geo = new THREE.SphereGeometry(0.028, 16, 12);  // BALL_RADIUS = 0.028m
+  const geo = new THREE.SphereGeometry(BALL_RADIUS_M, 16, 12);  // SET-006 shared radius
   const clone = new THREE.Mesh(geo, mat);
   clone.position.copy(mesh.position);
   threeScene.add(clone);

@@ -71,12 +71,20 @@ import { addCoins } from './game/player-data';
 import { getDefaultGameSaveManager } from './game/game-save-manager';
 import { DEFAULT_SHOT_TIME_S } from './renderer/shot-timer';
 import { createAudioManager } from './game/audio-manager';
-import { loadSettings } from './renderer/settings-panel';
+import {
+  subscribeSettings,
+  isAutoCueOn,
+  isSfxOn,
+  isMusicOn,
+} from './renderer/settings-panel';
+import { installSafeAreaCssVars } from './renderer/safe-area';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
 
 const container = document.getElementById('app')!;
+// SET-008: expose safe-area insets as CSS vars for layout chrome
+installSafeAreaCssVars();
 const scene = await createScene(container);
 const space = createPoolTable();
 const physics = createBallPoolPhysics(space, scene);
@@ -327,9 +335,12 @@ mainMenuEl.style.cssText = [
   'align-items:center', 'justify-content:center',
   'background:rgba(10,10,26,0.85)',
   'color:#fff', 'font-family:sans-serif', 'z-index:300',
+  // SET-008: safe-area so notch / home indicator never clips menu chrome
+  'padding:max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))',
+  'box-sizing:border-box',
 ].join(';');
 mainMenuEl.innerHTML = [
-  '<h1 style="font-size:36px;margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
+  '<h1 style="font-size:clamp(24px,6vw,36px);margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
   '<p style="font-size:14px;opacity:0.6;margin-bottom:24px;">HotSeat — 2 players, same screen</p>',
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
   '<button id="btn-continue" type="button" style="display:none;margin-top:12px;padding:12px 36px;font-size:15px;border-radius:6px;border:1px solid rgba(76,175,80,0.6);background:rgba(76,175,80,0.2);color:#fff;cursor:pointer;">▶ Continue saved game</button>',
@@ -361,9 +372,9 @@ loadReplayLabel.htmlFor = 'inp-record';
 const playerDataMgr = getDefaultPlayerDataManager();
 const gameSaveMgr = getDefaultGameSaveManager();
 
-// P1-T10 AUD — Web Audio SFX; mute via settings.sfx (AUD-004)
+// P1-T10 AUD — Web Audio SFX; mute via settings.sfx (AUD-004 / SET-001)
 const audio = createAudioManager({
-  isSfxOn: () => loadSettings().sfx,
+  isSfxOn: () => isSfxOn(),
 });
 document.addEventListener('pointerdown', () => audio.unlock(), { once: true, capture: true });
 startBtn.addEventListener('click', () => audio.unlock());
@@ -372,6 +383,19 @@ continueBtn.addEventListener('click', () => audio.unlock());
 gameSession.onShotAudio = (result, force01) => {
   audio.playShotResult(result, force01);
 };
+
+function _syncSettingsDataset(): void {
+  // QA-observable + CUE consumers (Unity Settings statics equiv)
+  document.documentElement.dataset.autoCue = isAutoCueOn() ? '1' : '0';
+  document.documentElement.dataset.sfx = isSfxOn() ? '1' : '0';
+  document.documentElement.dataset.music = isMusicOn() ? '1' : '0';
+}
+// SET-001~003: live settings broadcast (Unity Settings.OnAudio / OnMusic / OnCueIsAuto)
+subscribeSettings((s) => {
+  audio.setEnabled(s.sfx);
+  _syncSettingsDataset();
+});
+_syncSettingsDataset();
 
 function _refreshContinueButton(): void {
   continueBtn.style.display = gameSaveMgr.isSavedGame() ? 'inline-block' : 'none';
@@ -791,6 +815,7 @@ if (_demoConfig) {
       // G-2: set default aim so _updateAimVisuals shows cue + line before first drag.
       // direction = start − current = (0.2, 0) → normalized +X (toward rack).
       // resetForNewTurn() already cleared stale aim; this sets a fresh default each turn.
+      // SET-003 autoCue persists for CUE (dataset.autoCue); top-view always seeds aim.
       cue.onDragStart({ x: 0.1, z: 0 });
       cue.onDragMove({ x: -0.1, z: 0 });
       cue.cancel();

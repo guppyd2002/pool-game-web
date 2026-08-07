@@ -54,6 +54,17 @@ describe('G9: physics constants — single source of truth', () => {
     expect(BALL_RADIUS).toBe(285);
   });
 
+  it('SET-006 BALL_DIAMETER / BALL_RADIUS_M shared with render', async () => {
+    const {
+      BALL_DIAMETER, BALL_RADIUS_M, BALL_DIAMETER_M, PHYSICS_MULTIPLIER,
+    } = await import('../../physics/constants');
+    expect(BALL_DIAMETER).toBe(BALL_RADIUS * 2);
+    expect(BALL_DIAMETER).toBe(570);
+    expect(BALL_RADIUS_M).toBeCloseTo(0.0285, 10);
+    expect(BALL_DIAMETER_M).toBeCloseTo(0.057, 10);
+    expect(BALL_RADIUS_M * PHYSICS_MULTIPLIER).toBe(BALL_RADIUS);
+  });
+
   it('authoritative BALL_Y == TABLE_Y + BALL_RADIUS ≈ 9440', () => {
     expect(BALL_Y).toBe(9440);
     expect(TABLE_Y).toBe(9154);

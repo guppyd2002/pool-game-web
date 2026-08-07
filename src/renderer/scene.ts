@@ -11,13 +11,15 @@ import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
 import { makeBallMaterial } from './ball-materials';
 import { getPlayView } from './camera-tween';
+import { BALL_RADIUS_M } from '../physics/constants';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Table dimensions (meters, standard 8-ball)
+// Table dimensions (meters, standard 8-ball / 9ft cushion nose-to-nose)
 const TABLE_W = 2.54;
 const TABLE_H = 1.27;
-const BALL_RADIUS = 0.028;
+/** SET-006: render radius shares physics BALL_RADIUS (0.0285 m), not a parallel constant. */
+const BALL_RADIUS = BALL_RADIUS_M;
 
 // Ball colors moved to ball-materials.ts (WPA regulation set, CEO-approved).
 

@@ -1,9 +1,16 @@
 /**
- * UI-007 settings load/save (P1-T07).
+ * UI-007 / P1-T11 settings load/save + SET-001~003 helpers.
  * Vitest node env has no localStorage — use a minimal memory stub.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { loadSettings, saveSettings } from '../../renderer/settings-panel';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  loadSettings,
+  saveSettings,
+  subscribeSettings,
+  isSfxOn,
+  isMusicOn,
+  isAutoCueOn,
+} from '../../renderer/settings-panel';
 
 const store = new Map<string, string>();
 const lsStub = {
@@ -34,5 +41,33 @@ describe('settings-panel localStorage', () => {
     expect(s.music).toBe(false);
     expect(s.sfx).toBe(true);
     expect(s.autoCue).toBe(true);
+  });
+});
+
+describe('settings-panel SET-001~003 live helpers + subscribe', () => {
+  beforeEach(() => {
+    store.clear();
+    Object.defineProperty(globalThis, 'localStorage', { value: lsStub, configurable: true });
+  });
+
+  it('isSfxOn / isMusicOn / isAutoCueOn mirror storage', () => {
+    expect(isSfxOn()).toBe(true);
+    expect(isMusicOn()).toBe(true);
+    expect(isAutoCueOn()).toBe(false);
+    saveSettings({ music: false, sfx: false, autoCue: true });
+    expect(isSfxOn()).toBe(false);
+    expect(isMusicOn()).toBe(false);
+    expect(isAutoCueOn()).toBe(true);
+  });
+
+  it('subscribeSettings fires on saveSettings (OnAudio/OnMusic/OnCueIsAuto)', () => {
+    const spy = vi.fn();
+    const unsub = subscribeSettings(spy);
+    saveSettings({ music: true, sfx: false, autoCue: false });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ music: true, sfx: false, autoCue: false });
+    unsub();
+    saveSettings({ music: false, sfx: false, autoCue: false });
+    expect(spy).toHaveBeenCalledTimes(1); // unsubscribed
   });
 });

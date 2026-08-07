@@ -52,11 +52,20 @@
         font-family: sans-serif;
         gap: 16px;
         text-align: center;
-        padding: 32px;
+        padding: max(32px, env(safe-area-inset-top, 0px)) max(32px, env(safe-area-inset-right, 0px)) max(32px, env(safe-area-inset-bottom, 0px)) max(32px, env(safe-area-inset-left, 0px));
+        box-sizing: border-box;
       }
       #rotate-prompt .rotate-icon { font-size: 64px; }
       @media screen and (orientation: portrait) and (max-width: 900px) {
         #rotate-prompt { display: flex; }
+      }
+
+      /* SET-008: game-over / banners stay inside safe area on notched devices */
+      #game-over-ui, #reason-banner, #turn-prompt, #settings-panel {
+        box-sizing: border-box;
+      }
+      #main-menu {
+        box-sizing: border-box;
       }
     </style>
   </head>

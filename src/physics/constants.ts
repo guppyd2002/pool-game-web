@@ -21,6 +21,18 @@ export const BALL_MASS = 1700;
 /** Ball radius in fixed-point (0.0285 m × 10000 = 285 units) */
 export const BALL_RADIUS = 285;
 
+/**
+ * FEAT-SET-006 — ball diameter global param (Unity BallPoolSettings.ballDiameter).
+ * Fixed-point units; physics colliders + render meshes must both derive from this.
+ */
+export const BALL_DIAMETER = BALL_RADIUS * 2; // 570
+
+/** Ball radius in metres (render / Three.js). BALL_RADIUS / PHYSICS_MULTIPLIER. */
+export const BALL_RADIUS_M = BALL_RADIUS / PHYSICS_MULTIPLIER; // 0.0285
+
+/** Ball diameter in metres (Unity BallPoolSettings.ballDiameter float). */
+export const BALL_DIAMETER_M = BALL_DIAMETER / PHYSICS_MULTIPLIER; // 0.057
+
 // ─── Table geometry ──────────────────────────────────────────────────────────
 
 /** Y position of table cloth surface */
