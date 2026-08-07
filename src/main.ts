@@ -70,6 +70,8 @@ import { getDefaultPlayerDataManager } from './game/player-data-manager';
 import { addCoins } from './game/player-data';
 import { getDefaultGameSaveManager } from './game/game-save-manager';
 import { DEFAULT_SHOT_TIME_S } from './renderer/shot-timer';
+import { createAudioManager } from './game/audio-manager';
+import { loadSettings } from './renderer/settings-panel';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -358,6 +360,18 @@ loadReplayLabel.htmlFor = 'inp-record';
 // P1-T09 DATA layer
 const playerDataMgr = getDefaultPlayerDataManager();
 const gameSaveMgr = getDefaultGameSaveManager();
+
+// P1-T10 AUD — Web Audio SFX; mute via settings.sfx (AUD-004)
+const audio = createAudioManager({
+  isSfxOn: () => loadSettings().sfx,
+});
+document.addEventListener('pointerdown', () => audio.unlock(), { once: true, capture: true });
+startBtn.addEventListener('click', () => audio.unlock());
+continueBtn.addEventListener('click', () => audio.unlock());
+// Real shot only — not re-fired during visual replay frames
+gameSession.onShotAudio = (result, force01) => {
+  audio.playShotResult(result, force01);
+};
 
 function _refreshContinueButton(): void {
   continueBtn.style.display = gameSaveMgr.isSavedGame() ? 'inline-block' : 'none';

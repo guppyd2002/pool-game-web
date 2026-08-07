@@ -18,7 +18,7 @@
  *   - This avoids double physics.placeBall calls.
  */
 
-import type { IBallPoolPhysics, ShotData } from './ball-pool-physics';
+import type { IBallPoolPhysics, ShotData, ShotResult } from './ball-pool-physics';
 import type { CueController } from './cue-controller';
 import type { SceneAPI } from '../renderer/scene';
 import { createRuleEngine } from './rule-engine';
@@ -31,7 +31,7 @@ import type { BallTrail } from './ball-trail';
 import { REASON_MESSAGES } from './game-play-reason';
 import type { ReasonValue } from './game-play-reason';
 import type { ShotVerdict } from './rule-engine';
-import { BALL_Y, TABLE_Y } from '../physics/constants';
+import { BALL_Y, TABLE_Y, MAX_FORCE } from '../physics/constants';
 import { getAllRackPositions } from './rack-positions';
 import { CmVector } from '../physics/cm-vector';
 
@@ -140,6 +140,11 @@ export interface IGameSession {
   onReasonMessage: ((message: string) => void) | null;
   /** Record hook: fires post-settle (physics + rule engine committed) for each shot. */
   onShotFired: ((shot: RecordedShot) => void) | null;
+  /**
+   * AUD: real-shot SFX only (not visual re-sim). force01 = impulse/maxForce.
+   * Fires once per human/AI applyShot after physics settles.
+   */
+  onShotAudio: ((result: ShotResult, force01: number) => void) | null;
 }
 
 // ─── Checksum ────────────────────────────────────────────────────────────────
@@ -192,6 +197,13 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
   // shotData for human shots; set via cue.onShotData, read in cue.onShotApplied.
   let _pendingHumanShotData: ShotData | null = null;
 
+  function _force01FromShot(shot: ShotData | null): number {
+    if (!shot) return 0.5;
+    const imp = shot.impulse;
+    const mag = Math.sqrt(imp.x * imp.x + imp.y * imp.y + imp.z * imp.z);
+    return Math.max(0, Math.min(1, mag / MAX_FORCE));
+  }
+
   /** Compute and emit onShotFired after physics + rule-engine are post-settle. */
   function _emitShotFired(shotData: ShotData): void {
     if (!session.onShotFired) return;
@@ -223,6 +235,9 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
 
       ruleEngine.beginShot();
       const verdict = ruleEngine.processShotResult(result);
+
+      // AUD: real-shot SFX (replay re-sim does not call this path again)
+      session.onShotAudio?.(result, _force01FromShot(_pendingHumanShotData));
 
       // Post-settle record (physics.applyShot already settled before this callback)
       if (_pendingHumanShotData) {
@@ -291,6 +306,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
     onGameEnded: null,
     onReasonMessage: null,
     onShotFired: null,
+    onShotAudio: null,
 
     get currentPlayerIndex() { return store.getState().currentPlayerIndex; },
     get isGameEnded() { return store.getState().phase === 'GameOver'; },
@@ -354,6 +370,7 @@ export function createBallPool8Session(deps: GameSessionDeps): IGameSession {
       const result = physics.applyShot(shotData);
       ruleEngine.beginShot();
       const verdict = ruleEngine.processShotResult(result);
+      session.onShotAudio?.(result, _force01FromShot(shotData));
       // Post-settle record (applyShot is synchronous; physics settled before we reach here).
       // forceShot(game-session:288) passes shotData straight to applyShot — recorded==executed.
       _emitShotFired(shotData);
