@@ -46,6 +46,11 @@ import { createFineAdjustBarUI } from './renderer/fine-adjust-bar-ui';
 import { createUIEdgeFade } from './renderer/ui-edge-fade';
 import { createBallPool8Session } from './game/game-session';
 import { attachAIDemo, parseDemoConfig } from './game/ai-demo';
+import {
+  attachHumanVsAI,
+  shouldRunShotTimer,
+  type HumanVsAIController,
+} from './game/human-vs-ai';
 import { pickValidSeed } from './game/headless-game';
 import { createRecordDriver, downloadRecord, parseRecord } from './game/record-driver';
 import { createReplayHUD } from './renderer/replay-hud';
@@ -341,8 +346,9 @@ mainMenuEl.style.cssText = [
 ].join(';');
 mainMenuEl.innerHTML = [
   '<h1 style="font-size:clamp(24px,6vw,36px);margin-bottom:8px;letter-spacing:2px;">🎱 8-Ball Pool</h1>',
-  '<p style="font-size:14px;opacity:0.6;margin-bottom:24px;">HotSeat — 2 players, same screen</p>',
+  '<p style="font-size:14px;opacity:0.6;margin-bottom:24px;">HotSeat or vs Robot</p>',
   '<button id="btn-start" style="padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#4caf50;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(76,175,80,0.4);">Play 8-Ball HotSeat</button>',
+  '<button id="btn-vs-ai" type="button" style="margin-top:12px;padding:14px 40px;font-size:18px;border-radius:6px;border:none;background:#2196f3;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(33,150,243,0.4);">🤖 Play vs Robot</button>',
   '<button id="btn-continue" type="button" style="display:none;margin-top:12px;padding:12px 36px;font-size:15px;border-radius:6px;border:1px solid rgba(76,175,80,0.6);background:rgba(76,175,80,0.2);color:#fff;cursor:pointer;">▶ Continue saved game</button>',
   '<label id="btn-load-replay" style="margin-top:14px;padding:10px 32px;font-size:15px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;">📂 Load Replay</label>',
   '<input id="inp-record" type="file" accept=".poolrecord,.json" style="display:none;">',
@@ -360,7 +366,17 @@ mainMenuEl.innerHTML = [
 container.appendChild(mainMenuEl);
 
 const startBtn = mainMenuEl.querySelector('#btn-start') as HTMLButtonElement;
+const vsAiBtn = mainMenuEl.querySelector('#btn-vs-ai') as HTMLButtonElement;
 const continueBtn = mainMenuEl.querySelector('#btn-continue') as HTMLButtonElement;
+
+/** Session-external match mode (no PlayerGameInfo P2). */
+type MatchMode = 'hotseat' | 'vs-ai';
+let _matchMode: MatchMode = 'hotseat';
+let _vsAiCtrl: HumanVsAIController | null = null;
+/** MVP fixed difficulty — rank=3 / rankLast=5 (千手 GO). */
+const VS_AI_RANK = 3;
+const VS_AI_RANK_LAST = 5;
+const VS_AI_SEAT: 0 | 1 = 1;
 const loadReplayLabel = mainMenuEl.querySelector('#btn-load-replay') as HTMLLabelElement;
 const loadReplayInput = mainMenuEl.querySelector('#inp-record') as HTMLInputElement;
 const settingsBtn = mainMenuEl.querySelector('#btn-settings') as HTMLButtonElement;
@@ -491,12 +507,28 @@ function _enterTableChrome(): void {
 }
 
 function _beginHotSeatMatch(): void {
+  _matchMode = 'hotseat';
+  _bindHotSeatTurns();
   _enterTableChrome();
   tutorial.start();
   gameSaveMgr.clearGameState(); // fresh game
+  adapter.enable();
+  cue.enable();
   gameSession.startNewGame();
   _refreshBallHud();
   shotTimer.start();
+  _refreshContinueButton();
+}
+
+function _beginVsAiMatch(): void {
+  _matchMode = 'vs-ai';
+  _bindVsAiTurns();
+  _enterTableChrome();
+  tutorial.start();
+  gameSaveMgr.clearGameState();
+  // Human opens; timer/cue enabled via onHumanTurn on startNewGame
+  gameSession.startNewGame();
+  _refreshBallHud();
   _refreshContinueButton();
 }
 
@@ -532,8 +564,17 @@ startBtn.addEventListener('click', () => {
   });
 });
 
+vsAiBtn.addEventListener('click', () => {
+  audio.unlock();
+  // Skip HotSeat carousel — opponent is Robot (rank 3 fixed MVP)
+  _beginVsAiMatch();
+});
+
 // DATA-001: continue mid-game if within TTL
 continueBtn.addEventListener('click', () => {
+  // Continue is HotSeat mid-game only (vs-AI not persisted in MVP)
+  _matchMode = 'hotseat';
+  _bindHotSeatTurns();
   _resumeSavedMatch();
 });
 
@@ -545,15 +586,24 @@ const gameOverUI = createGameOverUI(container);
 const replayHUD = createReplayHUD(container);
 gameOverUI.onPlayAgain = () => {
   gameOverUI.hide();
+  if (_matchMode === 'vs-ai') {
+    _bindVsAiTurns();
+  } else {
+    _bindHotSeatTurns();
+  }
   gameSession.playAgain();
   _refreshBallHud();
-  if (!_demoConfig) shotTimer.start(); // UI-027 + UI-024
+  // Timer started by onHumanTurn / HotSeat turn hook — not for pure AI demo
+  if (!_demoConfig && _matchMode === 'hotseat') shotTimer.start();
 };
 gameOverUI.onExit = () => {
   gameOverUI.hide();
   turnPrompt.dismiss();
   shotTimer.stop();
   hudBar.setTimer(null);
+  _vsAiCtrl?.dispose();
+  _vsAiCtrl = null;
+  _matchMode = 'hotseat';
   gameSession.exitGame();
   hudBar.setVisible(false);
   playerBallHud.setVisible(false);
@@ -561,6 +611,8 @@ gameOverUI.onExit = () => {
   fineAdjustBar.element.style.display = 'none';
   spinDiscUI.element.style.display = 'none';
   adapter.setFineAim(false);
+  adapter.enable();
+  cue.enable();
   hudBar.setFineAimActive(false);
   _inTopView = false;
   hudBar.setTopViewLabel('⬆ Top');
@@ -655,10 +707,13 @@ const shotTimer = createShotTimer({
   },
   onShotTimeout: () => {
     if (_demoConfig) return;
+    // W3: never apply RULE-006 foul while AI is thinking/shooting
+    if (_matchMode === 'vs-ai' && _vsAiCtrl?.isAiTurn()) return;
     gameSession.notifyShotTimeout();
   },
   onGameEndTimeout: () => {
     if (_demoConfig) return;
+    if (_matchMode === 'vs-ai' && _vsAiCtrl?.isAiTurn()) return;
     gameSession.notifyGameEndTimeout();
   },
 });
@@ -800,35 +855,103 @@ if (_demoConfig) {
   gameSession.startNewGame();
   _refreshBallHud(); // open-table empty rows at demo start
 } else {
-  // Normal HotSeat mode: human-controlled turn changes
+  // Default HotSeat wiring; vs-AI rebinds via _bindVsAiTurns() on Play vs Robot.
+  _bindHotSeatTurns();
+}
+
+/**
+ * HotSeat: both seats human — cue/timer/BIH UI for every turn.
+ */
+function _bindHotSeatTurns(): void {
+  _vsAiCtrl?.dispose();
+  _vsAiCtrl = null;
   gameSession.onTurnChanged = (playerIndex, isBallInHand) => {
     _updatePlayerIndicator(playerIndex, isBallInHand);
-    // Reset power bar at each turn start
     powerSliderUI.reset();
     _currentPowerFraction = 0;
-    // B4: show clear instruction overlay + cue standby preview
     turnPrompt.show(playerIndex, isBallInHand);
-    // UI-024: restart shot clock on every new aiming turn; pause during BIH placement
+    adapter.enable();
+    cue.enable();
     if (isBallInHand) {
       shotTimer.stop();
       hudBar.setTimer(null);
       _enterBallInHandMode();
     } else {
       shotTimer.start();
-      // UI-016: re-enable control chrome for active player
       hudBar.setControlsEnabled(true);
       powerSliderUI.element.style.display = 'block';
       fineAdjustBar.element.style.display = 'block';
-      // G-2: set default aim so _updateAimVisuals shows cue + line before first drag.
-      // direction = start − current = (0.2, 0) → normalized +X (toward rack).
-      // resetForNewTurn() already cleared stale aim; this sets a fresh default each turn.
-      // SET-003 autoCue persists for CUE (dataset.autoCue); top-view always seeds aim.
+      spinDiscUI.element.style.display = 'block';
+      // G-2 default aim toward rack
       cue.onDragStart({ x: 0.1, z: 0 });
       cue.onDragMove({ x: -0.1, z: 0 });
       cue.cancel();
       _updateAimVisuals();
     }
   };
+}
+
+/**
+ * Human vs AI: P0 human / P1 AI (rank=3). attachHumanVsAI owns AI forceShot;
+ * chrome + RULE-006 timer only on human seats (W3).
+ */
+function _bindVsAiTurns(): void {
+  _vsAiCtrl?.dispose();
+  _vsAiCtrl = attachHumanVsAI(
+    gameSession,
+    physics,
+    space,
+    {
+      aiSeat: VS_AI_SEAT,
+      aiRank: VS_AI_RANK,
+      rankLast: VS_AI_RANK_LAST,
+      seed: Math.floor(Math.random() * 10000),
+      turnDelayMs: 700,
+      bihSettleMs: 200,
+    },
+    {
+      onHumanTurn(playerIndex, isBallInHand) {
+        _updatePlayerIndicator(playerIndex, isBallInHand);
+        powerSliderUI.reset();
+        _currentPowerFraction = 0;
+        turnPrompt.show(playerIndex, isBallInHand);
+        adapter.enable();
+        cue.enable();
+        if (isBallInHand) {
+          // Human BIH: stop timer, enter placement UI
+          shotTimer.stop();
+          hudBar.setTimer(null);
+          _enterBallInHandMode();
+        } else {
+          if (shouldRunShotTimer(playerIndex, VS_AI_SEAT)) shotTimer.start();
+          hudBar.setControlsEnabled(true);
+          powerSliderUI.element.style.display = 'block';
+          fineAdjustBar.element.style.display = 'block';
+          spinDiscUI.element.style.display = 'block';
+          cue.onDragStart({ x: 0.1, z: 0 });
+          cue.onDragMove({ x: -0.1, z: 0 });
+          cue.cancel();
+          _updateAimVisuals();
+        }
+      },
+      onAiTurn(playerIndex, isBallInHand) {
+        _updatePlayerIndicator(playerIndex, isBallInHand);
+        turnPrompt.show(playerIndex, isBallInHand);
+        // W3: stop wall-clock before AI thinks — never foul AI via ShotTime
+        shotTimer.stop();
+        hudBar.setTimer(null);
+        // W3: dual gate — adapter + cue.isEnabled so drag/tap/fireNow are inert
+        adapter.disable();
+        cue.disable();
+        hudBar.setControlsEnabled(false);
+        powerSliderUI.element.style.display = 'none';
+        fineAdjustBar.element.style.display = 'none';
+        spinDiscUI.element.style.display = 'none';
+        // AI BIH is auto place+forceShot inside attachHumanVsAI — no human BIH UI
+        void isBallInHand;
+      },
+    },
+  );
 }
 
 // ─── Ball-in-hand pointer handling (GAME-014 BallMoveManager) ────────────────
