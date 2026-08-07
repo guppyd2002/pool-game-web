@@ -60,6 +60,12 @@ import { createReasonBanner } from './renderer/reason-banner';
 import { createGameOverUI } from './renderer/game-over-ui';
 import { REASON_MESSAGES } from './game/game-play-reason';
 import { createCameraTween, POSE_OVERVIEW, getPlayView } from './renderer/camera-tween';
+import {
+  createCameraModeController,
+  applyZoomFov,
+  computeFollowLookAt,
+  computeFollowFov,
+} from './renderer/camera-mode';
 import { createTurnPrompt } from './renderer/turn-prompt';
 import { createHudBar } from './renderer/hud-bar';
 import { createPlayerBallHud } from './renderer/player-ball-hud';
@@ -174,6 +180,35 @@ function _updateAimVisuals(): void {
     _punchSavedCueBallPos = cueBall.position;
   }
 
+  // CAM-004 lite: during shot replay, weight-follow active balls + FOV boost (orbit/follow only)
+  if (
+    physics.isSimulating &&
+    (cameraMode.mode === 'orbit' || cameraMode.mode === 'follow') &&
+    !_inTopView
+  ) {
+    const active: Array<{ x: number; y: number; z: number; speed: number }> = [];
+    let maxSp = 0;
+    for (let id = 0; id < 16; id++) {
+      const b = physics.getBall(id);
+      if (!b || !b.isActive || b.isOutOfTable) continue;
+      const vx = b.velocity.x / MULTIPLIER;
+      const vy = b.velocity.y / MULTIPLIER;
+      const vz = b.velocity.z / MULTIPLIER;
+      const sp = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      maxSp = Math.max(maxSp, sp);
+      active.push({
+        x: b.position.x / MULTIPLIER,
+        y: b.position.y / MULTIPLIER,
+        z: b.position.z / MULTIPLIER,
+        speed: sp,
+      });
+    }
+    const look = computeFollowLookAt(active);
+    scene.camera.lookAt(look.x, look.y, look.z);
+    scene.camera.fov = computeFollowFov(_basePlayFov, maxSp);
+    scene.camera.updateProjectionMatrix();
+  }
+
   cueMesh.update(cueBall.position, aimDir, dt, cue.getVerticalAngle(), power);
 }
 
@@ -192,9 +227,12 @@ const adapter = createCueAdapter({
     _updateAimVisuals();
   },
   onZoom: (delta) => {
+    // CAM-003: pinch/wheel — distance dolly + FOV clamp (web stand-in for ZoomManager)
     const dir = scene.camera.position.clone().normalize();
     scene.camera.position.addScaledVector(dir, -delta * 0.5);
     scene.camera.position.clampLength(1.0, 5.0);
+    scene.camera.fov = applyZoomFov(scene.camera.fov, -delta * 2);
+    scene.camera.updateProjectionMatrix();
   },
   // F-③ tap-to-aim: provide cueball world position (float meters) for C-1 aim pair.
   getCueBallWorld: () => {
@@ -498,12 +536,18 @@ function _enterTableChrome(): void {
   mainMenuEl.style.display = 'none';
   hudBar.setVisible(true);
   playerBallHud.setVisible(true);
-  hudBar.setTopViewLabel('⬇ Table');
   powerSliderUI.element.style.display = 'block';
   fineAdjustBar.element.style.display = 'block';
   spinDiscUI.element.style.display = 'block';
-  _inTopView = true;
-  scene.setOrthoTop(true);
+  // CAM-001/002: menu overview → table play mode (default top ortho)
+  cameraMode.enterTable();
+  _inTopView = cameraMode.mode === 'top';
+  scene.setOrthoTop(_inTopView);
+  hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
+  const vw = container.clientWidth || window.innerWidth;
+  const vh = container.clientHeight || window.innerHeight;
+  const { fov } = getPlayView(vw, vh);
+  _basePlayFov = fov;
 }
 
 function _beginHotSeatMatch(): void {
@@ -617,6 +661,7 @@ gameOverUI.onExit = () => {
   _inTopView = false;
   hudBar.setTopViewLabel('⬆ Top');
   scene.setOrthoTop(false);
+  cameraMode.enterOverview(); // CAM-001: table → room/overview
   cameraTween.tweenTo(POSE_OVERVIEW, 0.5);
   _runCameraTween(true);
   mainMenuEl.style.display = 'flex';
@@ -628,10 +673,27 @@ gameOverUI.onExit = () => {
 
 let _inTopView = false;
 let _isLeftHand = false;
+/** Base FOV for CAM-004 lite restore after follow. */
+let _basePlayFov = 50;
+
+/** CAM-002: overview / top / orbit / follow (8BP web mapping of Unity camera modes). */
+const cameraMode = createCameraModeController('overview', (mode) => {
+  if (mode === 'top') {
+    scene.setOrthoTop(true);
+    _inTopView = true;
+    hudBar.setTopViewLabel('⬇ Table');
+  } else if (mode === 'orbit' || mode === 'follow') {
+    scene.setOrthoTop(false);
+    _inTopView = false;
+    hudBar.setTopViewLabel('⬆ Top');
+  }
+});
 
 function _toggleView(): void {
   cue.cancel();
-  _inTopView = !_inTopView;
+  // CAM-002: toggle top ortho ↔ orbit perspective
+  const next = cameraMode.toggleTopOrbit();
+  _inTopView = next === 'top';
   if (_inTopView) {
     scene.setOrthoTop(true);
   } else {
@@ -640,6 +702,7 @@ function _toggleView(): void {
     const vw = container.clientWidth || window.innerWidth;
     const vh = container.clientHeight || window.innerHeight;
     const { pose, fov } = getPlayView(vw, vh);
+    _basePlayFov = fov;
     scene.camera.fov = fov;
     scene.camera.updateProjectionMatrix();
     cameraTween.tweenTo(pose, 0);
