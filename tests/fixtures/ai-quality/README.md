@@ -112,6 +112,42 @@ If the first line is missing, the number is not usable for CEO or for DIV regist
 
 ---
 
+## Seed-batch runner (permanent measurement infra)
+
+In-process multi-seed sweeps OOM because physics frames accumulate on one heap.
+`scripts/run-seed-batch.mjs` runs **one child process per seed** so each game frees after exit.
+
+```bash
+# SP-004 ruler B, rank 4v4, seeds 0..49 — resume-safe partials
+node scripts/run-seed-batch.mjs \
+  --harness sp004 --rank0 4 --rank1 4 --n 50 \
+  --out tests/fixtures/ai-quality/sp004-r4-n50.json \
+  --partial-dir /tmp/seed-partials-sp004-r4
+
+# Headless formula (seed+shotCount), post-DIV-008(b) no respot
+node scripts/run-seed-batch.mjs --harness headless --rank0 4 --rank1 2 --from 0 --to 19 \
+  --out /tmp/headless-r4v2.json --partial-dir /tmp/seed-partials-hl
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--harness sp004\|headless` | Ruler B `*7919` / headless `seed+shot` |
+| `--rank0` / `--rank1` / `--rankLast` | AI ranks |
+| `--n` or `--from`/`--to` | Seed range |
+| `--maxShots` | Cap (default 200) |
+| `--out` | Final Kakashi-shaped JSON artifact (includes `measureCommit`) |
+| `--partial-dir` | Per-seed JSON for interrupt/resume |
+| `--concurrency` | Default 1 (raise carefully) |
+
+Heap: child gets `--max-old-space-size=8192` (override with `SEED_BATCH_HEAP_MB`).  
+Commit field: `git rev-parse HEAD`, or `MEASURE_SHA=…` override.
+
+Output schema matches `kakashi-foul-metric-baseline-*.json` (`schemaVersion`, `measureCommit`, `groups[].seeds[]` with shots/fouls/foulPerShot/completed/capHit/winner).
+
+**Do not compare sp004 vs headless groups as the same ruler.**
+
+---
+
 ## Freeze note (ops)
 
 Product freezes (HVA path, replay-controller, HS-002 assertion rewrite) are fleet decisions. This README is **documentation only** — it does not change runtime behaviour.
