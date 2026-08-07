@@ -160,10 +160,11 @@ export function attachHumanVsAI(
       const savedCb = session.onTurnChanged;
       session.onTurnChanged = null;
 
+      // Unity BallPoolAIManager:266-269 — ResetCueBall only when position changed.
+      // No head-spot respot: null cueBallNewPos → leave cue in place, fire precomputed shot
+      // (GetShotData uses current transform after optional move — DIV-008 (b)).
       if (result.cueBallNewPos) {
         physics.placeBall(0, result.cueBallNewPos);
-      } else {
-        physics.respotCueBall();
       }
       session.notifyBallPlaced();
 

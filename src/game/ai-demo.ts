@@ -54,9 +54,9 @@ export function parseDemoConfig(params: URLSearchParams): AIDemoConfig | null {
  *   3. calculateAIShot → forceShot (or place + forceShot for ball-in-hand)
  *   4. Replay runs → onTurnChanged fires again → repeat
  *
- * Ball-in-hand: AI computes cueBallNewPos + shotData together. Placement is applied
- * via physics.placeBall + session.notifyBallPlaced (suppressing onTurnChanged during
- * that call to avoid double-schedule), then the pre-computed shot fires after 200ms.
+ * Ball-in-hand: AI computes cueBallNewPos + shotData together. If cueBallNewPos is set,
+ * placeBall then notifyBallPlaced (onTurnChanged suppressed). If null, Unity-faithful
+ * in-place shot — do NOT respot (DIV-008 (b); matches BallPoolAIManager:266-269).
  */
 export function attachAIDemo(
   session: IGameSession,
@@ -92,11 +92,9 @@ export function attachAIDemo(
       const savedCb = session.onTurnChanged;
       session.onTurnChanged = null;
 
-      // Apply AI-computed cue ball position; fallback to respotCueBall if no placement found.
+      // Unity: move only when CalculateBestShot found a new position; else in-place shot.
       if (result.cueBallNewPos) {
         physics.placeBall(0, result.cueBallNewPos);
-      } else {
-        physics.respotCueBall();
       }
       session.notifyBallPlaced();  // phase: BallInHand → Aiming; onTurnChanged suppressed
 

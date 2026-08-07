@@ -110,10 +110,9 @@ export function runHeadlessGame(seed: number, r0: number, r1: number, maxShots =
     isFirstShot = false;
 
     if (ballInHand) {
-      // Place cue ball via AI's computed position; suppress onTurnChanged during
-      // notifyBallPlaced() to avoid double-scheduling (mirrors attachAIDemo pattern).
+      // Unity BallPoolAIManager:266-269 — place only when AI returns a new position.
+      // Null → in-place shot (no head-spot respot). DIV-008 (b).
       if (aiResult.cueBallNewPos) physics.placeBall(0, aiResult.cueBallNewPos);
-      else physics.respotCueBall();
 
       const savedCb: typeof session.onTurnChanged = session.onTurnChanged;
       session.onTurnChanged = null;

@@ -169,8 +169,8 @@ export function runDeterminismCheck(
     isFirstShot = false;
 
     if (ballInHand) {
+      // Unity-faithful: place only on non-null cueBallNewPos; no respot (DIV-008 (b)).
       if (aiResult.cueBallNewPos) physics.placeBall(0, aiResult.cueBallNewPos);
-      else physics.respotCueBall();
       const savedCb: typeof session.onTurnChanged = session.onTurnChanged;
       session.onTurnChanged = null;
       session.notifyBallPlaced();
