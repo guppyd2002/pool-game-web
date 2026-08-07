@@ -95,11 +95,13 @@ export function runHeadlessGame(seed: number, r0: number, r1: number, maxShots =
     pendingBallInHand = null;  // clear; forceShot will re-set via sync replay driver → onTurnChanged
 
     const rank = ranks[session.currentPlayerIndex];
+    // Arg order: (isFirstShot, ballInHand) — matches ai-controller signature / self-play.
+    // Was swapped (bih, isFirst) from birth (0d248a5); pickValidSeed vetted seeds on false AI.
     const aiResult = calculateAIShot(
       space,
       session.getAllowableFn(),
-      ballInHand,
       isFirstShot,
+      ballInHand,
       rank,
       5,  // rankLast — full difficulty ceiling
       seed + shotCount,

@@ -71,11 +71,13 @@ export function attachAIDemo(
   function doShot(ballInHand: boolean): void {
     if (session.isGameEnded) return;
     const playerIdx = session.currentPlayerIndex;
+    // Arg order: (isFirstShot, ballInHand) — matches ai-controller signature / self-play.
+    // Was swapped (bih, isFirst) from birth (6c087a0); CEO demo saw break-placement on every BIH.
     const result = calculateAIShot(
       space,
       session.getAllowableFn(),
-      ballInHand,
       isFirstShot,
+      ballInHand,
       ranks[playerIdx],
       5,  // rankLast (full difficulty ceiling)
       config.seed + shotCount,

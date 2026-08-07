@@ -462,11 +462,12 @@ describe('human-vs-AI real physics smoke', () => {
 
       if (session.currentPlayerIndex === 0) {
         const bih = session.isBallInHand;
+        // (isFirstShot, ballInHand) — correct signature order (was swapped)
         const aiShot = calculateAIShot(
           space,
           session.getAllowableFn(),
-          bih,
           shotCount === 0,
+          bih,
           3,
           5,
           deriveAiShotSeed(42, shotCount),

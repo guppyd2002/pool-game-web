@@ -269,7 +269,8 @@ describe('runDeterminismCheck() — Mode B', () => {
     while (pending !== null && shotCount < 200 && !session.isGameEnded) {
       const bih = pending; pending = null;
       const rank = ranks[session.currentPlayerIndex];
-      const ai = calculateAIShot(space, session.getAllowableFn(), bih, isFirstShot, rank, 5, SEED + shotCount);
+      // (isFirstShot, ballInHand) — correct signature order (was swapped)
+      const ai = calculateAIShot(space, session.getAllowableFn(), isFirstShot, bih, rank, 5, SEED + shotCount);
       shotCount++; isFirstShot = false;
 
       if (bih) {
