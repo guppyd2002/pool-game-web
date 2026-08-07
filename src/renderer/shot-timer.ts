@@ -6,7 +6,19 @@
  * notifyGameEndTimeout (rule-engine applyTimeout / applyGameEndTimeout).
  *
  * Pure helpers are unit-tested; createShotTimer is browser-only (RAF/setInterval).
+ *
+ * Product switch (CEO-facing wall-clock only — does NOT delete engine fidelity):
+ *   WALL_CLOCK_SHOT_TIMER_ENABLED=false → createShotTimer.start() is no-op;
+ *   applyTimeout / applyGameEndTimeout / notifyShotTimeout remain available for tests
+ *   and future re-enable. Flip to true to restore 30s client countdown.
  */
+
+/**
+ * When false, the live HUD shot clock never starts and never fires wall-clock fouls.
+ * Engine RULE-006 methods stay intact (Unity fidelity). Set true to re-enable.
+ * Prepared for CEO "撤" — default false on this prep branch only until merged.
+ */
+export const WALL_CLOCK_SHOT_TIMER_ENABLED = false;
 
 /** Default per-shot budget in seconds (Unity inspector typical ~30). */
 export const DEFAULT_SHOT_TIME_S = 30;
@@ -103,6 +115,12 @@ export function createShotTimer(opts: {
   return {
     start(): void {
       stop();
+      // Product kill-switch: leave engine notify* paths unused by never ticking.
+      if (!WALL_CLOCK_SHOT_TIMER_ENABLED) {
+        // One tick so the host can clear HUD (main maps this → setTimer(null) when disabled).
+        opts.onTick(shotTimeS, false);
+        return;
+      }
       _startMs = now();
       _shotFired = false;
       _gameEndFired = false;

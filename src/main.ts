@@ -70,7 +70,7 @@ import { createTurnPrompt } from './renderer/turn-prompt';
 import { createHudBar } from './renderer/hud-bar';
 import { createPlayerBallHud } from './renderer/player-ball-hud';
 import { createTutorialOverlay } from './renderer/tutorial-overlay';
-import { createShotTimer } from './renderer/shot-timer';
+import { createShotTimer, DEFAULT_SHOT_TIME_S, WALL_CLOCK_SHOT_TIMER_ENABLED } from './renderer/shot-timer';
 import { createPointFlyUI } from './renderer/point-fly-ui';
 import { createFindOpponentUI } from './renderer/find-opponent-ui';
 import { createSettingsPanel } from './renderer/settings-panel';
@@ -80,7 +80,6 @@ import { createCuesPopup, getEquippedCue } from './renderer/cues-popup';
 import { getDefaultPlayerDataManager } from './game/player-data-manager';
 import { addCoins } from './game/player-data';
 import { getDefaultGameSaveManager } from './game/game-save-manager';
-import { DEFAULT_SHOT_TIME_S } from './renderer/shot-timer';
 import { createAudioManager } from './game/audio-manager';
 import {
   subscribeSettings,
@@ -762,19 +761,27 @@ hudBar.setAimAssistActive(cue.aimLineVisible); // CUE-008 default ON
 const playerBallHud = createPlayerBallHud(container);
 playerBallHud.setVisible(false);
 
-// UI-024 / RULE-006: shot countdown (HotSeat only — AI demo does not use wall-clock foul)
+// UI-024 / RULE-006: shot countdown (HotSeat only — AI demo does not use wall-clock foul).
+// WALL_CLOCK_SHOT_TIMER_ENABLED (shot-timer.ts): product kill-switch for CEO wall-clock.
+// Engine applyTimeout / applyGameEndTimeout / notifyShotTimeout remain (Unity fidelity).
 const shotTimer = createShotTimer({
   onTick: (rem, inGrace) => {
+    if (!WALL_CLOCK_SHOT_TIMER_ENABLED) {
+      hudBar.setTimer(null);
+      return;
+    }
     const urgency = rem <= 5 ? 'critical' : inGrace || rem <= 10 ? 'warn' : 'normal';
     hudBar.setTimer(rem, urgency);
   },
   onShotTimeout: () => {
+    if (!WALL_CLOCK_SHOT_TIMER_ENABLED) return;
     if (_demoConfig) return;
     // W3: never apply RULE-006 foul while AI is thinking/shooting
     if (_matchMode === 'vs-ai' && _vsAiCtrl?.isAiTurn()) return;
     gameSession.notifyShotTimeout();
   },
   onGameEndTimeout: () => {
+    if (!WALL_CLOCK_SHOT_TIMER_ENABLED) return;
     if (_demoConfig) return;
     if (_matchMode === 'vs-ai' && _vsAiCtrl?.isAiTurn()) return;
     gameSession.notifyGameEndTimeout();
