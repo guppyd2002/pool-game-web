@@ -608,6 +608,12 @@ const hudBar = createHudBar(container, {
     hudBar.setLeftHandActive(_isLeftHand);
   },
   onToggleFineAim: _toggleFineAim,
+  // CUE-008: toggle aim line / ghost assist (persists across turns)
+  onToggleAimAssist: () => {
+    cue.toggleAimLine();
+    hudBar.setAimAssistActive(cue.aimLineVisible);
+    _updateAimVisuals();
+  },
   // UI-004: mid-game exit → main menu
   onExit: () => {
     if (!confirm('Leave the table and return to the main menu?')) return;
@@ -635,6 +641,7 @@ const hudBar = createHudBar(container, {
   },
 });
 hudBar.setVisible(false);  // hidden until game starts
+hudBar.setAimAssistActive(cue.aimLineVisible); // CUE-008 default ON
 
 // SP-Harden-6: 7-slot solids/stripes progress under HUD (Unity BallPool8PlayerUI)
 const playerBallHud = createPlayerBallHud(container);

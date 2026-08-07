@@ -16,6 +16,8 @@ export interface HudBar {
   setTopViewLabel(label: string): void;
   setLeftHandActive(active: boolean): void;
   setFineAimActive(active: boolean): void;
+  /** CUE-008: aim-line / ghost assist toggle chrome state. */
+  setAimAssistActive(active: boolean): void;
   /** UI-016: dim/hide non-essential chrome while waiting (optional). */
   setControlsEnabled(enabled: boolean): void;
   readonly element: HTMLElement;
@@ -26,6 +28,8 @@ export function createHudBar(container: HTMLElement, opts: {
   onToggleView: () => void;
   onToggleLeftHand: () => void;
   onToggleFineAim: () => void;
+  /** CUE-008 — toggle aim line / ghost ball assist */
+  onToggleAimAssist?: () => void;
   /** UI-004 — leave table back to main menu */
   onExit?: () => void;
 }): HudBar {
@@ -93,9 +97,17 @@ export function createHudBar(container: HTMLElement, opts: {
   leftHandBtn.style.minWidth = '36px';
   const fineAimBtn = _mkBtn('⌖', 'Fine aim mode (Shift)', opts.onToggleFineAim);
   fineAimBtn.style.minWidth = '36px';
+  const aimAssistBtn = _mkBtn('◎', 'Aim assist lines (CUE-008)', () => {
+    opts.onToggleAimAssist?.();
+  });
+  aimAssistBtn.style.minWidth = '36px';
+  if (!opts.onToggleAimAssist) {
+    aimAssistBtn.style.display = 'none';
+  }
 
   ctrlEl.appendChild(topViewBtn);
   ctrlEl.appendChild(fineAimBtn);
+  ctrlEl.appendChild(aimAssistBtn);
   ctrlEl.appendChild(leftHandBtn);
 
   if (opts.onExit) {
@@ -153,6 +165,12 @@ export function createHudBar(container: HTMLElement, opts: {
 
     setFineAimActive(active: boolean): void {
       fineAimBtn.style.background = active
+        ? 'rgba(76,175,80,0.4)'
+        : 'rgba(255,255,255,0.10)';
+    },
+
+    setAimAssistActive(active: boolean): void {
+      aimAssistBtn.style.background = active
         ? 'rgba(76,175,80,0.4)'
         : 'rgba(255,255,255,0.10)';
     },

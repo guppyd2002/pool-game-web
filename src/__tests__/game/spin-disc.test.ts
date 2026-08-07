@@ -359,3 +359,53 @@ describe('SpinDisc — reset()', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+// ─── CUE-007: need point (tutorial / AI assist) ──────────────────────────────
+
+describe('CUE-007 SpinDisc need point', () => {
+  it('getNeedPoint is null until set', () => {
+    const disc = createSpinDisc();
+    expect(disc.getNeedPoint()).toBeNull();
+    expect(disc.getDifferenceFromNeedPoint()).toBe(0);
+  });
+
+  it('setNeedPoint clamps to unit circle', () => {
+    const disc = createSpinDisc();
+    disc.setNeedPoint(2, 0);
+    const n = disc.getNeedPoint()!;
+    expect(n.x).toBeCloseTo(1);
+    expect(n.y).toBeCloseTo(0);
+  });
+
+  it('getDifferenceFromNeedPoint is 0 when spin matches need', () => {
+    const disc = createSpinDisc();
+    disc.setNeedPoint(0.5, 0);
+    disc.open();
+    disc.pointerDown(0.5, 0);
+    expect(disc.getDifferenceFromNeedPoint()).toBeCloseTo(0, 5);
+  });
+
+  it('getDifferenceFromNeedPoint is Euclidean distance when off-target', () => {
+    const disc = createSpinDisc();
+    disc.setNeedPoint(1, 0);
+    // spin stays 0,0
+    expect(disc.getDifferenceFromNeedPoint()).toBeCloseTo(1, 5);
+  });
+
+  it('clearNeedPoint removes assist target', () => {
+    const disc = createSpinDisc();
+    disc.setNeedPoint(0.3, -0.2);
+    disc.clearNeedPoint();
+    expect(disc.getNeedPoint()).toBeNull();
+    expect(disc.getDifferenceFromNeedPoint()).toBe(0);
+  });
+
+  it('reset() does not clear need point (tutorial target persists)', () => {
+    const disc = createSpinDisc();
+    disc.setNeedPoint(0.4, 0.1);
+    disc.open();
+    disc.pointerDown(0.5, 0);
+    disc.reset();
+    expect(disc.getNeedPoint()).toEqual({ x: 0.4, y: 0.1 });
+  });
+});

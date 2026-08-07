@@ -54,6 +54,25 @@ export interface SpinDisc {
 
   /** Zero spin and close. Call from CueController.resetForNewTurn(). */
   reset(): void;
+
+  /**
+   * CUE-007: Set tutorial/AI suggested hit point (normalized disc coords, unit-circle clamped).
+   * Maps to C# CueTargetingUIManager.SetNeedPoint(Vector2).
+   */
+  setNeedPoint(nx: number, ny: number): void;
+
+  /** CUE-007: Clear need point (hide assist marker). */
+  clearNeedPoint(): void;
+
+  /** CUE-007: Current need point or null if unset. */
+  getNeedPoint(): { x: number; y: number } | null;
+
+  /**
+   * CUE-007: Normalized distance from current spin to need point (0 = exact match).
+   * Maps to C# GetDifferenceFromNeedPoint(): Distance(hit, need) / radius.
+   * Returns 0 when no need point is set.
+   */
+  getDifferenceFromNeedPoint(): number;
 }
 
 /**
@@ -71,6 +90,9 @@ export function createSpinDisc(opts: SpinDiscOptions = {}): SpinDisc {
   let _isDragging = false;
   let _spinX = 0;
   let _spinY = 0;
+  // CUE-007 need-point (tutorial/AI assist); null = inactive
+  let _needX: number | null = null;
+  let _needY: number | null = null;
 
   function _applySpin(nx: number, ny: number): void {
     const s = computeSpinFromPosition(nx, ny);
@@ -129,7 +151,31 @@ export function createSpinDisc(opts: SpinDiscOptions = {}): SpinDisc {
       _spinX = 0;
       _spinY = 0;
       opts.onSpinChange?.(0, 0);
+      // Need point persists across turn reset (tutorial target may stay); clear via clearNeedPoint.
       if (_isOpen) _close();
+    },
+
+    setNeedPoint(nx: number, ny: number): void {
+      const s = computeSpinFromPosition(nx, ny);
+      _needX = s.x;
+      _needY = s.y;
+    },
+
+    clearNeedPoint(): void {
+      _needX = null;
+      _needY = null;
+    },
+
+    getNeedPoint(): { x: number; y: number } | null {
+      if (_needX === null || _needY === null) return null;
+      return { x: _needX, y: _needY };
+    },
+
+    getDifferenceFromNeedPoint(): number {
+      if (_needX === null || _needY === null) return 0;
+      const dx = _spinX - _needX;
+      const dy = _spinY - _needY;
+      return Math.sqrt(dx * dx + dy * dy);
     },
   };
 }

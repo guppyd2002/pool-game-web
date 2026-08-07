@@ -132,8 +132,20 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'box-shadow:0 0 6px rgba(211,58,58,0.8)',
   ].join(';');
 
+  // CUE-007 need-point marker (tutorial/AI assist — green ring)
+  const needDot = document.createElement('div');
+  needDot.style.cssText = [
+    'position:absolute',
+    `width:${DOT_R * 2 + 4}px`, `height:${DOT_R * 2 + 4}px`,
+    'border-radius:50%', 'border:2px solid #4caf50',
+    'background:rgba(76,175,80,0.25)',
+    'transform:translate(-50%,-50%)', 'pointer-events:none',
+    'display:none',
+  ].join(';');
+
   panel.appendChild(hline);
   panel.appendChild(vline);
+  panel.appendChild(needDot);
   panel.appendChild(dot);
   overlay.appendChild(spinLabel);
   overlay.appendChild(panel);
@@ -147,6 +159,15 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     const cy = DISC_RADIUS - disc.spinY * DISC_RADIUS * VISUAL_SCALE;
     dot.style.left = `${cx}px`;
     dot.style.top = `${cy}px`;
+    // CUE-007 need-point assist marker
+    const need = disc.getNeedPoint();
+    if (need) {
+      needDot.style.display = 'block';
+      needDot.style.left = `${DISC_RADIUS + need.x * DISC_RADIUS * VISUAL_SCALE}px`;
+      needDot.style.top = `${DISC_RADIUS - need.y * DISC_RADIUS * VISUAL_SCALE}px`;
+    } else {
+      needDot.style.display = 'none';
+    }
     // Reflect spin on collapsed button dot
     const hasSpinX = Math.abs(disc.spinX) > 0.05;
     const hasSpinY = Math.abs(disc.spinY) > 0.05;
