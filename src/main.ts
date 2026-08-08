@@ -334,7 +334,9 @@ const tutorial = createTutorialOverlay(container);
 
 const cameraTween = createCameraTween(scene.camera);
 
-// Set camera to overview pose immediately (no tween, duration=0)
+// Set perspective scene.camera to overview pose immediately (no tween, duration=0).
+// Note: scene.camera is the PerspectiveCamera; scene.activeCamera is orthoCam when
+// setOrthoTop(true), else scene.camera. render() uses activeCamera only.
 cameraTween.tweenTo(POSE_OVERVIEW, 0);
 
 function _runCameraTween(fromNow = true): void {
@@ -347,6 +349,22 @@ function _runCameraTween(fromNow = true): void {
     if (cameraTween.isActive) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
+}
+
+/**
+ * Apply getPlayView() pose + FOV to the perspective camera (scene.camera).
+ * Pose constants are NOT modified — only wired to the camera that renders play.
+ * Call whenever landing on perspective play (enter table, top→orbit toggle).
+ */
+function _applyPlayView(durationSecs = 0): void {
+  const vw = container.clientWidth || window.innerWidth;
+  const vh = container.clientHeight || window.innerHeight;
+  const { pose, fov } = getPlayView(vw, vh);
+  _basePlayFov = fov;
+  scene.camera.fov = fov;
+  scene.camera.updateProjectionMatrix();
+  cameraTween.tweenTo(pose, durationSecs);
+  if (durationSecs > 0) _runCameraTween(true);
 }
 
 // ─── GAME-018: game session ────────────────────────────────────────────────────
@@ -539,15 +557,18 @@ function _enterTableChrome(): void {
   powerSliderUI.element.style.display = 'block';
   fineAdjustBar.element.style.display = 'block';
   spinDiscUI.element.style.display = 'block';
-  // CAM-001/002: menu overview → table play mode (default top ortho)
-  cameraMode.enterTable();
-  _inTopView = cameraMode.mode === 'top';
-  scene.setOrthoTop(_inTopView);
-  hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
-  const vw = container.clientWidth || window.innerWidth;
-  const vh = container.clientHeight || window.innerHeight;
-  const { fov } = getPlayView(vw, vh);
-  _basePlayFov = fov;
+  // ── Play-view wiring (2026-08 step 0) ─────────────────────────────────────
+  // Bug: menu left scene.camera at POSE_OVERVIEW; enterTable only defaulted mode
+  // to top ortho / took getPlayView().fov and dropped pose. Prod pixels matched
+  // overview perspective (~6% table area), not play pose — CEO saw menu framing.
+  // Fix: land on orbit (perspective) so activeCamera === scene.camera, then apply
+  // full getPlayView() pose+fov. Top ortho still available via HUD toggle.
+  // Pose/FOV constants unchanged.
+  cameraMode.setMode('orbit');
+  _inTopView = false;
+  scene.setOrthoTop(false);
+  hudBar.setTopViewLabel('⬆ Top');
+  _applyPlayView(0);
 }
 
 function _beginHotSeatMatch(): void {
@@ -695,17 +716,11 @@ function _toggleView(): void {
   const next = cameraMode.toggleTopOrbit();
   _inTopView = next === 'top';
   if (_inTopView) {
-    scene.setOrthoTop(true);
+    scene.setOrthoTop(true); // activeCamera → orthoCam; scene.camera pose kept for return
   } else {
-    scene.setOrthoTop(false);
-    // SP-Harden-3b: restore viewport-aware play pose (not fixed desktop pose).
-    const vw = container.clientWidth || window.innerWidth;
-    const vh = container.clientHeight || window.innerHeight;
-    const { pose, fov } = getPlayView(vw, vh);
-    _basePlayFov = fov;
-    scene.camera.fov = fov;
-    scene.camera.updateProjectionMatrix();
-    cameraTween.tweenTo(pose, 0);
+    scene.setOrthoTop(false); // activeCamera → scene.camera (perspective)
+    // Re-apply play pose (may still be OVERVIEW if user never entered via fixed path)
+    _applyPlayView(0);
   }
   hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
 }
@@ -1138,7 +1153,19 @@ window.addEventListener('beforeunload', () => {
 // ─── Playwright / test hook ──────────────────────────────────────────────────
 // Exposes minimal refs for headless browser smoke tests.
 (window as unknown as Record<string, unknown>).__poolDebug = {
+  /** Perspective camera (poses). Prefer getActiveCamera() for what is drawn. */
   camera: scene.camera,
+  getActiveCamera: () => scene.activeCamera,
+  /** Snapshot for QA: which camera draws + perspective pose/FOV. */
+  cameraProbe: () => ({
+    drawing: scene.activeCamera === scene.camera ? 'perspective' : 'ortho',
+    perspectivePos: scene.camera.position.toArray() as [number, number, number],
+    perspectiveFov: scene.camera.fov,
+    playView: getPlayView(
+      container.clientWidth || window.innerWidth,
+      container.clientHeight || window.innerHeight,
+    ),
+  }),
   cueBallMesh: scene.balls[0],
   balls: scene.balls,
   renderer: scene.renderer,

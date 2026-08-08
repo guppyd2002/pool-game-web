@@ -44,9 +44,15 @@ function orthoFrustum(aspect: number): [number, number, number, number] {
 
 export interface SceneAPI {
   renderer: THREE.WebGLRenderer;
-  /** Perspective camera (always exists; used by tweens and orbit controls). */
+  /**
+   * Perspective camera — play/orbit/overview poses live here (getPlayView / POSE_*).
+   * Not always what is drawn: when setOrthoTop(true), render uses orthoCam instead.
+   */
   camera: THREE.PerspectiveCamera;
-  /** Currently active camera — perspective normally, ortho when setOrthoTop(true). */
+  /**
+   * Camera actually used by render(): orthoCam if setOrthoTop(true), else `camera`.
+   * Raycasts / aim must use this (not raw `camera`) or top-view input breaks.
+   */
   readonly activeCamera: THREE.Camera;
   scene: THREE.Scene;
   balls: THREE.Mesh[];
