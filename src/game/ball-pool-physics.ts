@@ -98,7 +98,15 @@ export interface IBallPoolPhysics {
   setStateFromString(state: string): void;
   resetToStartState(): void;
   getPhysicsConstants(): PhysicsConstants;
-  // CUE-013 / PHY-016 seam — ball-in-hand placement
+  /**
+   * CUE-013 / PHY-016 — put a ball back **in-play** on the table.
+   *
+   * **Invariant:** this API means "return to in-play" ⇒ mesh `visible = true`
+   * unconditionally. Callers MUST only invoke when that ball should appear
+   * on the table (not for stashing pocketed/OOT balls). As of 2026-08 audit,
+   * every production caller passes cue id=0 (BIH / respot / recorded place).
+   * Object balls use hideBall + _placeRack/resetVisibility, never placeBall.
+   */
   placeBall(id: number, position: CmVector): void;
   respotCueBall(): void;
 }
@@ -532,25 +540,54 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
 
     /**
      * Return a ball to in-play on the table.
-     * Must restore mesh visibility: hideBall/replay only set visible=false;
-     * without restore here, a pocketed cue stays invisible for the rest of the
-     * game after place (only _placeRack / resetVisibility re-show — new game).
-     * visible follows "on table / in play", not "someone remembered to set true".
+     *
+     * **Invariant (do not weaken without re-auditing all callers):**
+     * `placeBall` = every path that puts a ball back **in-play** ⇒ all those
+     * balls **must be visible**. Therefore this method restores
+     * `mesh.visible = true` unconditionally.
+     *
+     * Caller contract: only call when that ball should appear on the table.
+     * Do NOT use placeBall to park pocketed/OOT balls off-table — that would
+     * re-show them (the concentrated-restore hazard of this design).
+     *
+     * Audit 2026-08 (feature branch): every production caller is **cue id=0**
+     * (BIH commit, respotCueBall, AI BIH place, record/seek place). Object
+     * balls never go through placeBall (hideBall + _placeRack / resetVisibility).
+     *
+     * History: without restore here, hideBall left the cue invisible for the
+     * rest of the game after first scratch (only new-game paths re-showed).
      */
     placeBall(id: number, position: CmVector): void {
+      // Dev-only: signature allows any id; invariant is in-play. Non-zero is
+      // unexpected today — warn so a future placeBall(3, …) does not silently
+      // resurrect a pocketed object ball onto the felt.
+      if (id !== 0) {
+        const dev =
+          typeof import.meta !== 'undefined' &&
+          // Vite / vitest
+          Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);
+        if (dev) {
+          console.warn(
+            `[placeBall] id=${id} (expected cue 0). placeBall means in-play ⇒ visible; ` +
+              `do not use for pocketed/OOT stashing. See IBallPoolPhysics.placeBall invariant.`,
+          );
+        }
+      }
+
       const body = space.rigidbodies[id];
       body.collider.position = position;
       body.isKinematic = false;
       body.isOutOfCube = false;
       body.isActive = false;   // setter also zeros velocity + angularVelocity
       renderer.updateBallPosition(id, toFloat(position.x), toFloat(position.y - TABLE_Y), toFloat(position.z));
-      // In-play ⇒ visible. Covers BIH commit, respotCueBall, any re-spot path.
+      // In-play ⇒ visible (invariant above). Covers BIH / respot / recorded place.
       const mesh = renderer.balls[id];
       if (mesh) mesh.visible = true;
     },
 
     respotCueBall(): void {
       // Head-spot: x = -RAIL_LONG_X/2, y = BALL_Y, z = 0 (same as table-setup cueBallX)
+      // Always id 0 — satisfies placeBall invariant (cue back in-play).
       this.placeBall(0, new CmVector(-Math.trunc(RAIL_LONG_X / 2), BALL_Y, 0));
     },
   };
