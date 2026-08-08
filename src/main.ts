@@ -1042,6 +1042,12 @@ function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: numbe
  * BIH preview: show cue mesh at proposed position while dragging.
  * placeBall() on commit is the in-play root restore; this covers the pre-commit
  * window when hideBall has already set visible=false (green ring alone was the bug).
+ *
+ * Residual risk (2026-08 audit): main play loop does NOT per-frame sync
+ * `mesh.visible = !isOutOfTable` (only restoreSavedGame + replay-hud seek do).
+ * If a future change adds that sync with isOutOfTable as the sole predicate,
+ * this preview dies while cue is still OOT pre-commit — gate with
+ * `!ballInHand.isActive` or use a dedicated placement ghost mesh.
  */
 function _syncBihCueMeshPreview(): void {
   const pos = ballInHand.proposedPosition;
