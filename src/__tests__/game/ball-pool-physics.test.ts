@@ -506,6 +506,41 @@ describe('G6 placeBall: sets Fixed position and clears kinematic/OOT state', () 
     physics.placeBall(0, new CmVector(2000, BALL_Y, 0));
     expect(calls).toContain(0);
   });
+
+  /**
+   * CEO / DIV-style pin: hide is permanent until placeBall.
+   * After pocket (mesh visible=false), placeBall must restore visibility —
+   * not only new-game resetVisibility / _placeRack.
+   */
+  it('placeBall() restores mesh.visible after hide (in-play ⇒ visible)', () => {
+    const cueMesh = { visible: false, position: { set: () => {} } };
+    const trackedScene: SceneAPI = {
+      ...mockScene,
+      balls: [cueMesh as unknown as import('three').Mesh],
+      updateBallPosition: () => {},
+    };
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, trackedScene);
+    // Simulate post-pocket hide (replay-driver / hideBall)
+    cueMesh.visible = false;
+    physics.placeBall(0, new CmVector(0, BALL_Y, 0));
+    expect(cueMesh.visible).toBe(true);
+    expect(physics.getBall(0).isOutOfTable).toBe(false);
+  });
+
+  it('respotCueBall() also restores mesh.visible (via placeBall)', () => {
+    const cueMesh = { visible: false, position: { set: () => {} } };
+    const trackedScene: SceneAPI = {
+      ...mockScene,
+      balls: [cueMesh as unknown as import('three').Mesh],
+      updateBallPosition: () => {},
+    };
+    const { space } = makeGV01Space();
+    const physics = createBallPoolPhysics(space, trackedScene);
+    cueMesh.visible = false;
+    physics.respotCueBall();
+    expect(cueMesh.visible).toBe(true);
+  });
 });
 
 describe('G6 respotCueBall: places cue ball at head-spot', () => {

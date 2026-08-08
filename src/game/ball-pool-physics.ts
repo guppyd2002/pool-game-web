@@ -530,6 +530,13 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
 
     // ── CUE-013 / PHY-016: ball-in-hand placement ─────────────────────────
 
+    /**
+     * Return a ball to in-play on the table.
+     * Must restore mesh visibility: hideBall/replay only set visible=false;
+     * without restore here, a pocketed cue stays invisible for the rest of the
+     * game after place (only _placeRack / resetVisibility re-show — new game).
+     * visible follows "on table / in play", not "someone remembered to set true".
+     */
     placeBall(id: number, position: CmVector): void {
       const body = space.rigidbodies[id];
       body.collider.position = position;
@@ -537,6 +544,9 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
       body.isOutOfCube = false;
       body.isActive = false;   // setter also zeros velocity + angularVelocity
       renderer.updateBallPosition(id, toFloat(position.x), toFloat(position.y - TABLE_Y), toFloat(position.z));
+      // In-play ⇒ visible. Covers BIH commit, respotCueBall, any re-spot path.
+      const mesh = renderer.balls[id];
+      if (mesh) mesh.visible = true;
     },
 
     respotCueBall(): void {

@@ -35,8 +35,9 @@ import { createAimLengthDebugUI } from './renderer/aim-length-debug-ui';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
-import { MULTIPLIER } from './physics/fixed-math';
+import { MULTIPLIER, toFloat } from './physics/fixed-math';
 import { CmVector } from './physics/cm-vector';
+import { TABLE_Y } from './physics/constants';
 import { backswingOffset } from './game/shot-animation';
 import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
@@ -1037,6 +1038,25 @@ function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: numbe
   return tableIntersection(_bihRaycaster, TABLE_PLANE_Y);
 }
 
+/**
+ * BIH preview: show cue mesh at proposed position while dragging.
+ * placeBall() on commit is the in-play root restore; this covers the pre-commit
+ * window when hideBall has already set visible=false (green ring alone was the bug).
+ */
+function _syncBihCueMeshPreview(): void {
+  const pos = ballInHand.proposedPosition;
+  if (!pos) return;
+  const mesh = scene.balls[0];
+  if (!mesh) return;
+  scene.updateBallPosition(
+    0,
+    toFloat(pos.x),
+    toFloat(pos.y - TABLE_Y),
+    toFloat(pos.z),
+  );
+  mesh.visible = true;
+}
+
 function _enterBallInHandMode(): void {
   adapter.disable();
   // M-3: disable power bar during BIH — dragging power bar would fire with an
@@ -1049,6 +1069,7 @@ function _enterBallInHandMode(): void {
   ballInHand.enter();
   const t = performance.now() / 1000 - _bihStartT;
   placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+  _syncBihCueMeshPreview();
 }
 
 function onBihPointerMove(e: PointerEvent): void {
@@ -1057,6 +1078,7 @@ function onBihPointerMove(e: PointerEvent): void {
   if (pt) ballInHand.move(pt.x, pt.z);
   const t = performance.now() / 1000 - _bihStartT;
   placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+  _syncBihCueMeshPreview();
 }
 
 function onBihPointerUp(_e: PointerEvent): void {
