@@ -35,8 +35,9 @@ import { createAimLengthDebugUI } from './renderer/aim-length-debug-ui';
 import { createPlacementMarker } from './renderer/placement-marker';
 import { createBallInHandController } from './game/ball-in-hand';
 import { tableIntersection, TABLE_PLANE_Y } from './game/cue-adapter';
-import { MULTIPLIER } from './physics/fixed-math';
+import { MULTIPLIER, toFloat } from './physics/fixed-math';
 import { CmVector } from './physics/cm-vector';
+import { TABLE_Y } from './physics/constants';
 import { backswingOffset } from './game/shot-animation';
 import { createShotSlider } from './game/shot-slider';
 import { createSpinDisc } from './game/spin-disc';
@@ -70,7 +71,7 @@ import { createTurnPrompt } from './renderer/turn-prompt';
 import { createHudBar } from './renderer/hud-bar';
 import { createPlayerBallHud } from './renderer/player-ball-hud';
 import { createTutorialOverlay } from './renderer/tutorial-overlay';
-import { createShotTimer } from './renderer/shot-timer';
+import { createShotTimer, DEFAULT_SHOT_TIME_S, WALL_CLOCK_SHOT_TIMER_ENABLED } from './renderer/shot-timer';
 import { createPointFlyUI } from './renderer/point-fly-ui';
 import { createFindOpponentUI } from './renderer/find-opponent-ui';
 import { createSettingsPanel } from './renderer/settings-panel';
@@ -80,7 +81,6 @@ import { createCuesPopup, getEquippedCue } from './renderer/cues-popup';
 import { getDefaultPlayerDataManager } from './game/player-data-manager';
 import { addCoins } from './game/player-data';
 import { getDefaultGameSaveManager } from './game/game-save-manager';
-import { DEFAULT_SHOT_TIME_S } from './renderer/shot-timer';
 import { createAudioManager } from './game/audio-manager';
 import {
   subscribeSettings,
@@ -334,7 +334,9 @@ const tutorial = createTutorialOverlay(container);
 
 const cameraTween = createCameraTween(scene.camera);
 
-// Set camera to overview pose immediately (no tween, duration=0)
+// Park perspective scene.camera at overview (menu). Not always the drawing camera:
+// after enterTable(top), render uses OrthographicCamera via setOrthoTop(true).
+// __poolDebug.camera is this perspective object — use cameraProbe() for what draws.
 cameraTween.tweenTo(POSE_OVERVIEW, 0);
 
 function _runCameraTween(fromNow = true): void {
@@ -347,6 +349,18 @@ function _runCameraTween(fromNow = true): void {
     if (cameraTween.isActive) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
+}
+
+/** Apply getPlayView pose+fov to perspective scene.camera (orbit / play framing). */
+function _applyPlayView(durationSecs = 0): void {
+  const vw = container.clientWidth || window.innerWidth;
+  const vh = container.clientHeight || window.innerHeight;
+  const { pose, fov } = getPlayView(vw, vh);
+  _basePlayFov = fov;
+  scene.camera.fov = fov;
+  scene.camera.updateProjectionMatrix();
+  cameraTween.tweenTo(pose, durationSecs);
+  if (durationSecs > 0) _runCameraTween(true);
 }
 
 // ─── GAME-018: game session ────────────────────────────────────────────────────
@@ -539,15 +553,14 @@ function _enterTableChrome(): void {
   powerSliderUI.element.style.display = 'block';
   fineAdjustBar.element.style.display = 'block';
   spinDiscUI.element.style.display = 'block';
-  // CAM-001/002: menu overview → table play mode (default top ortho)
-  cameraMode.enterTable();
-  _inTopView = cameraMode.mode === 'top';
-  scene.setOrthoTop(_inTopView);
-  hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
-  const vw = container.clientWidth || window.innerWidth;
-  const vh = container.clientHeight || window.innerHeight;
-  const { fov } = getPlayView(vw, vh);
-  _basePlayFov = fov;
+  // Default play = top ortho (CAM-002). Must call setOrthoTop(true) so render uses
+  // orthoCam — not perspective scene.camera (which stays parked at OVERVIEW until orbit).
+  // Also pre-apply play pose onto perspective for when user toggles to orbit.
+  cameraMode.setMode('top');
+  _inTopView = true;
+  scene.setOrthoTop(true);
+  hudBar.setTopViewLabel('⬇ Table');
+  _applyPlayView(0); // parks perspective at getPlayView pose (not drawn while top)
 }
 
 function _beginHotSeatMatch(): void {
@@ -695,17 +708,10 @@ function _toggleView(): void {
   const next = cameraMode.toggleTopOrbit();
   _inTopView = next === 'top';
   if (_inTopView) {
-    scene.setOrthoTop(true);
+    scene.setOrthoTop(true); // drawing → orthoCam
   } else {
-    scene.setOrthoTop(false);
-    // SP-Harden-3b: restore viewport-aware play pose (not fixed desktop pose).
-    const vw = container.clientWidth || window.innerWidth;
-    const vh = container.clientHeight || window.innerHeight;
-    const { pose, fov } = getPlayView(vw, vh);
-    _basePlayFov = fov;
-    scene.camera.fov = fov;
-    scene.camera.updateProjectionMatrix();
-    cameraTween.tweenTo(pose, 0);
+    scene.setOrthoTop(false); // drawing → scene.camera (perspective)
+    _applyPlayView(0);
   }
   hudBar.setTopViewLabel(_inTopView ? '⬇ Table' : '⬆ Top');
 }
@@ -762,19 +768,26 @@ hudBar.setAimAssistActive(cue.aimLineVisible); // CUE-008 default ON
 const playerBallHud = createPlayerBallHud(container);
 playerBallHud.setVisible(false);
 
-// UI-024 / RULE-006: shot countdown (HotSeat only — AI demo does not use wall-clock foul)
+// UI-024 / RULE-006: shot countdown (HotSeat only — AI demo does not use wall-clock foul).
+// WALL_CLOCK_SHOT_TIMER_ENABLED: CEO 2026-08-09 撤. Engine applyTimeout/applyGameEndTimeout kept.
 const shotTimer = createShotTimer({
   onTick: (rem, inGrace) => {
+    if (!WALL_CLOCK_SHOT_TIMER_ENABLED) {
+      hudBar.setTimer(null);
+      return;
+    }
     const urgency = rem <= 5 ? 'critical' : inGrace || rem <= 10 ? 'warn' : 'normal';
     hudBar.setTimer(rem, urgency);
   },
   onShotTimeout: () => {
+    if (!WALL_CLOCK_SHOT_TIMER_ENABLED) return;
     if (_demoConfig) return;
     // W3: never apply RULE-006 foul while AI is thinking/shooting
     if (_matchMode === 'vs-ai' && _vsAiCtrl?.isAiTurn()) return;
     gameSession.notifyShotTimeout();
   },
   onGameEndTimeout: () => {
+    if (!WALL_CLOCK_SHOT_TIMER_ENABLED) return;
     if (_demoConfig) return;
     if (_matchMode === 'vs-ai' && _vsAiCtrl?.isAiTurn()) return;
     gameSession.notifyGameEndTimeout();
@@ -1030,6 +1043,21 @@ function _bihNdcToTable(clientX: number, clientY: number): { x: number; z: numbe
   return tableIntersection(_bihRaycaster, TABLE_PLANE_Y);
 }
 
+/**
+ * BIH preview: show cue mesh at proposed while dragging.
+ * placeBall on commit is the in-play root restore.
+ * Residual: if a future per-frame sync does mesh.visible=!isOutOfTable only,
+ * gate with !ballInHand.isActive or use a placement ghost.
+ */
+function _syncBihCueMeshPreview(): void {
+  const pos = ballInHand.proposedPosition;
+  if (!pos) return;
+  const mesh = scene.balls[0];
+  if (!mesh) return;
+  scene.updateBallPosition(0, toFloat(pos.x), toFloat(pos.y - TABLE_Y), toFloat(pos.z));
+  mesh.visible = true;
+}
+
 function _enterBallInHandMode(): void {
   adapter.disable();
   // M-3: disable power bar during BIH — dragging power bar would fire with an
@@ -1042,6 +1070,7 @@ function _enterBallInHandMode(): void {
   ballInHand.enter();
   const t = performance.now() / 1000 - _bihStartT;
   placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+  _syncBihCueMeshPreview();
 }
 
 function onBihPointerMove(e: PointerEvent): void {
@@ -1050,6 +1079,7 @@ function onBihPointerMove(e: PointerEvent): void {
   if (pt) ballInHand.move(pt.x, pt.z);
   const t = performance.now() / 1000 - _bihStartT;
   placementMarker.update(ballInHand.proposedPosition, ballInHand.proposedIsFree, t);
+  _syncBihCueMeshPreview();
 }
 
 function onBihPointerUp(_e: PointerEvent): void {
@@ -1102,8 +1132,30 @@ window.addEventListener('beforeunload', () => {
 
 // ─── Playwright / test hook ──────────────────────────────────────────────────
 // Exposes minimal refs for headless browser smoke tests.
+// IMPORTANT: `camera` is always the PerspectiveCamera. After enterTable(top),
+// render uses OrthographicCamera — use getActiveCamera() / cameraProbe().
 (window as unknown as Record<string, unknown>).__poolDebug = {
+  /** Perspective camera (poses). Prefer getActiveCamera for what is drawn. */
   camera: scene.camera,
+  getActiveCamera: () => scene.activeCamera,
+  /** What is drawing + perspective park + intended playView. */
+  cameraProbe: () => {
+    const active = scene.activeCamera;
+    const drawing =
+      active === scene.camera ? 'perspective' : 'ortho';
+    return {
+      drawing,
+      activeType: (active as { type?: string }).type ?? null,
+      activePos: (active as { position?: { toArray: () => number[] } }).position?.toArray?.() ?? null,
+      perspectivePos: scene.camera.position.toArray() as [number, number, number],
+      perspectiveFov: scene.camera.fov,
+      inTopView: _inTopView,
+      playView: getPlayView(
+        container.clientWidth || window.innerWidth,
+        container.clientHeight || window.innerHeight,
+      ),
+    };
+  },
   cueBallMesh: scene.balls[0],
   balls: scene.balls,
   renderer: scene.renderer,

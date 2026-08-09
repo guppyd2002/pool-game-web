@@ -98,7 +98,13 @@ export interface IBallPoolPhysics {
   setStateFromString(state: string): void;
   resetToStartState(): void;
   getPhysicsConstants(): PhysicsConstants;
-  // CUE-013 / PHY-016 seam — ball-in-hand placement
+  /**
+   * CUE-013 / PHY-016 — put a ball back **in-play** on the table.
+   *
+   * **Invariant:** this API means "return to in-play" ⇒ mesh `visible = true`
+   * unconditionally. Callers MUST only invoke when that ball should appear
+   * on the table. Production callers are cue id=0 (BIH / respot / recorded place).
+   */
   placeBall(id: number, position: CmVector): void;
   respotCueBall(): void;
 }
@@ -530,13 +536,30 @@ export function createBallPoolPhysics(space: CmSpace, renderer: SceneAPI): IBall
 
     // ── CUE-013 / PHY-016: ball-in-hand placement ─────────────────────────
 
+    /**
+     * Return a ball to in-play. Restores mesh.visible: hideBall leaves it false;
+     * without restore here, a pocketed cue stays invisible for the rest of the game.
+     * Invariant: placeBall = in-play ⇒ visible. Do not use to stash pocketed balls.
+     */
     placeBall(id: number, position: CmVector): void {
+      if (id !== 0) {
+        const dev =
+          typeof import.meta !== 'undefined' &&
+          Boolean((import.meta as { env?: { DEV?: boolean } }).env?.DEV);
+        if (dev) {
+          console.warn(
+            `[placeBall] id=${id} (expected cue 0). placeBall means in-play ⇒ visible.`,
+          );
+        }
+      }
       const body = space.rigidbodies[id];
       body.collider.position = position;
       body.isKinematic = false;
       body.isOutOfCube = false;
       body.isActive = false;   // setter also zeros velocity + angularVelocity
       renderer.updateBallPosition(id, toFloat(position.x), toFloat(position.y - TABLE_Y), toFloat(position.z));
+      const mesh = renderer.balls[id];
+      if (mesh) mesh.visible = true;
     },
 
     respotCueBall(): void {

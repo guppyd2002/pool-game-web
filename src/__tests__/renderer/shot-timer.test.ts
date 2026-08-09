@@ -8,6 +8,8 @@ import {
   isInGracePeriod,
   DEFAULT_SHOT_TIME_S,
   GAME_END_TIME_RATIO,
+  WALL_CLOCK_SHOT_TIMER_ENABLED,
+  createShotTimer,
 } from '../../renderer/shot-timer';
 
 describe('shot-timer pure helpers', () => {
@@ -16,6 +18,33 @@ describe('shot-timer pure helpers', () => {
   it('defaults match C# ratio 1.5×', () => {
     expect(DEFAULT_SHOT_TIME_S).toBe(30);
     expect(GAME_END_TIME_RATIO).toBeCloseTo(1.5, 5);
+  });
+
+  it('WALL_CLOCK_SHOT_TIMER_ENABLED is false (CEO 撤)', () => {
+    expect(WALL_CLOCK_SHOT_TIMER_ENABLED).toBe(false);
+  });
+
+  it('createShotTimer.start does not fire timeouts when wall-clock disabled', () => {
+    const onShotTimeout = () => { throw new Error('should not fire'); };
+    const onGameEndTimeout = () => { throw new Error('should not fire'); };
+    let ticks = 0;
+    const g = globalThis as unknown as {
+      window?: { setInterval: typeof setInterval; clearInterval: typeof clearInterval };
+    };
+    if (typeof g.window === 'undefined') {
+      g.window = { setInterval, clearInterval };
+    }
+    const t = createShotTimer({
+      onTick: () => { ticks++; },
+      onShotTimeout,
+      onGameEndTimeout,
+      shotTimeS: 1,
+      nowMs: () => 0,
+    });
+    t.start();
+    expect(ticks).toBe(1);
+    t.stop();
+    t.dispose();
   });
 
   it('computeTimerTier: ok → shot_timeout → game_end_timeout', () => {
