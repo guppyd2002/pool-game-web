@@ -75,6 +75,8 @@ for (const vp of VIEWPORTS) {
         drawType: cam.type, isOrtho: !!cam.isOrthographicCamera, projM11: cam.projectionMatrix.elements[11],
         projFracW: +(projW / W).toFixed(3), projFracH: +(projH / H).toFixed(3), projArea: +((projW * projH) / (W * H)).toFixed(3),
         ballDiamPx: +ballDiam(-HALF_X / 2).toFixed(1),
+        // ball ⌀ ÷ cushion long length (nose-to-nose X span in px) — world-invariant proportion
+        ballOverTableLenPct: +((ballDiam(-HALF_X / 2) / Math.max(1, projW)) * 100).toFixed(2),
         pxFracW: +(maxX >= 0 ? (maxX - minX) / cw : 0).toFixed(3),
         pxFracH: +(maxY >= 0 ? (maxY - minY) / ch : 0).toFixed(3),
         pxArea: +((content * 4) / (cw * ch)).toFixed(3),
