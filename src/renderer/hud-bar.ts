@@ -97,9 +97,24 @@ export function createHudBar(container: HTMLElement, opts: {
   p2El.style.cssText = 'flex:0 0 auto;opacity:0.75;white-space:nowrap;font-weight:bold;';
   p2El.textContent = 'P2';
 
+  // Phase 1 #6: two groups (view | session), gap ≥10px within, ≥44×44 tap.
   const ctrlEl = document.createElement('div');
-  // Phase 1 #6 will raise gap; keep ≥4px now, icons already min 36–44.
-  ctrlEl.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:8px;';
+  ctrlEl.setAttribute('data-hud-controls', '1');
+  ctrlEl.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:14px;';
+
+  const viewGroup = document.createElement('div');
+  viewGroup.setAttribute('data-hud-icon-group', 'view');
+  viewGroup.style.cssText = 'display:flex;align-items:center;gap:10px;';
+
+  const sessionGroup = document.createElement('div');
+  sessionGroup.setAttribute('data-hud-icon-group', 'session');
+  sessionGroup.style.cssText = 'display:flex;align-items:center;gap:10px;';
+
+  const groupSep = document.createElement('div');
+  groupSep.setAttribute('aria-hidden', 'true');
+  groupSep.setAttribute('data-hud-icon-sep', '1');
+  groupSep.style.cssText =
+    'width:1px;height:18px;background:rgba(255,255,255,0.28);flex:0 0 auto;';
 
   function _mkBtn(text: string, title: string, onClick: () => void): HTMLButtonElement {
     const b = document.createElement('button');
@@ -111,37 +126,40 @@ export function createHudBar(container: HTMLElement, opts: {
       'border:1px solid rgba(255,255,255,0.25)',
       'padding:2px 7px', 'border-radius:4px',
       'font-size:11px', 'cursor:pointer',
-      'min-height:28px', 'min-width:44px',
+      // Apple HIG / Phase 1 #6: tap-target ≥44×44 (visual chrome stays compact via padding).
+      'min-height:44px', 'min-width:44px',
+      'box-sizing:border-box',
       'font-family:sans-serif',
+      'display:inline-flex', 'align-items:center', 'justify-content:center',
     ].join(';');
     b.addEventListener('click', onClick);
     return b;
   }
 
   const topViewBtn = _mkBtn('⬆ Top', 'Toggle top view (T)', opts.onToggleView);
-  const leftHandBtn = _mkBtn('🤚', 'Left-hand mode', opts.onToggleLeftHand);
-  leftHandBtn.style.minWidth = '36px';
   const fineAimBtn = _mkBtn('⌖', 'Fine aim mode (Shift)', opts.onToggleFineAim);
-  fineAimBtn.style.minWidth = '36px';
   const aimAssistBtn = _mkBtn('◎', 'Aim assist lines (CUE-008)', () => {
     opts.onToggleAimAssist?.();
   });
-  aimAssistBtn.style.minWidth = '36px';
   if (!opts.onToggleAimAssist) {
     aimAssistBtn.style.display = 'none';
   }
+  const leftHandBtn = _mkBtn('🤚', 'Left-hand mode', opts.onToggleLeftHand);
 
-  ctrlEl.appendChild(topViewBtn);
-  ctrlEl.appendChild(fineAimBtn);
-  ctrlEl.appendChild(aimAssistBtn);
-  ctrlEl.appendChild(leftHandBtn);
+  viewGroup.appendChild(topViewBtn);
+  viewGroup.appendChild(fineAimBtn);
+  viewGroup.appendChild(aimAssistBtn);
+  sessionGroup.appendChild(leftHandBtn);
 
   if (opts.onExit) {
     const exitBtn = _mkBtn('✕', 'Exit to menu (UI-004)', opts.onExit);
-    exitBtn.style.minWidth = '36px';
     exitBtn.style.background = 'rgba(255,80,80,0.25)';
-    ctrlEl.appendChild(exitBtn);
+    sessionGroup.appendChild(exitBtn);
   }
+
+  ctrlEl.appendChild(viewGroup);
+  ctrlEl.appendChild(groupSep);
+  ctrlEl.appendChild(sessionGroup);
 
   bar.appendChild(p1El);
   bar.appendChild(p0SlotsWrap);

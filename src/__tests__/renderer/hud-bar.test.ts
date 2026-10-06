@@ -116,4 +116,27 @@ describe('createHudBar (T07)', () => {
     hud.dispose();
     expect(root.querySelector('#hud-bar')).toBeNull();
   });
+
+  it('Phase 1 #6: icon groups, gap ≥10px, tap-target ≥44×44', () => {
+    const hud = makeHud();
+    const view = hud.element.querySelector('[data-hud-icon-group="view"]') as HTMLElement;
+    const session = hud.element.querySelector('[data-hud-icon-group="session"]') as HTMLElement;
+    const sep = hud.element.querySelector('[data-hud-icon-sep]') as HTMLElement;
+    expect(view).toBeTruthy();
+    expect(session).toBeTruthy();
+    expect(sep).toBeTruthy();
+    expect(view.style.gap).toBe('10px');
+    expect(session.style.gap).toBe('10px');
+
+    const buttons = [...hud.element.querySelectorAll('button')] as HTMLButtonElement[];
+    expect(buttons.length).toBe(5); // Top, Fine, AimAssist, LeftHand, Exit
+    for (const b of buttons) {
+      expect(parseInt(b.style.minWidth, 10)).toBeGreaterThanOrEqual(44);
+      expect(parseInt(b.style.minHeight, 10)).toBeGreaterThanOrEqual(44);
+    }
+    // View group first three; session last two
+    expect(view.querySelectorAll('button').length).toBe(3);
+    expect(session.querySelectorAll('button').length).toBe(2);
+    hud.dispose();
+  });
 });
