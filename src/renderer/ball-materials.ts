@@ -27,6 +27,11 @@ const ATLAS_TILE  = 256;
 
 let _atlas: THREE.CanvasTexture | null = null;
 
+/** Phase 1 #7a probe — digit atlas anisotropy (may be null before first ball mat). */
+export function getBallDigitAtlas(): THREE.CanvasTexture | null {
+  return _atlas;
+}
+
 function getAtlas(): THREE.CanvasTexture {
   if (_atlas) return _atlas;
   const c = document.createElement('canvas');

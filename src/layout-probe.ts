@@ -100,14 +100,49 @@ async function main(): Promise<void> {
       'Screenshot check: does the RED box hug the green felt edge?',
     ];
 
-    metricsEl.textContent = formatDomMetrics({
-      app,
-      status: sceneStatus,
-      canvas,
-      renderer: scene.renderer,
-      sizeScratch,
-      feltLine,
-    });
+    const aniso = scene.getAnisotropyReport();
+    const anisoLines = [
+      '── #7a A-1′ anisotropy ──',
+      `getMaxAnisotropy()  ${aniso.maxAnisotropy}  cap=${aniso.cap}  applied=${aniso.applied}`,
+      ...aniso.table.map(
+        (t) =>
+          `table ${t.slot.padEnd(22)} set=${t.anisotropySet}  effective=${t.anisotropyEffective}`,
+      ),
+      ...(aniso.table.length === 0 ? ['table (no maps found)'] : []),
+      ...aniso.ball.map(
+        (t) =>
+          `ball  ${t.slot.padEnd(22)} set=${t.anisotropySet}  effective=${t.anisotropyEffective}`,
+      ),
+      ...(aniso.ball.length === 0
+        ? ['ball  (no maps — cue may be untextured; solids use atlas)']
+        : []),
+      'Note: top-view null delta is predicted; orbit benefits vertical faces.',
+    ];
+
+    metricsEl.textContent =
+      formatDomMetrics({
+        app,
+        status: sceneStatus,
+        canvas,
+        renderer: scene.renderer,
+        sizeScratch,
+        feltLine,
+      }) +
+      '\n\n' +
+      anisoLines.join('\n');
+  };
+
+  // Playwright / CEO A-B hooks
+  (window as unknown as { __layoutProbe: unknown }).__layoutProbe = {
+    scene,
+    getAnisotropyReport: () => scene.getAnisotropyReport(),
+    setOrthoTop: (v: boolean) => scene.setOrthoTop(v),
+    setOrbitPose: (pos: [number, number, number], lookAt: [number, number, number] = [0, 0, 0]) => {
+      scene.setOrthoTop(false);
+      scene.camera.position.set(...pos);
+      scene.camera.lookAt(...lookAt);
+      scene.camera.updateProjectionMatrix();
+    },
   };
 
   const loop = (): void => {

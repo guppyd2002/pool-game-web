@@ -10,6 +10,11 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createPocketMeshes, animateBallSink } from './pocket-visuals';
 import { createColliderDebug } from './debug-colliders';
 import { makeBallMaterial } from './ball-materials';
+import {
+  applyTableAnisotropy,
+  buildAnisotropyReport,
+  type AnisotropyReport,
+} from './table-anisotropy';
 import { getPlayView } from './camera-tween';
 import { BALL_RADIUS_M } from '../physics/constants';
 
@@ -68,6 +73,11 @@ export interface SceneAPI {
   setOrthoTop(active: boolean): void;
   /** Toggle physics collision boundary overlay (cyan lines, default off). */
   toggleColliders?(): void;
+  /**
+   * Phase 1 #7a A-1′ — GPU max anisotropy + table/ball texture effective values.
+   * Probe page must print this (CTO / 鼬 gate).
+   */
+  getAnisotropyReport(): AnisotropyReport;
   render(): void;
   dispose(): void;
 }
@@ -145,13 +155,18 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
   const gltf = await new GLTFLoader().loadAsync('/PoolTable.glb');
   const model = gltf.scene;
 
-  // Single PBR material (commercial_pool_table_mat) — preserve GLTFLoader output as-is.
+  // Single PBR material (commercial_pool_table_mat) — preserve GLTF maps as-is,
+  // then Phase 1 #7a A-1′ anisotropy (unless ?tableAniso=0 for A/B baseline).
   model.traverse(obj => {
     if (obj instanceof THREE.Mesh) {
       obj.castShadow = true;
       obj.receiveShadow = true;
     }
   });
+  const _tableAnisoOff =
+    typeof location !== 'undefined' &&
+    new URLSearchParams(location.search).get('tableAniso') === '0';
+  applyTableAnisotropy(renderer, model, !_tableAnisoOff);
 
   const rawBox = new THREE.Box3().setFromObject(model);
   // ⚠️ INTENTIONAL DEVIATION from Unity source — CEO decision 3fa92431 "physics follows model".
@@ -303,6 +318,9 @@ export async function createScene(container: HTMLElement): Promise<SceneAPI> {
     },
     toggleColliders(): void {
       colliderDebug.visible = !colliderDebug.visible;
+    },
+    getAnisotropyReport(): AnisotropyReport {
+      return buildAnisotropyReport(renderer, tableGroup, balls, !_tableAnisoOff);
     },
     render() {
       controls.update();
