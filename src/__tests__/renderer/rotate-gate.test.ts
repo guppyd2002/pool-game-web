@@ -158,7 +158,8 @@ describe('single-source / anti-drift contracts', () => {
     expect(html).toMatch(
       /html:not\(\.rotate-gate-resolved\)\s+#rotate-prompt/,
     );
-    expect(html).toContain('max-width: 1366px');
+    // Link CSS FOUC belt width to the TS constant (not a free-floating literal).
+    expect(html).toContain(`max-width: ${ROTATE_GATE_DEFAULT_MAX_WIDTH}px`);
     expect(html).toContain('(pointer: coarse)');
     expect(html).toContain('(hover: none)');
     // Forbid the old dual-truth media (900, no pointer)
