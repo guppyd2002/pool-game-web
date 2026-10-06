@@ -63,16 +63,22 @@ export function createFineAdjustBarUI(
 
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Outer wrapper — bottom centre, horizontally adaptive.
+  // Outer wrapper — Phase 1 #4: sit in bottom gutter (runtime --felt-*/--gutter-*).
+  // No hardcoded 12/80/281 gutter pixels; scale down if gutter is short.
   const overlay = document.createElement('div');
+  overlay.className = 'fine-adjust-overlay';
   overlay.style.cssText = [
     'position:absolute',
-    'bottom:12px',
-    'left:50%', 'transform:translateX(-50%)',
-    'width:min(780px, calc(100vw - 80px))',
+    'left:calc(var(--felt-left, 0px) + var(--felt-width, 100%) / 2)',
+    'transform:translateX(-50%)',
+    'top:calc(var(--felt-top, 0px) + var(--felt-height, 100%) + 2px)',
+    'width:min(780px, calc(var(--felt-width, 100%) - 16px))',
+    'max-height:max(24px, calc(var(--gutter-bottom, 40px) - 4px))',
     'z-index:100',
-    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:4px',
+    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:2px',
     'user-select:none',
+    'box-sizing:border-box',
+    'overflow:hidden',
   ].join(';');
 
   const label = document.createElement('div');

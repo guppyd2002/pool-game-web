@@ -39,21 +39,23 @@ export function createPowerSliderUI(
 ): PowerSliderUI {
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Outer wrapper — right edge chrome, NOT over felt (SP-Harden-3).
-  // Larger right inset + lower idle opacity so the bar doesn't cover pocket balls.
+  // Outer wrapper — Phase 1 #4: right gutter via runtime --gutter-right / --felt-*.
   // CSS class used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
   overlay.className = 'power-slider-overlay';
   overlay.setAttribute('aria-label', 'Shot power');
   overlay.style.cssText = [
     'position:absolute',
-    // Push fully into the chrome strip; safe-area for landscape notch.
-    'right:max(4px, env(safe-area-inset-right, 0px))',
+    // Anchor just outside felt right edge; clamp into gutter (+ safe-area).
+    'left:calc(var(--felt-left, 0px) + var(--felt-width, 100%) + 4px)',
+    'right:auto',
     'top:50%', 'transform:translateY(-50%)',
+    'max-width:calc(var(--gutter-right, 80px) - 8px)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:4px',
     'user-select:none',
-    'opacity:0.28', // idle: dim so table balls stay readable (brightens on touch)
+    // Idle dim kept until #5 (after gutter settle); still in gutter so less critical.
+    'opacity:0.28',
     'transition:opacity 0.15s ease-out',
   ].join(';');
 

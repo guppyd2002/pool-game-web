@@ -40,14 +40,16 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
 
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Overlay on table left edge — semi-transparent, opacity transitions on interaction.
+  // Phase 1 #4: left gutter via runtime --gutter-left (no hardcoded 12/281 px).
   // CSS class spin-disc-overlay used by left-hand-mode override in index.html.
   const overlay = document.createElement('div');
   overlay.className = 'spin-disc-overlay';
   overlay.style.cssText = [
     'position:absolute',
-    'left:max(12px, calc(12px + env(safe-area-inset-left, 0px)))',
+    'left:max(4px, env(safe-area-inset-left, 0px))',
+    'right:auto',
     'top:50%', 'transform:translateY(-50%)',
+    'max-width:calc(var(--gutter-left, 80px) - 8px)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:8px',
     'user-select:none',
