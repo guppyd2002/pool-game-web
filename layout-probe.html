@@ -46,6 +46,33 @@
   <body>
     <div id="app"></div>
     <pre id="metrics">Loading layout probe…</pre>
+    <!-- CTO C2: first paint before module/GLB — viewport + #app only -->
+    <script>
+      (function () {
+        try {
+          var el = document.getElementById('metrics');
+          var app = document.getElementById('app');
+          if (!el || !app) return;
+          var vv = window.visualViewport;
+          var r = app.getBoundingClientRect();
+          el.textContent = [
+            '0-A LAYOUT PROBE  (inline first-paint)',
+            'status: waiting for module + scene/GLB…',
+            '',
+            '── viewport ──',
+            'screen           ' + screen.width + ' × ' + screen.height,
+            'inner            ' + window.innerWidth + ' × ' + window.innerHeight,
+            'visualViewport   ' + (vv ? vv.width.toFixed(2) + ' × ' + vv.height.toFixed(2) : '—'),
+            'devicePixelRatio ' + window.devicePixelRatio,
+            '',
+            '── box ──',
+            '#app rect        ' + r.width.toFixed(2) + ' × ' + r.height.toFixed(2),
+            '',
+            'C4 / canvas      (pending — module loading)',
+          ].join('\n');
+        } catch (_) { /* keep placeholder */ }
+      })();
+    </script>
     <script type="module" src="/src/layout-probe.ts"></script>
   </body>
 </html>
