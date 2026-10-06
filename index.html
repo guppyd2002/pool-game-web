@@ -40,7 +40,8 @@
         }
       }
 
-      /* Rotate-device prompt — shown only in portrait on mobile */
+      /* B-11 / #046: rotate prompt is JS-owned (rotate-gate.ts).
+         CSS only reacts to html.rotate-gate-active — no orientation/max-width media here. */
       #rotate-prompt {
         display: none;
         position: fixed; inset: 0; z-index: 9999;
@@ -56,9 +57,7 @@
         box-sizing: border-box;
       }
       #rotate-prompt .rotate-icon { font-size: 64px; }
-      @media screen and (orientation: portrait) and (max-width: 900px) {
-        #rotate-prompt { display: flex; }
-      }
+      html.rotate-gate-active #rotate-prompt { display: flex; }
 
       /* SET-008: game-over / banners stay inside safe area on notched devices */
       #game-over-ui, #reason-banner, #turn-prompt, #settings-panel {
