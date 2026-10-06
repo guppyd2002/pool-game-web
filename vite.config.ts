@@ -7,8 +7,9 @@ export default defineConfig({
     rollupOptions: {
       // Multi-page: main game + standalone inspector tool
       input: {
-        main:      path.resolve(__dirname, 'index.html'),
-        inspector: path.resolve(__dirname, 'inspector.html'),
+        main:         path.resolve(__dirname, 'index.html'),
+        inspector:    path.resolve(__dirname, 'inspector.html'),
+        layoutProbe:  path.resolve(__dirname, 'layout-probe.html'),
       },
     },
   },
