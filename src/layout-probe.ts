@@ -2,10 +2,14 @@
  * Phase 1 / 0-A layout probe — independent page (layout-probe.html).
  * Shows viewport/box/buffer metrics + C4 felt red box from computeFeltScreenRect.
  * CEO screenshots this page; no console required.
+ *
+ * CTO C2 (PR #5 gate): metrics table MUST paint before PoolTable.glb finishes.
+ * C1/C2/C3 are DOM/viewport-only; C4 red box attaches after createScene.
  */
 import * as THREE from 'three';
-import { createScene } from './renderer/scene';
+import { createScene, type SceneAPI } from './renderer/scene';
 import { computeFeltScreenRect } from './layout/felt-geometry';
+import { formatDomMetrics, fmt } from './layout/probe-metrics';
 import { installSafeAreaCssVars } from './renderer/safe-area';
 
 function $(id: string): HTMLElement {
@@ -14,22 +18,43 @@ function $(id: string): HTMLElement {
   return el;
 }
 
-function fmt(n: number | null | undefined, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return '—';
-  return Number(n).toFixed(digits);
-}
-
-function ratio(a: number, b: number): string {
-  if (!b) return '—';
-  return (a / b).toFixed(5);
-}
-
 async function main(): Promise<void> {
   installSafeAreaCssVars();
   const app = $('app');
   const metricsEl = $('metrics');
+  app.style.position = 'relative';
 
-  const scene = await createScene(app);
+  // ── Immediate paint (before any await / GLB) — CTO C2 ─────────────────
+  let sceneStatus = 'scene/GLB: loading…';
+  const paintDomOnly = (): void => {
+    metricsEl.textContent = formatDomMetrics({ app, status: sceneStatus });
+  };
+  paintDomOnly();
+
+  let preRaf = 0;
+  const preLoop = (): void => {
+    paintDomOnly();
+    preRaf = requestAnimationFrame(preLoop);
+  };
+  preRaf = requestAnimationFrame(preLoop);
+
+  window.addEventListener('resize', paintDomOnly);
+  const vv = window.visualViewport;
+  vv?.addEventListener('resize', paintDomOnly);
+  vv?.addEventListener('scroll', paintDomOnly);
+
+  let scene: SceneAPI;
+  try {
+    scene = await createScene(app);
+  } catch (err) {
+    cancelAnimationFrame(preRaf);
+    sceneStatus = `scene/GLB: FAILED — ${String(err)}`;
+    paintDomOnly();
+    throw err;
+  }
+
+  cancelAnimationFrame(preRaf);
+  sceneStatus = 'scene/GLB: ready (ortho top)';
   scene.setOrthoTop(true);
 
   const overlay = document.createElement('div');
@@ -38,7 +63,6 @@ async function main(): Promise<void> {
   label.id = 'felt-label';
   label.textContent = 'C4 felt (formula)';
   overlay.appendChild(label);
-  app.style.position = 'relative';
   app.appendChild(overlay);
 
   const canvas = scene.renderer.domElement;
@@ -47,7 +71,6 @@ async function main(): Promise<void> {
   const paint = (): void => {
     scene.render();
 
-    const vv = window.visualViewport;
     const appRect = app.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
     const felt = computeFeltScreenRect(canvasRect.width, canvasRect.height);
@@ -69,86 +92,22 @@ async function main(): Promise<void> {
     root.setProperty('--gutter-top', `${felt.gutterTop}px`);
     root.setProperty('--gutter-bottom', `${felt.gutterBottom}px`);
 
-    const dpr = window.devicePixelRatio;
-    const c1buf = canvas.width / Math.max(1, canvas.height);
-    const c1css = canvasRect.width / Math.max(1, canvasRect.height);
-    const c1ok = Math.abs(c1buf - c1css) < 0.01;
-    const c2app = appRect.height;
-    const c2vv = vv?.height ?? null;
-    const c2delta = c2vv != null ? c2app - c2vv : null;
-    const c3expect = Math.round(canvasRect.width * dpr);
-    const c3ok = Math.abs(canvas.width - c3expect) <= 1;
-
-    scene.renderer.getSize(sizeScratch);
-    const sa = getComputedStyle(document.documentElement);
-
-    const lines: string[] = [];
-    lines.push(`0-A LAYOUT PROBE  ${new Date().toISOString()}`);
-    lines.push(`page: ${location.href}`);
-    lines.push(`UA: ${navigator.userAgent}`);
-    lines.push(
-      `standalone: ${window.matchMedia('(display-mode: standalone)').matches}  orientation: ${(screen.orientation && screen.orientation.type) || '—'}`,
-    );
-    lines.push('');
-    lines.push('── viewport ──');
-    lines.push(`screen           ${screen.width} × ${screen.height}`);
-    lines.push(`inner            ${window.innerWidth} × ${window.innerHeight}`);
-    lines.push(
-      `visualViewport   ${fmt(vv?.width)} × ${fmt(vv?.height)}  offset(${fmt(vv?.offsetLeft)},${fmt(vv?.offsetTop)}) scale=${fmt(vv?.scale, 3)}`,
-    );
-    lines.push(
-      `docElement       ${document.documentElement.clientWidth} × ${document.documentElement.clientHeight}`,
-    );
-    lines.push(`devicePixelRatio ${dpr}`);
-    lines.push('');
-    lines.push('── box ──');
-    lines.push(
-      `#app rect        ${fmt(appRect.width)} × ${fmt(appRect.height)} @ (${fmt(appRect.left)},${fmt(appRect.top)})`,
-    );
-    lines.push(
-      `canvas rect      ${fmt(canvasRect.width)} × ${fmt(canvasRect.height)} @ (${fmt(canvasRect.left)},${fmt(canvasRect.top)})`,
-    );
-    lines.push(
-      `canvas computed  ${getComputedStyle(canvas).width} × ${getComputedStyle(canvas).height}`,
-    );
-    lines.push('');
-    lines.push('── buffer ──');
-    lines.push(
-      `canvas buffer    ${canvas.width} × ${canvas.height}  ratio=${ratio(canvas.width, canvas.height)}`,
-    );
-    lines.push(`renderer.getPixelRatio() ${scene.renderer.getPixelRatio()}`);
-    lines.push(`renderer.getSize ${fmt(sizeScratch.x)} × ${fmt(sizeScratch.y)}`);
-    lines.push('');
-    lines.push('── safe-area CSS vars ──');
-    lines.push(
-      `--sa-* T/B/L/R   ${sa.getPropertyValue('--sa-top').trim() || '0'} / ${sa.getPropertyValue('--sa-bottom').trim() || '0'} / ${sa.getPropertyValue('--sa-left').trim() || '0'} / ${sa.getPropertyValue('--sa-right').trim() || '0'}`,
-    );
-    lines.push('');
-    lines.push('── C4 felt (formula) — RED BOX ──');
-    lines.push(
+    const feltLine = [
+      '── C4 felt (formula) — RED BOX ──',
       `felt rect        ${fmt(felt.width)} × ${fmt(felt.height)} @ (${fmt(felt.left)},${fmt(felt.top)})`,
-    );
-    lines.push(
       `felt frac        W=${fmt(felt.widthFrac * 100, 1)}%  H=${fmt(felt.heightFrac * 100, 1)}%`,
-    );
-    lines.push(
       `gutters L/R/T/B  ${fmt(felt.gutterLeft)} / ${fmt(felt.gutterRight)} / ${fmt(felt.gutterTop)} / ${fmt(felt.gutterBottom)}`,
-    );
-    lines.push('Screenshot check: does the RED box hug the green felt edge?');
-    lines.push('');
-    lines.push('── decisive compares ──');
-    lines.push(
-      `C1 buffer/css aspect  ${fmt(c1buf, 5)} vs ${fmt(c1css, 5)}  → ${c1ok ? 'MATCH (not H2)' : 'MISMATCH → H2?'}`,
-    );
-    lines.push(
-      `C2 #app.h vs vv.h     ${fmt(c2app)} vs ${fmt(c2vv)}  Δ=${fmt(c2delta)}  → ${c2delta != null && Math.abs(c2delta) > 2 ? 'H1?' : 'ok/unknown'}`,
-    );
-    lines.push(
-      `C3 buffer vs rect×dpr ${canvas.width} vs ~${c3expect}  → ${c3ok ? 'MATCH' : 'MISMATCH'}`,
-    );
-    lines.push('C4 felt formula box   see RED overlay (visual)');
+      'Screenshot check: does the RED box hug the green felt edge?',
+    ];
 
-    metricsEl.textContent = lines.join('\n');
+    metricsEl.textContent = formatDomMetrics({
+      app,
+      status: sceneStatus,
+      canvas,
+      renderer: scene.renderer,
+      sizeScratch,
+      feltLine,
+    });
   };
 
   const loop = (): void => {
@@ -158,13 +117,17 @@ async function main(): Promise<void> {
   loop();
 
   window.addEventListener('resize', paint);
-  const vv = window.visualViewport;
   vv?.addEventListener('resize', paint);
   vv?.addEventListener('scroll', paint);
 }
 
 main().catch((err) => {
   const el = document.getElementById('metrics');
-  if (el) el.textContent = `Layout probe failed:\n${String(err)}`;
+  if (el) {
+    const prev =
+      el.textContent && !el.textContent.startsWith('Loading') ? el.textContent : '';
+    el.textContent =
+      (prev ? prev + '\n\n' : '') + `Layout probe scene failed:\n${String(err)}`;
+  }
   console.error(err);
 });
