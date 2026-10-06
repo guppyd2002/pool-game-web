@@ -1,0 +1,86 @@
+{
+  "task": "Phase 1 #7a A-1′",
+  "L_formula": "L = 0.2126R + 0.7152G + 0.0722B (canvas sRGB 0–255)",
+  "fps_iphone_dpr3": "未測",
+  "note_top_view": "Null visual delta on top is predicted — not a failure.",
+  "before": {
+    "anisotropy": {
+      "maxAnisotropy": 16,
+      "cap": 8,
+      "applied": false,
+      "table": [
+        {
+          "slot": "table.map",
+          "anisotropySet": 1,
+          "anisotropyEffective": 1
+        },
+        {
+          "slot": "table.normalMap",
+          "anisotropySet": 1,
+          "anisotropyEffective": 1
+        },
+        {
+          "slot": "table.metalnessMap",
+          "anisotropySet": 1,
+          "anisotropyEffective": 1
+        }
+      ],
+      "ball": [
+        {
+          "slot": "ball.digitAtlas(uAtlas)",
+          "anisotropySet": 8,
+          "anisotropyEffective": 8
+        }
+      ]
+    },
+    "felt_L": 110.96799893749709,
+    "ball_L": 110.96420487500072,
+    "shots": [
+      "/home/guppyd/pool-game-web/tests/smoke/screenshots/phase1-7a/before-top.png",
+      "/home/guppyd/pool-game-web/tests/smoke/screenshots/phase1-7a/before-orbit.png"
+    ]
+  },
+  "after": {
+    "anisotropy": {
+      "maxAnisotropy": 16,
+      "cap": 8,
+      "applied": true,
+      "table": [
+        {
+          "slot": "table.map",
+          "anisotropySet": 8,
+          "anisotropyEffective": 8
+        },
+        {
+          "slot": "table.normalMap",
+          "anisotropySet": 8,
+          "anisotropyEffective": 8
+        },
+        {
+          "slot": "table.metalnessMap",
+          "anisotropySet": 8,
+          "anisotropyEffective": 8
+        }
+      ],
+      "ball": [
+        {
+          "slot": "ball.digitAtlas(uAtlas)",
+          "anisotropySet": 8,
+          "anisotropyEffective": 8
+        }
+      ]
+    },
+    "felt_L": 110.96798621874704,
+    "ball_L": 110.96407200000071,
+    "shots": [
+      "/home/guppyd/pool-game-web/tests/smoke/screenshots/phase1-7a/after-top.png",
+      "/home/guppyd/pool-game-web/tests/smoke/screenshots/phase1-7a/after-orbit.png"
+    ]
+  },
+  "delta": {
+    "felt_dL_pct": 0.000011461637737253501,
+    "ball_dL_pct": 0.00011974582267792104,
+    "felt_pass": true,
+    "ball_pass": true
+  }
+}
