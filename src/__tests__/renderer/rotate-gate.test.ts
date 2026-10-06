@@ -141,20 +141,27 @@ describe('readRotateGateFlags', () => {
     expect(f.maxWidth).toBe(ROTATE_GATE_DEFAULT_MAX_WIDTH);
   });
 
-  it('sunset helper', () => {
+  it('sunset helper + literal width pins (non-self-referential)', () => {
     expect(flagsExpired(new Date('2026-11-04'))).toBe(false);
     expect(flagsExpired(new Date('2026-11-05'))).toBe(true);
     expect(ROTATE_GATE_FLAG_SUNSET_ISO).toBe('2026-11-05');
     expect(ROTATE_GATE_LEGACY_MAX_WIDTH).toBe(900);
+    expect(ROTATE_GATE_DEFAULT_MAX_WIDTH).toBe(1366);
   });
 });
 
 describe('single-source / anti-drift contracts', () => {
-  it('index.html must not drive #rotate-prompt via orientation/max-width media', () => {
+  it('index.html: FOUC belt only under :not(.rotate-gate-resolved); steady = JS class', () => {
     const html = fs.readFileSync(path.join(REPO_ROOT, 'index.html'), 'utf8');
-    // Allow class-based rule only
     expect(html).toMatch(/html\.rotate-gate-active\s+#rotate-prompt/);
-    // Forbid the old dual-truth media (CSS/TS drift root cause)
+    // FOUC insurance (must match JS formula; scoped so JS handoff ends dual-truth window)
+    expect(html).toMatch(
+      /html:not\(\.rotate-gate-resolved\)\s+#rotate-prompt/,
+    );
+    expect(html).toContain('max-width: 1366px');
+    expect(html).toContain('(pointer: coarse)');
+    expect(html).toContain('(hover: none)');
+    // Forbid the old dual-truth media (900, no pointer)
     expect(html).not.toContain(
       '@media screen and (orientation: portrait) and (max-width: 900px)',
     );

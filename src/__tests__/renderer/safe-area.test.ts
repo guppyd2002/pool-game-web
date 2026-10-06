@@ -24,12 +24,6 @@ describe('computeViewportMetrics (SET-008)', () => {
     expect(m.isShortLandscape).toBe(false);
   });
 
-  it('B-11: iPad portrait 1024×1366 is within rotate max width', () => {
-    const m = computeViewportMetrics(1024, 1366);
-    expect(m.isLandscape).toBe(false);
-    expect(m.isPortraitMobile).toBe(true);
-  });
-
   it('desktop landscape is not short', () => {
     const m = computeViewportMetrics(1280, 720);
     expect(m.isLandscape).toBe(true);

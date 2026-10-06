@@ -40,8 +40,10 @@
         }
       }
 
-      /* B-11 / #046: rotate prompt is JS-owned (rotate-gate.ts).
-         CSS only reacts to html.rotate-gate-active — no orientation/max-width media here. */
+      /* B-11 / #046: steady-state is JS-owned (html.rotate-gate-active via rotate-gate.ts).
+         FOUC belt: same formula in CSS until html.rotate-gate-resolved (set on first JS apply).
+         Two @media rules = OR of (pointer:coarse) / (hover:none); never any-pointer.
+         Measured FOUC without belt ≈ 2.4s @ Fast3G+CPU4x on db4e89d — belt required. */
       #rotate-prompt {
         display: none;
         position: fixed; inset: 0; z-index: 9999;
@@ -57,6 +59,12 @@
         box-sizing: border-box;
       }
       #rotate-prompt .rotate-icon { font-size: 64px; }
+      @media screen and (orientation: portrait) and (max-width: 1366px) and (pointer: coarse) {
+        html:not(.rotate-gate-resolved) #rotate-prompt { display: flex; }
+      }
+      @media screen and (orientation: portrait) and (max-width: 1366px) and (hover: none) {
+        html:not(.rotate-gate-resolved) #rotate-prompt { display: flex; }
+      }
       html.rotate-gate-active #rotate-prompt { display: flex; }
 
       /* SET-008: game-over / banners stay inside safe area on notched devices */
@@ -71,8 +79,8 @@
   <body>
     <div id="rotate-prompt">
       <div class="rotate-icon">📱↻</div>
-      <div style="font-size:18px;font-weight:bold;">Please rotate your device</div>
-      <div style="font-size:14px;opacity:0.6;">Hustle Pool plays in landscape mode</div>
+      <div style="font-size:18px;font-weight:bold;">Please use a landscape window or device</div>
+      <div style="font-size:14px;opacity:0.6;">Hustle Pool plays in landscape — rotate the device or widen the window</div>
     </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>

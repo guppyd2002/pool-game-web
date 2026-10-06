@@ -23,6 +23,8 @@ export const ROTATE_GATE_LEGACY_MAX_WIDTH = 900;
 export const ROTATE_GATE_FLAG_SUNSET_ISO = '2026-11-05';
 
 export const ROTATE_GATE_ACTIVE_CLASS = 'rotate-gate-active';
+/** Set on first JS apply — disables CSS FOUC belt (`html:not(.rotate-gate-resolved)`). */
+export const ROTATE_GATE_RESOLVED_CLASS = 'rotate-gate-resolved';
 
 export interface PointerMedia {
   pointerCoarse: boolean;
@@ -64,7 +66,8 @@ export function computeShouldShowRotatePrompt(input: RotateGateInput): boolean {
 }
 
 export function flagsExpired(now: Date = new Date()): boolean {
-  // Compare calendar date UTC YYYY-MM-DD
+  // Compare calendar date as UTC YYYY-MM-DD (toISOString is always UTC).
+  // Taiwan 2026-11-05 08:00 CST == 2026-11-05 00:00 UTC — sunset trips at that UTC midnight.
   const today = now.toISOString().slice(0, 10);
   return today >= ROTATE_GATE_FLAG_SUNSET_ISO;
 }
@@ -146,6 +149,8 @@ export function installRotateGate(
       maxWidth: flags.maxWidth,
       legacy: flags.legacy,
     });
+    // Hand off from CSS FOUC belt → JS steady-state (must set resolved before/with active).
+    root.classList.add(ROTATE_GATE_RESOLVED_CLASS);
     root.classList.toggle(ROTATE_GATE_ACTIVE_CLASS, show);
   };
 

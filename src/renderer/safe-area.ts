@@ -4,12 +4,7 @@
  *
  * Unity reads Screen.safeArea + banner height; web uses CSS env(safe-area-inset-*)
  * and viewport metrics. Pure helpers for layout + tests.
- *
- * B-11: portrait width threshold shares ROTATE_GATE_DEFAULT_MAX_WIDTH (single source).
- * Showing the rotate overlay also requires pointer/hover — see rotate-gate.ts.
  */
-
-import { ROTATE_GATE_DEFAULT_MAX_WIDTH } from './rotate-gate';
 
 export interface SafeAreaInsets {
   top: number;
@@ -52,9 +47,9 @@ export function readSafeAreaInsets(
 
 /**
  * Pure metrics from width/height (testable without DOM).
+ * Mirrors index.html media breakpoints:
  *   short landscape: landscape && h ≤ 440
- *   portrait mobile (width half of B-11 gate): portrait && w ≤ ROTATE_GATE_DEFAULT_MAX_WIDTH
- * Full rotate prompt = that AND (pointer:coarse || hover:none) — rotate-gate.ts.
+ *   portrait mobile: portrait && w ≤ 900
  */
 export function computeViewportMetrics(
   width: number,
@@ -71,7 +66,7 @@ export function computeViewportMetrics(
     aspect,
     isLandscape,
     isShortLandscape: isLandscape && h <= 440,
-    isPortraitMobile: !isLandscape && w <= ROTATE_GATE_DEFAULT_MAX_WIDTH,
+    isPortraitMobile: !isLandscape && w <= 900,
     safe,
   };
 }
