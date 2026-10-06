@@ -40,9 +40,11 @@ export function createHudBar(container: HTMLElement, opts: {
 }): HudBar {
   const bar = document.createElement('div');
   bar.id = 'hud-bar';
+  // Phase 1 #4: stay inside top gutter (--gutter-top); no hardcoded gutter px.
   bar.style.cssText = [
     'position:absolute', 'top:0', 'left:0', 'right:0',
     'height:36px',
+    'max-height:max(28px, var(--gutter-top, 36px))',
     'padding-left:max(8px, env(safe-area-inset-left, 0px))',
     'padding-right:max(8px, env(safe-area-inset-right, 0px))',
     'padding-top:env(safe-area-inset-top, 0px)',

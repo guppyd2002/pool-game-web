@@ -90,6 +90,7 @@ import {
 } from './renderer/settings-panel';
 import { installSafeAreaCssVars } from './renderer/safe-area';
 import { createPwaInstallTip } from './renderer/pwa-install-tip';
+import { installFeltCssVars } from './layout/felt-css-vars';
 import * as THREE from 'three';
 
 // ─── Initialize scene + physics ───────────────────────────────────────────────
@@ -97,9 +98,13 @@ import * as THREE from 'three';
 const container = document.getElementById('app')!;
 // SET-008: expose safe-area insets as CSS vars for layout chrome
 installSafeAreaCssVars();
+// Phase 1 #4: runtime --felt-* / --gutter-* from computeFeltScreenRect (no hardcoded px).
+const feltCss = installFeltCssVars(container);
 // Phase 1 / 0-G: one-shot Add-to-Home-Screen tip (skipped in standalone).
 createPwaInstallTip(document.body);
 const scene = await createScene(container);
+// Recompute after canvas mounts (size may change).
+feltCss.update();
 const space = createPoolTable();
 const physics = createBallPoolPhysics(space, scene);
 

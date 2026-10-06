@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { createScene, type SceneAPI } from './renderer/scene';
 import { computeFeltScreenRect } from './layout/felt-geometry';
+import { applyFeltCssVars } from './layout/felt-css-vars';
 import { formatDomMetrics, fmt } from './layout/probe-metrics';
 import { installSafeAreaCssVars } from './renderer/safe-area';
 
@@ -80,25 +81,23 @@ async function main(): Promise<void> {
     overlay.style.width = `${felt.width}px`;
     overlay.style.height = `${felt.height}px`;
 
-    const root = document.documentElement.style;
-    root.setProperty('--felt-left', `${felt.left}px`);
-    root.setProperty('--felt-top', `${felt.top}px`);
-    root.setProperty('--felt-right', `${felt.gutterRight}px`);
-    root.setProperty('--felt-bottom', `${felt.gutterBottom}px`);
-    root.setProperty('--felt-width', `${felt.width}px`);
-    root.setProperty('--felt-height', `${felt.height}px`);
-    root.setProperty('--gutter-left', `${felt.gutterLeft}px`);
-    root.setProperty('--gutter-right', `${felt.gutterRight}px`);
-    root.setProperty('--gutter-top', `${felt.gutterTop}px`);
-    root.setProperty('--gutter-bottom', `${felt.gutterBottom}px`);
+    const { invariant } = applyFeltCssVars(app, canvasRect.width, canvasRect.height);
 
     const feltLine = [
       '── C4 felt (formula) — RED BOX ──',
       `felt rect        ${fmt(felt.width)} × ${fmt(felt.height)} @ (${fmt(felt.left)},${fmt(felt.top)})`,
       `felt frac        W=${fmt(felt.widthFrac * 100, 1)}%  H=${fmt(felt.heightFrac * 100, 1)}%`,
       `gutters L/R/T/B  ${fmt(felt.gutterLeft)} / ${fmt(felt.gutterRight)} / ${fmt(felt.gutterTop)} / ${fmt(felt.gutterBottom)}`,
+      `C4 invariant     ${invariant.ok ? 'OK' : 'RED — ' + invariant.errors.join('; ')}`,
       'Screenshot check: does the RED box hug the green felt edge?',
     ];
+    if (invariant.red) {
+      metricsEl.style.borderColor = '#f44';
+      metricsEl.style.color = '#ffb0b0';
+    } else {
+      metricsEl.style.borderColor = '#3a3';
+      metricsEl.style.color = '#e8ffe8';
+    }
 
     const aniso = scene.getAnisotropyReport();
     const anisoLines = [
