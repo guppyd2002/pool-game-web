@@ -17,33 +17,22 @@ import {
 } from './table-anisotropy';
 import { getPlayView } from './camera-tween';
 import { BALL_RADIUS_M } from '../physics/constants';
+import {
+  TABLE_W_M,
+  TABLE_H_M,
+  orthoFrustum,
+} from '../layout/ortho-constants';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Table dimensions (meters, standard 8-ball / 9ft cushion nose-to-nose)
-const TABLE_W = 2.54;
-const TABLE_H = 1.27;
+// Nose-to-nose meters — single source: layout/ortho-constants.ts (C-1 with felt-geometry).
+const TABLE_W = TABLE_W_M;
+const TABLE_H = TABLE_H_M;
 /** SET-006: render radius shares physics BALL_RADIUS (0.0285 m), not a parallel constant. */
 const BALL_RADIUS = BALL_RADIUS_M;
 
 // Ball colors moved to ball-materials.ts (WPA regulation set, CEO-approved).
-
-// Ortho top-view frustum: table half-extents + margin so pocket mouths aren't
-// clipped by the viewport edge (SP-Harden-3 mobile landscape). Was 15% — too
-// tight on short landscape viewports when HUD strip also consumes height.
-// Camera sits at (0,5,0) looking straight down, up=(0,0,-1) to avoid gimbal lock.
-const ORTHO_MARGIN = 1.28; // 28% breathing room around cushion nose-to-nose
-const ORTHO_HALF_X = (TABLE_W / 2) * ORTHO_MARGIN;
-const ORTHO_HALF_Z = (TABLE_H / 2) * ORTHO_MARGIN;
-
-/** Compute OrthographicCamera frustum that fits the whole table for the given viewport aspect. */
-function orthoFrustum(aspect: number): [number, number, number, number] {
-  const tableAspect = ORTHO_HALF_X / ORTHO_HALF_Z;
-  // Fit whichever dimension is the constraint; expand the other to fill screen.
-  const hw = aspect >= tableAspect ? ORTHO_HALF_Z * aspect : ORTHO_HALF_X;
-  const hh = aspect >= tableAspect ? ORTHO_HALF_Z          : ORTHO_HALF_X / aspect;
-  return [-hw, hw, hh, -hh]; // left, right, top, bottom
-}
+// Ortho frustum: orthoFrustum() from ortho-constants (ORTHO_MARGIN 1.1365).
 
 // ─── Scene API Interface ─────────────────────────────────────────────────────
 

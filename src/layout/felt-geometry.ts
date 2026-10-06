@@ -1,19 +1,24 @@
 /**
  * Phase 1 / 0-A — screen-space felt rectangle from ortho top-view formula.
  *
- * Mirrors `scene.ts` ORTHO_MARGIN + TABLE_W/H (nose-to-nose meters).
- * Used by layout-probe C4 red box and (later) --felt-* CSS vars.
- * Do NOT import physics constants here; do NOT change TABLE_W/H in physics.
- *
- * See phase1-layout-triage-design.md §0.1 / C4.
+ * Constants: single source `ortho-constants.ts` (shared with scene.ts).
+ * Used by layout-probe C4 red box and --felt-* / --gutter-* CSS vars.
+ * Do NOT import physics constants; do NOT change TABLE_W/H.
  */
 
-/** Must match scene.ts TABLE_W (cushion nose-to-nose). */
-export const LAYOUT_TABLE_W_M = 2.54;
-/** Must match scene.ts TABLE_H. */
-export const LAYOUT_TABLE_H_M = 1.27;
-/** Must match scene.ts ORTHO_MARGIN. */
-export const LAYOUT_ORTHO_MARGIN = 1.28;
+import {
+  ORTHO_MARGIN,
+  TABLE_H_M,
+  TABLE_W_M,
+  orthoFrustum,
+} from './ortho-constants';
+
+/** @deprecated Prefer TABLE_W_M from ortho-constants — re-export for older imports. */
+export const LAYOUT_TABLE_W_M = TABLE_W_M;
+/** @deprecated Prefer TABLE_H_M from ortho-constants. */
+export const LAYOUT_TABLE_H_M = TABLE_H_M;
+/** @deprecated Prefer ORTHO_MARGIN from ortho-constants. */
+export const LAYOUT_ORTHO_MARGIN = ORTHO_MARGIN;
 
 export interface FeltScreenRect {
   /** CSS px relative to the canvas/view box origin (top-left). */
@@ -40,16 +45,12 @@ export function computeFeltScreenRect(viewWidth: number, viewHeight: number): Fe
   const h = Math.max(1, viewHeight);
   const aspect = w / h;
 
-  const halfX = (LAYOUT_TABLE_W_M / 2) * LAYOUT_ORTHO_MARGIN;
-  const halfZ = (LAYOUT_TABLE_H_M / 2) * LAYOUT_ORTHO_MARGIN;
-  const tableAspect = halfX / halfZ; // 2.0 with current constants
+  const [, rightF, topF] = orthoFrustum(aspect);
+  const hw = rightF; // symmetric about 0
+  const hh = topF;
 
-  // Same branch as scene.ts orthoFrustum
-  const hw = aspect >= tableAspect ? halfZ * aspect : halfX;
-  const hh = aspect >= tableAspect ? halfZ : halfX / aspect;
-
-  const widthFrac = LAYOUT_TABLE_W_M / 2 / hw;
-  const heightFrac = LAYOUT_TABLE_H_M / 2 / hh;
+  const widthFrac = TABLE_W_M / 2 / hw;
+  const heightFrac = TABLE_H_M / 2 / hh;
 
   const width = w * widthFrac;
   const height = h * heightFrac;
