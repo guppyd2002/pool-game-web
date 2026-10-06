@@ -1,0 +1,494 @@
+[
+  {
+    "device": "iPhone-14-land",
+    "orientation": "landscape",
+    "configuredViewport": {
+      "w": 844,
+      "h": 390
+    },
+    "configuredDpr": 3,
+    "configuredUserAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "method": "NON-REAL-DEVICE Playwright viewport; DOM=getBoundingClientRect; aim=Line2.material",
+    "viewport": {
+      "innerWidth": 844,
+      "innerHeight": 390
+    },
+    "devicePixelRatio": 3,
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "power": {
+      "leftPx": 774.4,
+      "rightPx": 840,
+      "topPx": 77.33,
+      "bottomPx": 312.67,
+      "widthPx": 65.6,
+      "heightPx": 235.34,
+      "leftPctVw": 91.75,
+      "rightPctVw": 99.53,
+      "widthPctVw": 7.77,
+      "heightPctVh": 60.34,
+      "side": "RIGHT",
+      "display": "block",
+      "opacity": "0.28"
+    },
+    "spin": {
+      "leftPx": 12,
+      "rightPx": 67.76,
+      "topPx": 160.56,
+      "bottomPx": 229.44,
+      "widthPx": 55.76,
+      "heightPx": 68.88,
+      "leftPctVw": 1.42,
+      "rightPctVw": 8.03,
+      "widthPctVw": 6.61,
+      "heightPctVh": 17.66,
+      "side": "LEFT",
+      "display": "block",
+      "opacity": "0.1"
+    },
+    "aim": {
+      "linewidthPx": 2.5,
+      "color": "#4db8ff",
+      "opacity": 0.95,
+      "transparent": true,
+      "stroke": "none (single Line2; no near-black dual stroke)",
+      "visible": true,
+      "allLine2Count": 3,
+      "visibleLine2Count": 1
+    },
+    "bp8Compare": {
+      "power": {
+        "side": "LEFT",
+        "widthPctVw": 3,
+        "heightPctVh": 50.8,
+        "note": "static hypothesis from challenge #045 — not re-measured vs live 8BP app"
+      },
+      "spin": {
+        "side": "RIGHT-TOP",
+        "note": "8BP Spin top-right per challenge #045 H1"
+      },
+      "aim": {
+        "widthPx": 2,
+        "color": "#ffffff",
+        "opacity": 1,
+        "stroke": "near-black ~1px",
+        "note": "static 8BP vs our Line2 (no dual stroke)"
+      }
+    },
+    "rotatePromptOnMenu": {
+      "cssShown": false,
+      "mq": false,
+      "shown": false
+    },
+    "rotatePromptShown": false
+  },
+  {
+    "device": "iPhone-14-port",
+    "orientation": "portrait",
+    "configuredViewport": {
+      "w": 390,
+      "h": 844
+    },
+    "configuredDpr": 3,
+    "configuredUserAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "method": "NON-REAL-DEVICE Playwright viewport; DOM=getBoundingClientRect; aim=Line2.material",
+    "viewport": {
+      "innerWidth": 390,
+      "innerHeight": 844
+    },
+    "devicePixelRatio": 3,
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "power": {
+      "leftPx": 306,
+      "rightPx": 386,
+      "topPx": 280.5,
+      "bottomPx": 563.5,
+      "widthPx": 80,
+      "heightPx": 283,
+      "leftPctVw": 78.46,
+      "rightPctVw": 98.97,
+      "widthPctVw": 20.51,
+      "heightPctVh": 33.53,
+      "side": "RIGHT",
+      "display": "block",
+      "opacity": "0.28"
+    },
+    "spin": {
+      "leftPx": 12,
+      "rightPx": 80,
+      "topPx": 382,
+      "bottomPx": 462,
+      "widthPx": 68,
+      "heightPx": 80,
+      "leftPctVw": 3.08,
+      "rightPctVw": 20.51,
+      "widthPctVw": 17.44,
+      "heightPctVh": 9.48,
+      "side": "LEFT",
+      "display": "block",
+      "opacity": "0.1"
+    },
+    "aim": {
+      "linewidthPx": 2.5,
+      "color": "#4db8ff",
+      "opacity": 0.95,
+      "transparent": true,
+      "stroke": "none (single Line2; no near-black dual stroke)",
+      "visible": true,
+      "allLine2Count": 3,
+      "visibleLine2Count": 1
+    },
+    "bp8Compare": {
+      "power": {
+        "side": "LEFT",
+        "widthPctVw": 3,
+        "heightPctVh": 50.8,
+        "note": "static hypothesis from challenge #045 — not re-measured vs live 8BP app"
+      },
+      "spin": {
+        "side": "RIGHT-TOP",
+        "note": "8BP Spin top-right per challenge #045 H1"
+      },
+      "aim": {
+        "widthPx": 2,
+        "color": "#ffffff",
+        "opacity": 1,
+        "stroke": "near-black ~1px",
+        "note": "static 8BP vs our Line2 (no dual stroke)"
+      }
+    },
+    "rotatePromptOnMenu": {
+      "cssShown": true,
+      "mq": true,
+      "shown": true
+    },
+    "rotatePromptShown": true
+  },
+  {
+    "device": "iPad-land",
+    "orientation": "landscape",
+    "configuredViewport": {
+      "w": 1024,
+      "h": 768
+    },
+    "configuredDpr": 2,
+    "configuredUserAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "method": "NON-REAL-DEVICE Playwright viewport; DOM=getBoundingClientRect; aim=Line2.material",
+    "viewport": {
+      "innerWidth": 1024,
+      "innerHeight": 768
+    },
+    "devicePixelRatio": 2,
+    "userAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "power": {
+      "leftPx": 940,
+      "rightPx": 1020,
+      "topPx": 242.5,
+      "bottomPx": 525.5,
+      "widthPx": 80,
+      "heightPx": 283,
+      "leftPctVw": 91.8,
+      "rightPctVw": 99.61,
+      "widthPctVw": 7.81,
+      "heightPctVh": 36.85,
+      "side": "RIGHT",
+      "display": "block",
+      "opacity": "0.28"
+    },
+    "spin": {
+      "leftPx": 12,
+      "rightPx": 80,
+      "topPx": 344,
+      "bottomPx": 424,
+      "widthPx": 68,
+      "heightPx": 80,
+      "leftPctVw": 1.17,
+      "rightPctVw": 7.81,
+      "widthPctVw": 6.64,
+      "heightPctVh": 10.42,
+      "side": "LEFT",
+      "display": "block",
+      "opacity": "0.1"
+    },
+    "aim": {
+      "linewidthPx": 2.5,
+      "color": "#4db8ff",
+      "opacity": 0.95,
+      "transparent": true,
+      "stroke": "none (single Line2; no near-black dual stroke)",
+      "visible": true,
+      "allLine2Count": 3,
+      "visibleLine2Count": 1
+    },
+    "bp8Compare": {
+      "power": {
+        "side": "LEFT",
+        "widthPctVw": 3,
+        "heightPctVh": 50.8,
+        "note": "static hypothesis from challenge #045 — not re-measured vs live 8BP app"
+      },
+      "spin": {
+        "side": "RIGHT-TOP",
+        "note": "8BP Spin top-right per challenge #045 H1"
+      },
+      "aim": {
+        "widthPx": 2,
+        "color": "#ffffff",
+        "opacity": 1,
+        "stroke": "near-black ~1px",
+        "note": "static 8BP vs our Line2 (no dual stroke)"
+      }
+    },
+    "rotatePromptOnMenu": {
+      "cssShown": false,
+      "mq": false,
+      "shown": false
+    },
+    "rotatePromptShown": false
+  },
+  {
+    "device": "iPad-port",
+    "orientation": "portrait",
+    "configuredViewport": {
+      "w": 768,
+      "h": 1024
+    },
+    "configuredDpr": 2,
+    "configuredUserAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "method": "NON-REAL-DEVICE Playwright viewport; DOM=getBoundingClientRect; aim=Line2.material",
+    "viewport": {
+      "innerWidth": 768,
+      "innerHeight": 1024
+    },
+    "devicePixelRatio": 2,
+    "userAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "power": {
+      "leftPx": 684,
+      "rightPx": 764,
+      "topPx": 370.5,
+      "bottomPx": 653.5,
+      "widthPx": 80,
+      "heightPx": 283,
+      "leftPctVw": 89.06,
+      "rightPctVw": 99.48,
+      "widthPctVw": 10.42,
+      "heightPctVh": 27.64,
+      "side": "RIGHT",
+      "display": "block",
+      "opacity": "0.28"
+    },
+    "spin": {
+      "leftPx": 12,
+      "rightPx": 80,
+      "topPx": 472,
+      "bottomPx": 552,
+      "widthPx": 68,
+      "heightPx": 80,
+      "leftPctVw": 1.56,
+      "rightPctVw": 10.42,
+      "widthPctVw": 8.85,
+      "heightPctVh": 7.81,
+      "side": "LEFT",
+      "display": "block",
+      "opacity": "0.1"
+    },
+    "aim": {
+      "linewidthPx": 2.5,
+      "color": "#4db8ff",
+      "opacity": 0.95,
+      "transparent": true,
+      "stroke": "none (single Line2; no near-black dual stroke)",
+      "visible": true,
+      "allLine2Count": 3,
+      "visibleLine2Count": 1
+    },
+    "bp8Compare": {
+      "power": {
+        "side": "LEFT",
+        "widthPctVw": 3,
+        "heightPctVh": 50.8,
+        "note": "static hypothesis from challenge #045 — not re-measured vs live 8BP app"
+      },
+      "spin": {
+        "side": "RIGHT-TOP",
+        "note": "8BP Spin top-right per challenge #045 H1"
+      },
+      "aim": {
+        "widthPx": 2,
+        "color": "#ffffff",
+        "opacity": 1,
+        "stroke": "near-black ~1px",
+        "note": "static 8BP vs our Line2 (no dual stroke)"
+      }
+    },
+    "rotatePromptOnMenu": {
+      "cssShown": true,
+      "mq": true,
+      "shown": true
+    },
+    "rotatePromptShown": true
+  },
+  {
+    "device": "iPad-Pro-port-1024",
+    "orientation": "portrait",
+    "configuredViewport": {
+      "w": 1024,
+      "h": 1366
+    },
+    "configuredDpr": 2,
+    "configuredUserAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "method": "NON-REAL-DEVICE Playwright viewport; DOM=getBoundingClientRect; aim=Line2.material",
+    "viewport": {
+      "innerWidth": 1024,
+      "innerHeight": 1366
+    },
+    "devicePixelRatio": 2,
+    "userAgent": "Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "power": {
+      "leftPx": 940,
+      "rightPx": 1020,
+      "topPx": 541.5,
+      "bottomPx": 824.5,
+      "widthPx": 80,
+      "heightPx": 283,
+      "leftPctVw": 91.8,
+      "rightPctVw": 99.61,
+      "widthPctVw": 7.81,
+      "heightPctVh": 20.72,
+      "side": "RIGHT",
+      "display": "block",
+      "opacity": "0.28"
+    },
+    "spin": {
+      "leftPx": 12,
+      "rightPx": 80,
+      "topPx": 643,
+      "bottomPx": 723,
+      "widthPx": 68,
+      "heightPx": 80,
+      "leftPctVw": 1.17,
+      "rightPctVw": 7.81,
+      "widthPctVw": 6.64,
+      "heightPctVh": 5.86,
+      "side": "LEFT",
+      "display": "block",
+      "opacity": "0.1"
+    },
+    "aim": {
+      "linewidthPx": 2.5,
+      "color": "#4db8ff",
+      "opacity": 0.95,
+      "transparent": true,
+      "stroke": "none (single Line2; no near-black dual stroke)",
+      "visible": true,
+      "allLine2Count": 3,
+      "visibleLine2Count": 1
+    },
+    "bp8Compare": {
+      "power": {
+        "side": "LEFT",
+        "widthPctVw": 3,
+        "heightPctVh": 50.8,
+        "note": "static hypothesis from challenge #045 — not re-measured vs live 8BP app"
+      },
+      "spin": {
+        "side": "RIGHT-TOP",
+        "note": "8BP Spin top-right per challenge #045 H1"
+      },
+      "aim": {
+        "widthPx": 2,
+        "color": "#ffffff",
+        "opacity": 1,
+        "stroke": "near-black ~1px",
+        "note": "static 8BP vs our Line2 (no dual stroke)"
+      }
+    },
+    "rotatePromptOnMenu": {
+      "cssShown": false,
+      "mq": false,
+      "shown": false
+    },
+    "rotatePromptShown": false
+  },
+  {
+    "device": "Desktop-Chrome-land",
+    "orientation": "landscape",
+    "configuredViewport": {
+      "w": 1280,
+      "h": 720
+    },
+    "configuredDpr": 1,
+    "configuredUserAgent": "(Playwright Desktop Chrome default)",
+    "method": "NON-REAL-DEVICE Playwright viewport; DOM=getBoundingClientRect; aim=Line2.material",
+    "viewport": {
+      "innerWidth": 1280,
+      "innerHeight": 720
+    },
+    "devicePixelRatio": 1,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.7827.55 Safari/537.36",
+    "power": {
+      "leftPx": 1196,
+      "rightPx": 1276,
+      "topPx": 218.5,
+      "bottomPx": 501.5,
+      "widthPx": 80,
+      "heightPx": 283,
+      "leftPctVw": 93.44,
+      "rightPctVw": 99.69,
+      "widthPctVw": 6.25,
+      "heightPctVh": 39.31,
+      "side": "RIGHT",
+      "display": "block",
+      "opacity": "0.28"
+    },
+    "spin": {
+      "leftPx": 12,
+      "rightPx": 80,
+      "topPx": 320,
+      "bottomPx": 400,
+      "widthPx": 68,
+      "heightPx": 80,
+      "leftPctVw": 0.94,
+      "rightPctVw": 6.25,
+      "widthPctVw": 5.31,
+      "heightPctVh": 11.11,
+      "side": "LEFT",
+      "display": "block",
+      "opacity": "0.1"
+    },
+    "aim": {
+      "linewidthPx": 2.5,
+      "color": "#4db8ff",
+      "opacity": 0.95,
+      "transparent": true,
+      "stroke": "none (single Line2; no near-black dual stroke)",
+      "visible": true,
+      "allLine2Count": 3,
+      "visibleLine2Count": 1
+    },
+    "bp8Compare": {
+      "power": {
+        "side": "LEFT",
+        "widthPctVw": 3,
+        "heightPctVh": 50.8,
+        "note": "static hypothesis from challenge #045 — not re-measured vs live 8BP app"
+      },
+      "spin": {
+        "side": "RIGHT-TOP",
+        "note": "8BP Spin top-right per challenge #045 H1"
+      },
+      "aim": {
+        "widthPx": 2,
+        "color": "#ffffff",
+        "opacity": 1,
+        "stroke": "near-black ~1px",
+        "note": "static 8BP vs our Line2 (no dual stroke)"
+      }
+    },
+    "rotatePromptOnMenu": {
+      "cssShown": false,
+      "mq": false,
+      "shown": false
+    },
+    "rotatePromptShown": false
+  }
+]

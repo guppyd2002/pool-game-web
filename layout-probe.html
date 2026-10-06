@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Layout Probe 0-A — Phase 1</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body, #app {
+        width: 100%; height: 100%; overflow: hidden; background: #0a0a1a;
+      }
+      #metrics {
+        position: fixed; z-index: 10000;
+        top: max(8px, env(safe-area-inset-top, 0px));
+        left: max(8px, env(safe-area-inset-left, 0px));
+        max-width: min(520px, calc(100vw - 16px));
+        max-height: calc(100vh - 16px);
+        overflow: auto;
+        font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #e8ffe8;
+        background: rgba(0, 0, 0, 0.82);
+        border: 1px solid #3a3;
+        border-radius: 6px;
+        padding: 8px 10px;
+        pointer-events: none;
+        white-space: pre-wrap;
+      }
+      #felt-overlay {
+        position: absolute;
+        border: 2px solid #ff2244;
+        box-shadow: 0 0 0 1px rgba(255, 0, 0, 0.35) inset;
+        pointer-events: none;
+        z-index: 5;
+      }
+      #felt-label {
+        position: absolute;
+        top: -16px; left: 0;
+        color: #ff4466;
+        font: 10px/1 ui-monospace, monospace;
+        text-shadow: 0 0 4px #000;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <pre id="metrics">Loading layout probe…</pre>
+    <script type="module" src="/src/layout-probe.ts"></script>
+  </body>
+</html>
