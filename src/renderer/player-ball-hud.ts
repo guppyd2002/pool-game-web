@@ -69,7 +69,8 @@ export interface PlayerBallHud {
   dispose(): void;
 }
 
-function _paintSlot(el: HTMLElement, ballId: number): void {
+/** Paint one 7-slot disc (shared with hud-bar merged row). */
+export function paintBallSlot(el: HTMLElement, ballId: number): void {
   const v = slotVisualFromBallId(ballId);
   if (v.kind === 'empty') {
     // Hide icon, keep layout slot (no reflow) — Unity SetEmpty
@@ -95,7 +96,7 @@ function _paintSlot(el: HTMLElement, ballId: number): void {
   }
 }
 
-function _makeSlot(): HTMLElement {
+export function makeBallSlotEl(): HTMLElement {
   const s = document.createElement('div');
   s.style.cssText = [
     'width:18px', 'height:18px', 'border-radius:50%',
@@ -108,73 +109,43 @@ function _makeSlot(): HTMLElement {
   return s;
 }
 
-function _makeRow(label: string): { row: HTMLElement; slots: HTMLElement[] } {
-  const row = document.createElement('div');
-  row.style.cssText = [
-    'display:flex', 'align-items:center', 'gap:3px',
-    'flex:0 0 auto',
-  ].join(';');
-  const name = document.createElement('span');
-  name.textContent = label;
-  name.style.cssText = 'font-size:10px;font-weight:bold;opacity:0.85;margin-right:2px;min-width:18px;';
-  row.appendChild(name);
-  const slots: HTMLElement[] = [];
-  for (let i = 0; i < 7; i++) {
-    const s = _makeSlot();
-    slots.push(s);
-    row.appendChild(s);
-  }
-  return { row, slots };
-}
-
 /**
- * Build dual 7-slot rows. Prefer placing under the main HUD strip.
- * Container is absolute, just below the 36px HUD bar.
+ * Phase 1 #3: slots live inside the 36px hud-bar (no second strip).
+ * `createPlayerBallHud` kept as a thin adapter that paints into host slot nodes.
  */
-export function createPlayerBallHud(container: HTMLElement): PlayerBallHud {
-  const wrap = document.createElement('div');
-  wrap.id = 'player-ball-hud';
-  wrap.style.cssText = [
-    'position:absolute',
-    'top:calc(36px + env(safe-area-inset-top, 0px))',
-    'left:0', 'right:0',
-    'padding:4px 8px',
-    'padding-left:max(8px, env(safe-area-inset-left, 0px))',
-    'padding-right:max(8px, env(safe-area-inset-right, 0px))',
-    'display:flex', 'justify-content:space-between', 'align-items:center',
-    'background:rgba(0,0,0,0.55)',
-    'z-index:199',
-    'pointer-events:none', // never block canvas aim
-    'font-family:sans-serif', 'color:#fff',
-  ].join(';');
-
-  const left = _makeRow('P1');
-  const right = _makeRow('P2');
-  wrap.appendChild(left.row);
-  wrap.appendChild(right.row);
-  container.appendChild(wrap);
+export function createPlayerBallHud(
+  _container: HTMLElement,
+  hosts?: { p0: HTMLElement[]; p1: HTMLElement[] },
+): PlayerBallHud {
+  const p0 = hosts?.p0 ?? [];
+  const p1 = hosts?.p1 ?? [];
+  // Invisible stub element for setVisible/dispose compatibility when merged into hud-bar.
+  const stub = document.createElement('div');
+  stub.id = 'player-ball-hud';
+  stub.style.display = 'none';
+  stub.setAttribute('data-merged-into-hud', '1');
 
   function _apply(slots: HTMLElement[], balls: readonly number[]): void {
     for (let i = 0; i < 7; i++) {
-      _paintSlot(slots[i], balls[i] ?? 0);
+      if (!slots[i]) continue;
+      paintBallSlot(slots[i], balls[i] ?? 0);
     }
   }
 
   return {
-    get element() { return wrap; },
+    get element() { return stub; },
 
-    update(p0, p1, _t0?, _t1?): void {
-      // Open table: all zeros → 7 hidden slots (layout kept)
-      _apply(left.slots, p0.length === 7 ? p0 : [0, 0, 0, 0, 0, 0, 0]);
-      _apply(right.slots, p1.length === 7 ? p1 : [0, 0, 0, 0, 0, 0, 0]);
+    update(player0Balls, player1Balls, _t0?, _t1?): void {
+      _apply(p0, player0Balls.length === 7 ? player0Balls : [0, 0, 0, 0, 0, 0, 0]);
+      _apply(p1, player1Balls.length === 7 ? player1Balls : [0, 0, 0, 0, 0, 0, 0]);
     },
 
-    setVisible(visible: boolean): void {
-      wrap.style.display = visible ? 'flex' : 'none';
+    setVisible(_visible: boolean): void {
+      // Visibility follows hud-bar; stub stays hidden.
     },
 
     dispose(): void {
-      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      /* slots owned by hud-bar */
     },
   };
 }

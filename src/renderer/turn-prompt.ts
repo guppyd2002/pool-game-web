@@ -1,8 +1,9 @@
 /**
  * B4 — TurnPrompt: turn-change player indicator.
  *
- * Shows "Player N's turn" briefly (auto-fades after 2 s or on first interaction).
- * No action instructions — tutorial-overlay handles those to avoid conflicting text.
+ * Phase 1 #3: hud-bar already shows "Player N's turn" permanently.
+ * This bubble only appears for **ball-in-hand** ("place cue ball") — actionable info
+ * the HUD also shows, but the brief centre cue helps placement mode.
  */
 
 export interface TurnPrompt {
@@ -45,15 +46,16 @@ export function createTurnPrompt(container: HTMLElement): TurnPrompt {
     show(playerIndex, ballInHand) {
       clearTimeout(_hideTimer);
       clearTimeout(_autoTimer);
-      // Only show player label — no action text (tutorial-overlay handles instructions).
-      const label = ballInHand
-        ? `Player ${playerIndex + 1}'s turn — place cue ball`
-        : `Player ${playerIndex + 1}'s turn`;
-      el.textContent = label;
+      // Phase 1 #3: skip ordinary turn text (hud-bar owns it). BIH only.
+      if (!ballInHand) {
+        el.style.display = 'none';
+        el.style.opacity = '0';
+        return;
+      }
+      el.textContent = `Player ${playerIndex + 1}'s turn — place cue ball`;
       el.style.display = 'block';
       el.offsetHeight;  // force reflow so transition plays
       el.style.opacity = '1';
-      // Auto-dismiss so it doesn't linger on top of the tutorial overlay.
       _autoTimer = window.setTimeout(_fadeOut, AUTO_DISMISS_MS);
     },
 
