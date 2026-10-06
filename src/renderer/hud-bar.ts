@@ -1,12 +1,17 @@
 /**
  * Landscape HUD — top full-width strip (UI-024 / UI-028 / UI-004 / UI-016 controls).
  *
- * Layout: [P1] | [timer · turn] | [P2] | [TopView] [FineAim] [LeftHand] [Exit]
- * Background: #000 80% opacity, white text, WCAG AAA contrast (ratio >7:1).
+ * Phase 1 #3 layout (single 36px row):
+ *   [P1][7 slots] | [timer · turn] | [7 slots][P2] | [icons…]
+ * Ball slots previously lived in a second strip (player-ball-hud); merged here.
  */
+
+import { makeBallSlotEl } from './player-ball-hud';
 
 export interface HudBar {
   setPlayerTurn(playerIndex: 0 | 1, isBallInHand: boolean): void;
+  /** 7-slot hosts for createPlayerBallHud paint adapter. */
+  readonly ballSlotHosts: { p0: HTMLElement[]; p1: HTMLElement[] };
   /**
    * UI-024 countdown. remainingS ≥ 0; urgency styles the digit colour.
    * Pass null to hide timer (e.g. mid-replay).
@@ -52,9 +57,19 @@ export function createHudBar(container: HTMLElement, opts: {
   p1El.style.cssText = 'flex:0 0 auto;opacity:0.75;white-space:nowrap;font-weight:bold;';
   p1El.textContent = 'P1';
 
+  const p0SlotsWrap = document.createElement('div');
+  p0SlotsWrap.style.cssText = 'display:flex;align-items:center;gap:2px;flex:0 0 auto;';
+  p0SlotsWrap.setAttribute('aria-label', 'Player 1 balls');
+  const p0Slots: HTMLElement[] = [];
+  for (let i = 0; i < 7; i++) {
+    const s = makeBallSlotEl();
+    p0Slots.push(s);
+    p0SlotsWrap.appendChild(s);
+  }
+
   const centreEl = document.createElement('div');
   centreEl.style.cssText =
-    'flex:1;text-align:center;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:center;gap:10px;';
+    'flex:1;text-align:center;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;';
 
   const timerEl = document.createElement('span');
   timerEl.id = 'hud-timer';
@@ -68,12 +83,23 @@ export function createHudBar(container: HTMLElement, opts: {
   centreEl.appendChild(timerEl);
   centreEl.appendChild(turnEl);
 
+  const p1SlotsWrap = document.createElement('div');
+  p1SlotsWrap.style.cssText = 'display:flex;align-items:center;gap:2px;flex:0 0 auto;';
+  p1SlotsWrap.setAttribute('aria-label', 'Player 2 balls');
+  const p1Slots: HTMLElement[] = [];
+  for (let i = 0; i < 7; i++) {
+    const s = makeBallSlotEl();
+    p1Slots.push(s);
+    p1SlotsWrap.appendChild(s);
+  }
+
   const p2El = document.createElement('div');
   p2El.style.cssText = 'flex:0 0 auto;opacity:0.75;white-space:nowrap;font-weight:bold;';
   p2El.textContent = 'P2';
 
   const ctrlEl = document.createElement('div');
-  ctrlEl.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:4px;';
+  // Phase 1 #6 will raise gap; keep ≥4px now, icons already min 36–44.
+  ctrlEl.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;gap:8px;';
 
   function _mkBtn(text: string, title: string, onClick: () => void): HTMLButtonElement {
     const b = document.createElement('button');
@@ -118,7 +144,9 @@ export function createHudBar(container: HTMLElement, opts: {
   }
 
   bar.appendChild(p1El);
+  bar.appendChild(p0SlotsWrap);
   bar.appendChild(centreEl);
+  bar.appendChild(p1SlotsWrap);
   bar.appendChild(p2El);
   bar.appendChild(ctrlEl);
   container.appendChild(bar);
@@ -127,6 +155,8 @@ export function createHudBar(container: HTMLElement, opts: {
     get element() {
       return bar;
     },
+
+    ballSlotHosts: { p0: p0Slots, p1: p1Slots },
 
     setPlayerTurn(playerIndex: 0 | 1, isBallInHand: boolean): void {
       const label = `Player ${playerIndex + 1}`;

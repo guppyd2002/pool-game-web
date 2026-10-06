@@ -764,8 +764,8 @@ const hudBar = createHudBar(container, {
 hudBar.setVisible(false);  // hidden until game starts
 hudBar.setAimAssistActive(cue.aimLineVisible); // CUE-008 default ON
 
-// SP-Harden-6: 7-slot solids/stripes progress under HUD (Unity BallPool8PlayerUI)
-const playerBallHud = createPlayerBallHud(container);
+// SP-Harden-6 / Phase 1 #3: 7-slot progress merged into 36px hud-bar (no second strip)
+const playerBallHud = createPlayerBallHud(container, hudBar.ballSlotHosts);
 playerBallHud.setVisible(false);
 
 // UI-024 / RULE-006: shot countdown (HotSeat only — AI demo does not use wall-clock foul).
