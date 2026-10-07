@@ -772,7 +772,7 @@ const hudBar = createHudBar(container, {
 hudBar.setVisible(false);  // hidden until game starts
 hudBar.setAimAssistActive(cue.aimLineVisible); // CUE-008 default ON
 
-// SP-Harden-6 / Phase 1 #3: 7-slot progress merged into 36px hud-bar (no second strip)
+// SP-Harden-6 / Phase 1 #3: 7-slot progress merged into hud-bar (no second strip; height via --hud-bar-height)
 const playerBallHud = createPlayerBallHud(container, hudBar.ballSlotHosts);
 playerBallHud.setVisible(false);
 

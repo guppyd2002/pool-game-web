@@ -15,9 +15,13 @@
 
 import type { CueController, TablePoint } from '../game/cue-controller';
 
-const TRACK_H = 32;
+/** Phase 1 F-2b-1: T-rule ≥44px tap target (was 32). */
+export const FINE_ADJUST_TRACK_H = 44;
+const TRACK_H = FINE_ADJUST_TRACK_H;
 const THUMB_W = 48;
-const THUMB_H = 28;
+/** Phase 1 F-2b-1: thumb fills track height (was 28). */
+export const FINE_ADJUST_THUMB_H = 44;
+const THUMB_H = FINE_ADJUST_THUMB_H;
 
 /** ±degrees for full bar travel — landscape gives 78px/° precision (780dp ÷ 10°). */
 export const FINE_ANGLE_MAX_DEG = 5;
@@ -73,7 +77,8 @@ export function createFineAdjustBarUI(
     'transform:translateX(-50%)',
     'top:calc(var(--felt-top, 0px) + var(--felt-height, 100%) + 2px)',
     'width:min(780px, calc(var(--felt-width, 100%) - 16px))',
-    'max-height:max(24px, calc(var(--gutter-bottom, 40px) - 4px))',
+    // F-2b-1: track is 44px; never clip below T-rule height.
+    `max-height:max(${TRACK_H}px, calc(var(--gutter-bottom, 48px) - 4px))`,
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:2px',
     'user-select:none',
@@ -81,17 +86,12 @@ export function createFineAdjustBarUI(
     'overflow:hidden',
   ].join(';');
 
-  const label = document.createElement('div');
-  label.textContent = '← Fine Aim →';
-  label.style.cssText = [
-    'color:rgba(255,255,255,0.5)', 'font-size:9px', 'font-family:sans-serif',
-    'letter-spacing:1px', 'pointer-events:none',
-  ].join(';');
+  // F-2b-1 / CEO #5: decorative «← Fine Aim →» label removed (low-contrast 9px text).
 
   // Track — horizontal, full overlay width, captures pointer events.
   const track = document.createElement('div');
   track.style.cssText = [
-    `width:100%`, `height:${TRACK_H}px`, 'border-radius:16px',
+    `width:100%`, `height:${TRACK_H}px`, 'border-radius:22px',
     'background:rgba(0,0,0,0.88)', 'border:2px solid rgba(0,206,209,0.4)',
     'box-shadow:0 0 0 1px rgba(0,206,209,0.1),0 4px 20px rgba(0,0,0,0.8)',
     'position:relative', 'overflow:hidden',
@@ -112,7 +112,7 @@ export function createFineAdjustBarUI(
   thumb.style.cssText = [
     'position:absolute', 'top:50%', 'transform:translate(-50%,-50%)',
     `width:${THUMB_W}px`, `height:${THUMB_H}px`,
-    'background:rgba(0,206,209,0.85)', 'border-radius:14px',
+    'background:rgba(0,206,209,0.85)', 'border-radius:22px',
     'pointer-events:none',
     'left:50%',
   ].join(';');
@@ -126,7 +126,6 @@ export function createFineAdjustBarUI(
   ].join(';');
 
   overlay.appendChild(track);
-  overlay.appendChild(label);
   overlay.appendChild(angleText);
   container.appendChild(overlay);
 
