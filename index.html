@@ -20,16 +20,15 @@
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body, #app { width: 100%; height: 100%; overflow: hidden; }
 
-      /* Landscape UX: left-hand mode flips power ↔ spin gutters (Phase 1 #4 vars) */
+      /* Landscape UX: left-hand mode flips power ↔ spin gutters (Phase 1 #4 vars).
+         F-2b-5: no max-width/overflow clamp on wrappers — children size from gutter. */
       #app.left-hand-mode .power-slider-overlay {
         left: max(4px, env(safe-area-inset-left, 0px)) !important;
         right: auto !important;
-        max-width: calc(var(--gutter-left, 80px) - 8px) !important;
       }
       #app.left-hand-mode .spin-disc-overlay {
         left: calc(var(--felt-left, 0px) + var(--felt-width, 100%) + 4px) !important;
         right: auto !important;
-        max-width: calc(var(--gutter-right, 80px) - 8px) !important;
       }
 
       /* SP-Harden-3 / 3b: short landscape — shrink chrome; enlarge side legends */
