@@ -13,6 +13,7 @@
 
 import type { SpinDisc } from '../game/spin-disc';
 import {
+  GUTTER_INNER_PAD_PX,
   SPIN_BTN_NATURAL,
   SPIN_DISC_RADIUS_NATURAL,
   readCssPxVar,
@@ -119,7 +120,8 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     const gutter = readCssPxVar(
       container,
       leftHand ? '--gutter-right' : '--gutter-left',
-      SPIN_DISC_RADIUS_NATURAL * 2 + 8,
+      // Natural diameter + pad: first paint before --gutter-* publish must not be 0px.
+      SPIN_DISC_RADIUS_NATURAL * 2 + GUTTER_INNER_PAD_PX,
     );
     discR = spinDiscRadiusFromGutter(gutter);
     const btnEdge = spinBtnSizeFromGutter(gutter);

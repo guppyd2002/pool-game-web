@@ -10,6 +10,7 @@ import { createSpinDiscUI } from '../../renderer/spin-disc-ui';
 import { createShotSlider } from '../../game/shot-slider';
 import { createSpinDisc } from '../../game/spin-disc';
 import {
+  GUTTER_INNER_PAD_PX,
   POWER_TRACK_W_NATURAL,
   SPIN_BTN_NATURAL,
   SPIN_DISC_RADIUS_NATURAL,
@@ -41,8 +42,8 @@ describe('F-2b-5 gutter-driven side controls', () => {
     const track = Array.from(overlay.querySelectorAll<HTMLElement>('div')).find(
       (el) => el.style.cursor === 'ns-resize',
     )!;
-    // usable = 46 − 8 = 38
-    expect(parseFloat(track.style.width)).toBe(38);
+    // usable = 46 − pad(4) = 42
+    expect(parseFloat(track.style.width)).toBe(46 - GUTTER_INNER_PAD_PX);
     expect(parseFloat(track.style.width)).toBeLessThan(POWER_TRACK_W_NATURAL);
   });
 
@@ -67,14 +68,14 @@ describe('F-2b-5 gutter-driven side controls', () => {
     expect(overlay.style.overflow).toBe('');
 
     const btn = overlay.querySelector('button')!;
-    // usable = 48 − 8 = 40
-    expect(parseFloat(btn.style.width)).toBe(40);
+    // usable = 48 − pad(4) = 44
+    expect(parseFloat(btn.style.width)).toBe(48 - GUTTER_INNER_PAD_PX);
     expect(parseFloat(btn.style.width)).toBeLessThan(SPIN_BTN_NATURAL);
 
     const panel = Array.from(overlay.querySelectorAll<HTMLElement>('div')).find(
       (el) => el.style.borderRadius === '50%' && el.style.position === 'relative',
     )!;
-    expect(parseFloat(panel.style.width)).toBe(40);
+    expect(parseFloat(panel.style.width)).toBe(48 - GUTTER_INNER_PAD_PX);
     expect(parseFloat(panel.style.width)).toBeLessThan(SPIN_DISC_RADIUS_NATURAL * 2);
   });
 

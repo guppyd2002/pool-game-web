@@ -13,6 +13,7 @@
 
 import type { ShotSlider } from '../game/shot-slider';
 import {
+  GUTTER_INNER_PAD_PX,
   POWER_TRACK_W_NATURAL,
   powerTrackWidthFromGutter,
   readCssPxVar,
@@ -80,7 +81,8 @@ export function createPowerSliderUI(
     const gutter = readCssPxVar(
       container,
       leftHand ? '--gutter-left' : '--gutter-right',
-      POWER_TRACK_W_NATURAL + 8,
+      // Natural + pad: first paint before --gutter-* publish must not be 0px.
+      POWER_TRACK_W_NATURAL + GUTTER_INNER_PAD_PX,
     );
     const w = powerTrackWidthFromGutter(gutter);
     track.style.width = `${w}px`;
