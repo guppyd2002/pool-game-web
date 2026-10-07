@@ -37,7 +37,10 @@ describe('F-2b-5 gutter-driven side controls', () => {
 
     const overlay = ui.element;
     expect(overlay.style.maxWidth).toBe('');
+    // Shorthand getter returns '' when only overflow-x/y is set — check all three.
     expect(overlay.style.overflow).toBe('');
+    expect(overlay.style.overflowX).toBe('');
+    expect(overlay.style.overflowY).toBe('');
 
     const track = Array.from(overlay.querySelectorAll<HTMLElement>('div')).find(
       (el) => el.style.cursor === 'ns-resize',
@@ -65,7 +68,10 @@ describe('F-2b-5 gutter-driven side controls', () => {
 
     const overlay = ui.element;
     expect(overlay.style.maxWidth).toBe('');
+    // Shorthand getter returns '' when only overflow-x/y is set — check all three.
     expect(overlay.style.overflow).toBe('');
+    expect(overlay.style.overflowX).toBe('');
+    expect(overlay.style.overflowY).toBe('');
 
     const btn = overlay.querySelector('button')!;
     // usable = 48 − pad(4) = 44
