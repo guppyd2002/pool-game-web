@@ -60,8 +60,8 @@ test.describe('F-2b-3 hud horizontal @375', () => {
         gapsTotal,
         sumChildW,
         sumChildWPlusGaps: sumChildW + gapsTotal,
-        hudBarHeightVar: cs.getPropertyValue('--hud-bar-height').trim() ||
-          getComputedStyle(document.documentElement).getPropertyValue('--hud-bar-height').trim(),
+        // Measured rendered height (no --hud-bar-height token — constant would lie under wrap).
+        barRectHeight: Math.round(bar.getBoundingClientRect().height * 100) / 100,
         childBoxes,
       };
     });

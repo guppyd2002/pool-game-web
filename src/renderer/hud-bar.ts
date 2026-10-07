@@ -40,11 +40,13 @@ export function createHudBar(container: HTMLElement, opts: {
 }): HudBar {
   const bar = document.createElement('div');
   bar.id = 'hud-bar';
-  // Phase 1 #4 + F-2b-3: 44px bar; publish --hud-bar-height for siblings (F-2b-4).
+  // Phase 1 #4 + F-2b-3: min-height 44px bar.
   // P0 wrap stopgap (gutter_top≈230): min-height + flex-wrap so Exit/LeftHand stay in-viewport.
   // ⛔ F-4 expiry: when portrait+rotate lands, REMOVE flex-wrap + height:auto (restore fixed
   // height:44). After rotate gutter_top≈66px; wrap→88px gets max-height-clipped. Step 2
   // (dual-row slots + side gutter buttons) ships with F-4 — do not horizontal-scroll.
+  // No --hud-bar-height token: P0 height:auto can render 88px; a constant 44 would lie.
+  // If a sibling needs positioning later, publish getBoundingClientRect().height (measured).
   const HUD_BAR_HEIGHT_PX = 44;
   bar.style.cssText = [
     'position:absolute', 'top:0', 'left:0', 'right:0',
@@ -60,8 +62,6 @@ export function createHudBar(container: HTMLElement, opts: {
     'font-family:sans-serif', 'font-size:12px', 'color:#fff',
     'gap:8px',
   ].join(';');
-  bar.style.setProperty('--hud-bar-height', `${HUD_BAR_HEIGHT_PX}px`);
-  document.documentElement.style.setProperty('--hud-bar-height', `${HUD_BAR_HEIGHT_PX}px`);
 
   const p1El = document.createElement('div');
   p1El.style.cssText = 'flex:0 0 auto;opacity:0.75;white-space:nowrap;font-weight:bold;';

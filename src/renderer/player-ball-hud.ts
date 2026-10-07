@@ -111,8 +111,9 @@ export function makeBallSlotEl(): HTMLElement {
 
 /**
  * Phase 1 #3: slots live inside the hud-bar row (no second strip).
- * Height token: `--hud-bar-height` published by `hud-bar.ts` (F-2b-4) — do not
- * hardcode 36/44 here if a positioned sibling is ever reintroduced.
+ * Tripwire: if a positioned sibling is ever reintroduced, publish
+ * getBoundingClientRect().height (measured, + ResizeObserver) — do not publish
+ * a height constant and do not hardcode 36/44.
  * `createPlayerBallHud` is a thin adapter that paints into host slot nodes.
  */
 export function createPlayerBallHud(

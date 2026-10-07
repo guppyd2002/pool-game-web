@@ -140,19 +140,20 @@ describe('createHudBar (T07)', () => {
     hud.dispose();
   });
 
-  it('Phase 1 F-2b-3/4: bar min-height 44, wrap stopgap, publishes --hud-bar-height', () => {
+  it('Phase 1 F-2b-3/P0: bar min-height 44 + wrap stopgap; no lying --hud-bar-height token', () => {
     const hud = makeHud();
     // P0 wrap stopgap (expires at F-4): min-height:44 + height:auto + flex-wrap.
     // No overflow-x:hidden — keeps scrollWidth>clientWidth observable; avoids overflow-y→auto.
+    // No --hud-bar-height: height:auto can render 88px; a constant 44 would lie.
     expect(hud.element.style.minHeight).toBe('44px');
     expect(hud.element.style.height).toBe('auto');
     expect(hud.element.style.flexWrap).toBe('wrap');
     expect(hud.element.style.overflowX).toBe('');
-    expect(hud.element.style.getPropertyValue('--hud-bar-height').trim()).toBe('44px');
+    expect(hud.element.style.getPropertyValue('--hud-bar-height').trim()).toBe('');
     expect(
       getComputedStyle(document.documentElement).getPropertyValue('--hud-bar-height').trim() ||
         document.documentElement.style.getPropertyValue('--hud-bar-height').trim(),
-    ).toBe('44px');
+    ).toBe('');
     hud.dispose();
   });
 });
