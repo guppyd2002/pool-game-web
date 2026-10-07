@@ -139,4 +139,16 @@ describe('createHudBar (T07)', () => {
     expect(session.querySelectorAll('button').length).toBe(2);
     hud.dispose();
   });
+
+  it('Phase 1 F-2b-3/4: bar height 44 and publishes --hud-bar-height', () => {
+    const hud = makeHud();
+    expect(hud.element.style.height).toBe('44px');
+    expect(hud.element.style.getPropertyValue('--hud-bar-height').trim()).toBe('44px');
+    expect(
+      getComputedStyle(document.documentElement).getPropertyValue('--hud-bar-height').trim() ||
+        document.documentElement.style.getPropertyValue('--hud-bar-height').trim(),
+    ).toBe('44px');
+    hud.dispose();
+  });
 });
+

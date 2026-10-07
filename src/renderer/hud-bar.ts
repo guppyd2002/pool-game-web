@@ -1,7 +1,7 @@
 /**
  * Landscape HUD — top full-width strip (UI-024 / UI-028 / UI-004 / UI-016 controls).
  *
- * Phase 1 #3 layout (single 36px row):
+ * Phase 1 #3 layout (single row; F-2b-3 height 44px):
  *   [P1][7 slots] | [timer · turn] | [7 slots][P2] | [icons…]
  * Ball slots previously lived in a second strip (player-ball-hud); merged here.
  */
@@ -40,11 +40,12 @@ export function createHudBar(container: HTMLElement, opts: {
 }): HudBar {
   const bar = document.createElement('div');
   bar.id = 'hud-bar';
-  // Phase 1 #4: stay inside top gutter (--gutter-top); no hardcoded gutter px.
+  // Phase 1 #4 + F-2b-3: 44px bar; publish --hud-bar-height for siblings (F-2b-4).
+  const HUD_BAR_HEIGHT_PX = 44;
   bar.style.cssText = [
     'position:absolute', 'top:0', 'left:0', 'right:0',
-    'height:36px',
-    'max-height:max(28px, var(--gutter-top, 36px))',
+    `height:${HUD_BAR_HEIGHT_PX}px`,
+    `max-height:max(${HUD_BAR_HEIGHT_PX}px, var(--gutter-top, ${HUD_BAR_HEIGHT_PX}px))`,
     'padding-left:max(8px, env(safe-area-inset-left, 0px))',
     'padding-right:max(8px, env(safe-area-inset-right, 0px))',
     'padding-top:env(safe-area-inset-top, 0px)',
@@ -54,6 +55,8 @@ export function createHudBar(container: HTMLElement, opts: {
     'font-family:sans-serif', 'font-size:12px', 'color:#fff',
     'gap:8px',
   ].join(';');
+  bar.style.setProperty('--hud-bar-height', `${HUD_BAR_HEIGHT_PX}px`);
+  document.documentElement.style.setProperty('--hud-bar-height', `${HUD_BAR_HEIGHT_PX}px`);
 
   const p1El = document.createElement('div');
   p1El.style.cssText = 'flex:0 0 auto;opacity:0.75;white-space:nowrap;font-weight:bold;';
