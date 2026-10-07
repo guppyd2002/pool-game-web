@@ -32,7 +32,7 @@ const TABLE_H = TABLE_H_M;
 const BALL_RADIUS = BALL_RADIUS_M;
 
 // Ball colors moved to ball-materials.ts (WPA regulation set, CEO-approved).
-// Ortho frustum: orthoFrustum() from ortho-constants (ORTHO_MARGIN 1.1365).
+// Ortho frustum: orthoFrustum() from ortho-constants (ORTHO_MARGIN 1.28).
 
 // ─── Scene API Interface ─────────────────────────────────────────────────────
 

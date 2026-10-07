@@ -4,8 +4,10 @@
  * Used by `scene.ts` (OrthoCamera frustum) and `felt-geometry.ts` (C4 / --felt-*).
  * CTO C-1: never fork ORTHO_MARGIN / TABLE_W/H between those two files.
  *
- * ORTHO_MARGIN 1.1365 = GLB full-table width 2.8866 m ÷ felt 2.54 m
- * (chief-architect 0-A measure): whole table (rails) flush to viewport; lower clips rails.
+ * ORTHO_MARGIN restored to 1.28 (CTO T3=A / 綱手 2026-10-07).
+ * 1.1365 (rails-flush) withdrawn in design §F.5: under D-1 portrait+rotate,
+ * bottom gutter at 1.1365 cannot fit a 44px track (floor M≥1.2516). Do not
+ * invent a middle magic number — 1.28 is the prior value with headroom.
  * Do NOT change TABLE_W/H (physics / nose-to-nose). Do NOT import from src/physics/**.
  */
 
@@ -16,9 +18,9 @@ export const TABLE_H_M = 1.27;
 
 /**
  * Ortho frustum margin over nose-to-nose half-extents.
- * Was 1.28 (~78% height util); 1.1365 ≈ 88% with rails flush.
+ * 1.28 ≈ 78% height util; keeps side/bottom gutters usable for chrome (T≥44).
  */
-export const ORTHO_MARGIN = 1.1365;
+export const ORTHO_MARGIN = 1.28;
 
 export const ORTHO_HALF_X = (TABLE_W_M / 2) * ORTHO_MARGIN;
 export const ORTHO_HALF_Z = (TABLE_H_M / 2) * ORTHO_MARGIN;
