@@ -1,9 +1,9 @@
 {
-  "name": "Hustle Pool",
-  "short_name": "Hustle Pool",
+  "name": "Hustle Pool Layout Probe",
+  "short_name": "Layout Probe",
   "description": "8-ball pool web game",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/layout-probe.html",
+  "scope": "/layout-probe.html",
   "display": "standalone",
   "background_color": "#0a0a1a",
   "theme_color": "#0a0a1a",
