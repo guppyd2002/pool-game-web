@@ -56,7 +56,6 @@ export function createHudBar(container: HTMLElement, opts: {
     'padding-top:env(safe-area-inset-top, 0px)',
     'background:rgba(0,0,0,0.80)',
     'display:flex', 'flex-wrap:wrap', 'align-items:center',
-    'overflow-x:hidden',
     'z-index:200',
     'font-family:sans-serif', 'font-size:12px', 'color:#fff',
     'gap:8px',

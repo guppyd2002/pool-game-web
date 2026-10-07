@@ -143,10 +143,11 @@ describe('createHudBar (T07)', () => {
   it('Phase 1 F-2b-3/4: bar min-height 44, wrap stopgap, publishes --hud-bar-height', () => {
     const hud = makeHud();
     // P0 wrap stopgap (expires at F-4): min-height:44 + height:auto + flex-wrap.
+    // No overflow-x:hidden — keeps scrollWidth>clientWidth observable; avoids overflow-y→auto.
     expect(hud.element.style.minHeight).toBe('44px');
     expect(hud.element.style.height).toBe('auto');
     expect(hud.element.style.flexWrap).toBe('wrap');
-    expect(hud.element.style.overflowX).toBe('hidden');
+    expect(hud.element.style.overflowX).toBe('');
     expect(hud.element.style.getPropertyValue('--hud-bar-height').trim()).toBe('44px');
     expect(
       getComputedStyle(document.documentElement).getPropertyValue('--hud-bar-height').trim() ||
