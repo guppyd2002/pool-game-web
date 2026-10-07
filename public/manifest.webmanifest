@@ -1,7 +1,7 @@
 {
   "name": "Hustle Pool",
   "short_name": "Hustle Pool",
-  "description": "8-ball pool — landscape web play",
+  "description": "8-ball pool web game",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
