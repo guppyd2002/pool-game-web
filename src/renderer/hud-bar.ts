@@ -42,9 +42,9 @@ export function createHudBar(container: HTMLElement, opts: {
   bar.id = 'hud-bar';
   // Phase 1 #4 + F-2b-3: min-height 44px bar.
   // P0 wrap stopgap (gutter_top≈230): min-height + flex-wrap so Exit/LeftHand stay in-viewport.
-  // ⛔ F-4 expiry: when portrait+rotate lands, REMOVE flex-wrap + height:auto (restore fixed
-  // height:44). After rotate gutter_top≈66px; wrap→88px gets max-height-clipped. Step 2
-  // (dual-row slots + side gutter buttons) ships with F-4 — do not horizontal-scroll.
+  // ⛔ F-4′ expiry (必要條件，非謹慎起見): when portrait+rotate lands, REMOVE flex-wrap +
+  // height:auto (restore fixed height:44). QA@2983c67: rotate gutter_top=66.39, bar rect=70
+  // ⇒ 餘裕 −3.61px (not estimate). Step 2 (dual-row slots + side gutter buttons) with F-4.
   // No --hud-bar-height token: P0 height:auto can render 88px; a constant 44 would lie.
   // If a sibling needs positioning later, publish getBoundingClientRect().height (measured).
   const HUD_BAR_HEIGHT_PX = 44;
