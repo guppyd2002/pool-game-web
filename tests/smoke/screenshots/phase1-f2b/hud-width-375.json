@@ -1,0 +1,57 @@
+{
+  "barHeight": "44px",
+  "barClientWidth": 375,
+  "barScrollWidth": 643,
+  "barOverflowX": true,
+  "paddingLeft": "8px",
+  "paddingRight": "8px",
+  "gap": 8,
+  "gapsTotal": 40,
+  "sumChildW": 594.54,
+  "sumChildWPlusGaps": 634.54,
+  "hudBarHeightVar": "44px",
+  "childBoxes": [
+    {
+      "tag": "DIV",
+      "id": "P1",
+      "w": 14.69,
+      "h": 14,
+      "overflowX": false
+    },
+    {
+      "tag": "DIV",
+      "id": "Player 1 balls",
+      "w": 138,
+      "h": 18,
+      "overflowX": false
+    },
+    {
+      "tag": "DIV",
+      "id": "Player 1's t",
+      "w": 0,
+      "h": 14,
+      "overflowX": true
+    },
+    {
+      "tag": "DIV",
+      "id": "Player 2 balls",
+      "w": 138,
+      "h": 18,
+      "overflowX": false
+    },
+    {
+      "tag": "DIV",
+      "id": "P2",
+      "w": 14.69,
+      "h": 14,
+      "overflowX": false
+    },
+    {
+      "tag": "DIV",
+      "id": "⬇ Table⌖◎🤚✕",
+      "w": 289.16,
+      "h": 44,
+      "overflowX": false
+    }
+  ]
+}
