@@ -41,16 +41,22 @@ export function createHudBar(container: HTMLElement, opts: {
   const bar = document.createElement('div');
   bar.id = 'hud-bar';
   // Phase 1 #4 + F-2b-3: 44px bar; publish --hud-bar-height for siblings (F-2b-4).
+  // P0 wrap stopgap (gutter_top≈230): min-height + flex-wrap so Exit/LeftHand stay in-viewport.
+  // ⛔ F-4 expiry: when portrait+rotate lands, REMOVE flex-wrap + height:auto (restore fixed
+  // height:44). After rotate gutter_top≈66px; wrap→88px gets max-height-clipped. Step 2
+  // (dual-row slots + side gutter buttons) ships with F-4 — do not horizontal-scroll.
   const HUD_BAR_HEIGHT_PX = 44;
   bar.style.cssText = [
     'position:absolute', 'top:0', 'left:0', 'right:0',
-    `height:${HUD_BAR_HEIGHT_PX}px`,
+    `min-height:${HUD_BAR_HEIGHT_PX}px`,
+    'height:auto',
     `max-height:max(${HUD_BAR_HEIGHT_PX}px, var(--gutter-top, ${HUD_BAR_HEIGHT_PX}px))`,
     'padding-left:max(8px, env(safe-area-inset-left, 0px))',
     'padding-right:max(8px, env(safe-area-inset-right, 0px))',
     'padding-top:env(safe-area-inset-top, 0px)',
     'background:rgba(0,0,0,0.80)',
-    'display:flex', 'align-items:center',
+    'display:flex', 'flex-wrap:wrap', 'align-items:center',
+    'overflow-x:hidden',
     'z-index:200',
     'font-family:sans-serif', 'font-size:12px', 'color:#fff',
     'gap:8px',

@@ -140,9 +140,13 @@ describe('createHudBar (T07)', () => {
     hud.dispose();
   });
 
-  it('Phase 1 F-2b-3/4: bar height 44 and publishes --hud-bar-height', () => {
+  it('Phase 1 F-2b-3/4: bar min-height 44, wrap stopgap, publishes --hud-bar-height', () => {
     const hud = makeHud();
-    expect(hud.element.style.height).toBe('44px');
+    // P0 wrap stopgap (expires at F-4): min-height:44 + height:auto + flex-wrap.
+    expect(hud.element.style.minHeight).toBe('44px');
+    expect(hud.element.style.height).toBe('auto');
+    expect(hud.element.style.flexWrap).toBe('wrap');
+    expect(hud.element.style.overflowX).toBe('hidden');
     expect(hud.element.style.getPropertyValue('--hud-bar-height').trim()).toBe('44px');
     expect(
       getComputedStyle(document.documentElement).getPropertyValue('--hud-bar-height').trim() ||
