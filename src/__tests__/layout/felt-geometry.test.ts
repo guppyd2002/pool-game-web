@@ -21,14 +21,14 @@ describe('computeFeltScreenRect', () => {
     expect(LAYOUT_ORTHO_MARGIN).toBe(ORTHO_MARGIN);
     expect(TABLE_W_M).toBe(2.54);
     expect(TABLE_H_M).toBe(1.27);
-    expect(ORTHO_MARGIN).toBe(1.1365);
+    expect(ORTHO_MARGIN).toBe(1.28);
   });
 
-  it('CEO 1140×370: height util ≈88% at ORTHO_MARGIN 1.1365', () => {
+  it('CEO 1140×370: height util ≈78.1% at ORTHO_MARGIN 1.28 (design §0.1)', () => {
     const r = computeFeltScreenRect(1140, 370);
-    expect(r.heightFrac).toBeCloseTo(1 / 1.1365, 5);
-    expect(r.widthFrac).toBeCloseTo(2.0 / (1.1365 * (1140 / 370)), 4);
-    expect(r.gutterTop).toBeCloseTo(370 * (1 - 1 / 1.1365) / 2, 1);
+    expect(r.heightFrac).toBeCloseTo(1 / 1.28, 5);
+    expect(r.widthFrac).toBeCloseTo(2.0 / (1.28 * (1140 / 370)), 4);
+    expect(r.gutterTop).toBeCloseTo(370 * (1 - 1 / 1.28) / 2, 1);
     expect(r.gutterLeft + r.width + r.gutterRight).toBeCloseTo(1140, 5);
     expect(r.gutterTop + r.height + r.gutterBottom).toBeCloseTo(370, 5);
     // C4: felt stays inside view
@@ -41,7 +41,7 @@ describe('computeFeltScreenRect', () => {
   it('square-ish 800×400 (aspect 2.0): felt fills at tableAspect', () => {
     const r = computeFeltScreenRect(800, 400);
     expect(r.aspect).toBeCloseTo(2, 5);
-    expect(r.heightFrac).toBeCloseTo(1 / 1.1365, 5);
-    expect(r.widthFrac).toBeCloseTo(1 / 1.1365, 5);
+    expect(r.heightFrac).toBeCloseTo(1 / 1.28, 5);
+    expect(r.widthFrac).toBeCloseTo(1 / 1.28, 5);
   });
 });
