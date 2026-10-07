@@ -89,7 +89,6 @@ import {
   isMusicOn,
 } from './renderer/settings-panel';
 import { installSafeAreaCssVars } from './renderer/safe-area';
-import { createPwaInstallTip } from './renderer/pwa-install-tip';
 import { installFeltCssVars } from './layout/felt-css-vars';
 import * as THREE from 'three';
 
@@ -100,8 +99,7 @@ const container = document.getElementById('app')!;
 installSafeAreaCssVars();
 // Phase 1 #4: runtime --felt-* / --gutter-* from computeFeltScreenRect (no hardcoded px).
 const feltCss = installFeltCssVars(container);
-// Phase 1 / 0-G: one-shot Add-to-Home-Screen tip (skipped in standalone).
-createPwaInstallTip(document.body);
+// Phase 1 A′ (decision 83046f66): game page has NO PWA tip / no standalone invite.
 const scene = await createScene(container);
 // Recompute after canvas mounts (size may change).
 feltCss.update();
