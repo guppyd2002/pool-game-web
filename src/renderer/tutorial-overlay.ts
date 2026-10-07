@@ -63,6 +63,10 @@ export function createTutorialOverlay(container: HTMLElement): TutorialOverlay {
     'background:none', 'border:none', 'color:rgba(255,255,255,0.6)',
     'font-size:14px', 'cursor:pointer', 'padding:0 4px',
     'line-height:1', 'pointer-events:auto',
+    // Phase 1 F-2b-2 / T-rule: match pwa-install-tip dismiss hit area.
+    'min-width:44px', 'min-height:44px',
+    'display:inline-flex', 'align-items:center', 'justify-content:center',
+    'box-sizing:border-box',
   ].join(';');
   closeBtn.setAttribute('aria-label', 'Dismiss tutorial');
   pill.appendChild(closeBtn);
