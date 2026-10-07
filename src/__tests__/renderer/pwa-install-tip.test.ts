@@ -25,7 +25,7 @@ describe('Phase 1 0-G PWA', () => {
       orientation?: string;
     };
     expect(m.display).toBe('standalone');
-    // D-1 undecided: orientation must stay unset
+    // D-1 已定直屏但 orientation 仍須不設（§F.3 自適應；設 portrait＝manifest 版 B-11）
     expect(m.orientation).toBeUndefined();
     expect(m.icons.some((i) => i.sizes === '192x192')).toBe(true);
     expect(m.icons.some((i) => i.sizes === '512x512')).toBe(true);
