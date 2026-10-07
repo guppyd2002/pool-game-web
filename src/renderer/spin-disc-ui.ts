@@ -12,9 +12,13 @@
  */
 
 import type { SpinDisc } from '../game/spin-disc';
-
-/** Visual radius of the disc in CSS pixels. */
-const DISC_RADIUS = 65;
+import {
+  SPIN_BTN_NATURAL,
+  SPIN_DISC_RADIUS_NATURAL,
+  readCssPxVar,
+  spinBtnSizeFromGutter,
+  spinDiscRadiusFromGutter,
+} from '../layout/gutter-control-size';
 
 /** Spin dot half-size. */
 const DOT_R = 9;
@@ -40,8 +44,8 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
 
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Phase 1 #4: left gutter via runtime --gutter-left (no hardcoded 12/281 px).
-  // CSS class spin-disc-overlay used by left-hand-mode override in index.html.
+  // Phase 1 #4/#F-2b-5: position in gutter; disc/btn size from --gutter-* on children.
+  // Do NOT max-width/overflow-clamp the wrapper (clips T-target).
   const overlay = document.createElement('div');
   overlay.className = 'spin-disc-overlay';
   overlay.style.cssText = [
@@ -49,7 +53,6 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'left:max(4px, env(safe-area-inset-left, 0px))',
     'right:auto',
     'top:50%', 'transform:translateY(-50%)',
-    'max-width:calc(var(--gutter-left, 80px) - 8px)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:8px',
     'user-select:none',
@@ -67,12 +70,15 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'text-shadow:0 1px 3px rgba(0,0,0,0.9)',
   ].join(';');
 
-  // Collapsed button — 68×68dp circle showing cueball icon
+  /** Runtime disc radius — starts natural, then gutter-clamped. */
+  let discR = SPIN_DISC_RADIUS_NATURAL;
+
+  // Collapsed button — size from gutter (natural 68).
   const btn = document.createElement('button');
   btn.title = 'Spin / English';
   btn.setAttribute('aria-label', 'Cue ball spin');
   btn.style.cssText = [
-    'width:68px', 'height:68px', 'border-radius:50%',
+    `width:${SPIN_BTN_NATURAL}px`, `height:${SPIN_BTN_NATURAL}px`, 'border-radius:50%',
     'background:rgba(28,36,48,0.92)',
     'border:2px solid rgba(255,255,255,0.35)',
     'box-shadow:0 2px 12px rgba(0,0,0,0.7)',
@@ -80,6 +86,7 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'cursor:pointer', 'touch-action:none',
     'display:flex', 'align-items:center', 'justify-content:center',
     'transition:border-color 0.15s',
+    'position:relative',
   ].join(';');
   btn.innerHTML = '⚪';
 
@@ -92,14 +99,12 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'transform:translate(14px,-14px)',
     'pointer-events:none',
   ].join(';');
-  btn.style.position = 'relative';
   btn.appendChild(btnDot);
 
-  // Expanded disc panel — 130×130dp, shown on open
-  const D = DISC_RADIUS * 2;
+  // Expanded disc panel — diameter = 2*discR from gutter.
   const panel = document.createElement('div');
   panel.style.cssText = [
-    `width:${D}px`, `height:${D}px`, 'border-radius:50%',
+    `width:${discR * 2}px`, `height:${discR * 2}px`, 'border-radius:50%',
     'border:2px solid rgba(255,255,255,0.6)',
     'background:rgba(28,36,48,0.9)',
     'box-shadow:0 4px 20px rgba(0,0,0,0.8)',
@@ -108,6 +113,22 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
     'transform:scale(0.6)', 'opacity:0',
     'transition:transform 0.15s ease-out, opacity 0.15s ease-out',
   ].join(';');
+
+  function applyGutterSize(): void {
+    const leftHand = container.classList.contains('left-hand-mode');
+    const gutter = readCssPxVar(
+      container,
+      leftHand ? '--gutter-right' : '--gutter-left',
+      SPIN_DISC_RADIUS_NATURAL * 2 + 8,
+    );
+    discR = spinDiscRadiusFromGutter(gutter);
+    const btnEdge = spinBtnSizeFromGutter(gutter);
+    panel.style.width = `${discR * 2}px`;
+    panel.style.height = `${discR * 2}px`;
+    btn.style.width = `${btnEdge}px`;
+    btn.style.height = `${btnEdge}px`;
+    syncDot();
+  }
 
   const hline = document.createElement('div');
   hline.style.cssText = `position:absolute;top:50%;left:10%;width:80%;height:1px;background:rgba(255,255,255,0.2);transform:translateY(-50%);pointer-events:none;`;
@@ -154,19 +175,25 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
   overlay.appendChild(btn);
   container.appendChild(overlay);
 
+  applyGutterSize();
+  window.addEventListener('resize', applyGutterSize);
+  window.visualViewport?.addEventListener('resize', applyGutterSize);
+  const classMo = new MutationObserver(() => applyGutterSize());
+  classMo.observe(container, { attributes: true, attributeFilter: ['class'] });
+
   // ─── Dot position sync ──────────────────────────────────────────────────────
 
   function syncDot(): void {
-    const cx = DISC_RADIUS + disc.spinX * DISC_RADIUS * VISUAL_SCALE;
-    const cy = DISC_RADIUS - disc.spinY * DISC_RADIUS * VISUAL_SCALE;
+    const cx = discR + disc.spinX * discR * VISUAL_SCALE;
+    const cy = discR - disc.spinY * discR * VISUAL_SCALE;
     dot.style.left = `${cx}px`;
     dot.style.top = `${cy}px`;
     // CUE-007 need-point assist marker
     const need = disc.getNeedPoint();
     if (need) {
       needDot.style.display = 'block';
-      needDot.style.left = `${DISC_RADIUS + need.x * DISC_RADIUS * VISUAL_SCALE}px`;
-      needDot.style.top = `${DISC_RADIUS - need.y * DISC_RADIUS * VISUAL_SCALE}px`;
+      needDot.style.left = `${discR + need.x * discR * VISUAL_SCALE}px`;
+      needDot.style.top = `${discR - need.y * discR * VISUAL_SCALE}px`;
     } else {
       needDot.style.display = 'none';
     }
@@ -234,10 +261,12 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
 
   function toNormalized(clientX: number, clientY: number): { nx: number; ny: number } {
     const rect = panel.getBoundingClientRect();
-    const cx = rect.left + DISC_RADIUS, cy = rect.top + DISC_RADIUS;
+    const r = Math.max(1, rect.width / 2);
+    const cx = rect.left + r;
+    const cy = rect.top + r;
     return {
-      nx:  (clientX - cx) / DISC_RADIUS * KOEFICIENT,
-      ny: -(clientY - cy) / DISC_RADIUS * KOEFICIENT,
+      nx: (clientX - cx) / r * KOEFICIENT,
+      ny: -(clientY - cy) / r * KOEFICIENT,
     };
   }
 
@@ -293,6 +322,9 @@ export function createSpinDiscUI(container: HTMLElement, disc: SpinDisc): SpinDi
 
     dispose(): void {
       _cancelAutoClose();
+      window.removeEventListener('resize', applyGutterSize);
+      window.visualViewport?.removeEventListener('resize', applyGutterSize);
+      classMo.disconnect();
       container.removeChild(overlay);
     },
   };

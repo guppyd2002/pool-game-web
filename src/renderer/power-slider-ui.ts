@@ -12,6 +12,11 @@
  */
 
 import type { ShotSlider } from '../game/shot-slider';
+import {
+  POWER_TRACK_W_NATURAL,
+  powerTrackWidthFromGutter,
+  readCssPxVar,
+} from '../layout/gutter-control-size';
 
 export interface PowerSliderUI {
   /** Sync bar fill to current force fraction (e.g. from external update). */
@@ -26,35 +31,25 @@ export interface PowerSliderUI {
 /** Height of the draggable track in CSS pixels. Landscape spec: 240dp. */
 const TRACK_H = 240;
 
-/**
- * Width of the draggable track in CSS pixels.
- * 80dp is the minimum recommended touch-target width (Material / HIG guidelines).
- * Previous 48dp was too narrow for reliable single-finger interaction on mobile.
- */
-const TRACK_W = 80;
-
 export function createPowerSliderUI(
   container: HTMLElement,
   slider: ShotSlider,
 ): PowerSliderUI {
   // ─── DOM structure ──────────────────────────────────────────────────────────
 
-  // Outer wrapper — Phase 1 #4: right gutter via runtime --gutter-right / --felt-*.
-  // CSS class used by left-hand-mode override in index.html.
+  // Outer wrapper — Phase 1 #4/#F-2b-5: position in gutter; size lives on the track child.
+  // Do NOT use max-width/overflow on the wrapper as a layout clamp (clips T-target).
   const overlay = document.createElement('div');
   overlay.className = 'power-slider-overlay';
   overlay.setAttribute('aria-label', 'Shot power');
   overlay.style.cssText = [
     'position:absolute',
-    // Anchor just outside felt right edge; clamp into gutter (+ safe-area).
     'left:calc(var(--felt-left, 0px) + var(--felt-width, 100%) + 4px)',
     'right:auto',
     'top:50%', 'transform:translateY(-50%)',
-    'max-width:calc(var(--gutter-right, 80px) - 8px)',
     'z-index:100',
     'display:flex', 'flex-direction:column', 'align-items:center', 'gap:4px',
     'user-select:none',
-    // Idle dim kept until #5 (after gutter settle); still in gutter so less critical.
     'opacity:0.28',
     'transition:opacity 0.15s ease-out',
   ].join(';');
@@ -69,15 +64,32 @@ export function createPowerSliderUI(
     'text-shadow:0 1px 3px rgba(0,0,0,0.9)',
   ].join(';');
 
-  // Track container — semi-transparent pill overlaid on table edge.
+  // Track — width from --gutter-right (F-2b-5); overflow:hidden only for fill paint.
   const track = document.createElement('div');
   track.style.cssText = [
-    `width:${TRACK_W}px`, `height:${TRACK_H}px`, 'border-radius:18px',
+    `width:${POWER_TRACK_W_NATURAL}px`, `height:${TRACK_H}px`, 'border-radius:18px',
     'background:rgba(0,0,0,0.50)', 'border:2px solid rgba(255,255,255,0.55)',
     'box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 4px 16px rgba(0,0,0,0.6)',
     'position:relative', 'overflow:hidden',
     'touch-action:none', 'cursor:ns-resize',
   ].join(';');
+
+  function applyGutterWidth(): void {
+    // Left-hand mode swaps to left gutter via CSS class on #app.
+    const leftHand = container.classList.contains('left-hand-mode');
+    const gutter = readCssPxVar(
+      container,
+      leftHand ? '--gutter-left' : '--gutter-right',
+      POWER_TRACK_W_NATURAL + 8,
+    );
+    const w = powerTrackWidthFromGutter(gutter);
+    track.style.width = `${w}px`;
+  }
+  applyGutterWidth();
+  window.addEventListener('resize', applyGutterWidth);
+  window.visualViewport?.addEventListener('resize', applyGutterWidth);
+  const classMo = new MutationObserver(() => applyGutterWidth());
+  classMo.observe(container, { attributes: true, attributeFilter: ['class'] });
 
   // F-②: Fill bar — top-anchored (cue-pull metaphor: drag DOWN = more power shown from top).
   // Thumb shows current drag position; fill below thumb shows accumulated pullback.
@@ -207,7 +219,10 @@ export function createPowerSliderUI(
     },
 
     dispose(): void {
-      container.removeChild(overlay);
+      window.removeEventListener('resize', applyGutterWidth);
+      window.visualViewport?.removeEventListener('resize', applyGutterWidth);
+      classMo.disconnect();
+      overlay.remove();
     },
   };
 }
